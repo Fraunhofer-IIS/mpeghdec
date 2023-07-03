@@ -2,7 +2,7 @@
 
 The Fraunhofer MPEG-H decoder (**mpeghdec**) is a C/C++ implementation of the MPEG-H Audio standard as defined in [ISO/IEC 23008-3:2022](https://www.iso.org/standard/83525.html). MPEG-H Audio is the Next Generation Audio (NGA) codec for personalized and immersive sound. Please visit [www.mpegh.com](https://mpegh.com) to learn more about the MPEG-H Audio.
 
-For documentation and usage, please have a look at the [Wiki](https://github.com/Fraunhofer-IIS/mpeghdec/-/wikis/home).
+For documentation and usage, please have a look at the [Wiki](https://github.com/Fraunhofer-IIS/mpeghdec/wiki/home).
 
 ## Supported features
 
@@ -120,7 +120,7 @@ The following project-specific CMake parameters are available:
 
 ### How to build using CMake
 
-Find below the basic instructions to build the project or visit the ["Wiki Build"](https://github.com/Fraunhofer-IIS/mpeghdec/-/wikis/Build) page(s) to get further information (additional build parameters and platform specific build instructions).
+Find below the basic instructions to build the project or visit the ["Wiki Build"](https://github.com/Fraunhofer-IIS/mpeghdec/wiki/Build) page(s) to get further information (additional build parameters and platform specific build instructions).
 
 1. Clone the project and make a build folder.
    ```
@@ -140,8 +140,8 @@ Find below the basic instructions to build the project or visit the ["Wiki Build
 
 The **mpeghdec** provides following command-line based example programs:
 
-- [MPEG-H decoder](https://github.com/Fraunhofer-IIS/mpeghdec/-/wikis/Demos/mpeghDecoder)
-- [MPEG-H UI manager](https://github.com/Fraunhofer-IIS/mpeghdec/-/wikis/Demos/mpeghUiManager)
+- [MPEG-H decoder](https://github.com/Fraunhofer-IIS/mpeghdec/wiki/mpeghDecoder)
+- [MPEG-H UI manager](https://github.com/Fraunhofer-IIS/mpeghdec/wiki/mpeghUiManager)
 
 ## Contributing
 
