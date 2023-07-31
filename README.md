@@ -88,15 +88,6 @@ For documentation and usage, please have a look at the [Wiki](https://github.com
         apple-clang 12.0.5
     </td>
   </tr>
-  <tr>
-    <td><strong>Browser<br />(emscripten)</strong></td>
-    <td>
-        WASM
-    </td>
-    <td>
-        emcc 3.1.33
-    </td>
-  </tr>
 </table>
 
 Support for further platforms and architectures can be requested directly from [Fraunhofer IIS](https://www.iis.fraunhofer.de/en/ff/amm/broadcast-streaming/mpegh.html).
