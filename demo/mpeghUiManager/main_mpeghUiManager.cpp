@@ -98,6 +98,7 @@ amm-info@iis.fraunhofer.de
 #include "mpeghUIManager.h"
 #include "interactivityScriptParser.h"
 #include "cmdl_parser.h"
+#include "genericStds.h"
 
 using namespace mmt::isobmff;
 
@@ -111,14 +112,8 @@ using namespace mmt::isobmff;
 // Size of the XML buffer in number of chars
 #define XML_BUFFER_SIZE 1024
 
-void cmdlHelp(const char* progname) {
-  std::cout << std::endl
-            << progname
-            << " -if <input file> -of <output file> [-script <interactivity "
-               "script>][-xmlSceneState <XML output>][-persistFile <filename>]"
-            << std::endl
-            << std::endl;
-}
+/*************************** function declarations ***************************/
+static void cmdlHelp(const char* progname);
 
 class CProcessor {
  private:
@@ -304,14 +299,14 @@ class CProcessor {
           m_writer->trackWriter<CMpeghTrackWriter>(mpeghConfig);
 
       std::cout << std::endl;
-      std::cout << "Sample Info:" << std::endl;
       std::cout << "########################################" << std::endl;
-      std::cout << "Max Sample Size        : " << trackInfo.maxSampleSize << " Bytes" << std::endl;
-      std::cout << "Total number of samples: " << trackInfo.sampleCount << std::endl;
+      std::cout << "ISOBMFF/MP4 Samples Info:" << std::endl;
+      std::cout << "Max ISOBMFF/MP4 Sample Size        : " << trackInfo.maxSampleSize << " Bytes"
+                << std::endl;
+      std::cout << "Total number of ISOBMFF/MP4 Samples: " << trackInfo.sampleCount << std::endl;
       std::cout << std::endl;
-
-      std::cout << "Reading all samples of this track" << std::endl;
       std::cout << "########################################" << std::endl;
+      std::cout << "Reading all ISOBMFF/MP4 Samples of this track" << std::endl;
 
       // Preallocate the sample with max MPEG-H frame size to avoid reallocation of memory.
       // Sample can be re-used for each nextSample call.
@@ -327,7 +322,8 @@ class CProcessor {
         uint32_t mhasLength = sample.rawData.size();
         MPEGH_UI_ERROR feedErr = mpegh_UI_FeedMHAS(m_uiManager, sample.rawData.data(), mhasLength);
         if (feedErr != MPEGH_UI_OK) {
-          std::cout << "Warning: Unable to feed MHAS for frame " << sampleCounter << std::endl;
+          std::cout << "Warning: Unable to feed MHAS for ISOBMFF/MP4 Sample " << sampleCounter
+                    << std::endl;
         }
 
         // process XML actions
@@ -337,8 +333,8 @@ class CProcessor {
           MPEGH_UI_ERROR err =
               mpegh_UI_ApplyXmlAction(m_uiManager, c.c_str(), c.length(), &flagsOut);
           if (err != MPEGH_UI_OK) {
-            std::cout << "Warning: Failed to apply XML action for frame " << sampleCounter
-                      << " with command:" << std::endl;
+            std::cout << "Warning: Failed to apply XML action for ISOBMFF/MP4 Sample "
+                      << sampleCounter << " with command:" << std::endl;
             std::cout << c << std::endl;
           }
         }
@@ -351,7 +347,8 @@ class CProcessor {
                                                    MAX_MPEGH_FRAME_SIZE, &newMhasLength);
           if (err != MPEGH_UI_OK) {
             sample.rawData.resize(mhasLength);
-            std::cout << "Warning: Failed to update MHAS for frame " << sampleCounter << std::endl;
+            std::cout << "Warning: Failed to update MHAS for ISOBMFF/MP4 Sample " << sampleCounter
+                      << std::endl;
           } else {
             sample.rawData.resize(newMhasLength);
           }
@@ -370,8 +367,8 @@ class CProcessor {
             MPEGH_UI_ERROR err = mpegh_UI_GetXmlSceneState(m_uiManager, xmlSceneStateBuf.data(),
                                                            XML_BUFFER_SIZE, 0, &flagsOut);
             if (err != MPEGH_UI_OK) {
-              std::cout << "Warning: Failed to get XML scene state for frame " << sampleCounter
-                        << std::endl;
+              std::cout << "Warning: Failed to get XML scene state for ISOBMFF/MP4 Sample "
+                        << sampleCounter << std::endl;
               break;
             }
 
@@ -386,7 +383,7 @@ class CProcessor {
         }
 
         sampleCounter++;
-        std::cout << "Samples processed: " << sampleCounter << "\r" << std::flush;
+        std::cout << "ISOBMFF/MP4 Samples processed: " << sampleCounter << "\r" << std::flush;
 
         mpeghTrackReader->nextSample(sample);
       }
@@ -409,33 +406,50 @@ int main(int argc, char** argv) {
   char persistFilename[CMDL_MAX_STRLEN] = "";
   uint32_t helpMode = 0;
 
-  // Parse command line
+  // Check if helpMode was set.
   IIS_ScanCmdl(argc, argv, "(-h %1)", &helpMode);
   if (helpMode) {
     cmdlHelp(argv[0]);
-    exit(0);
+    return FDK_EXITCODE_OK;
   }
-  if (IIS_ScanCmdl(argc, argv, "(-if %s) (-of %s)", inputFilename, outputFilename) < 2) {
+
+  // Check if we got the mandatory input and output parameters.
+  if (IIS_ScanCmdl(argc, argv, "-if %s -of %s", inputFilename, outputFilename) < 2) {
     cmdlHelp(argv[0]);
-    exit(-1);
+    return FDK_EXITCODE_USAGE;
   }
+
+  // Parse optional command line parameters.
   IIS_ScanCmdl(argc, argv, "(-script %s)", scriptFilename);
   IIS_ScanCmdl(argc, argv, "(-xmlSceneState %s)", xmlSceneStateFilename);
   IIS_ScanCmdl(argc, argv, "(-persistFile %s)", persistFilename);
 
+  std::cout << "Input file:  " << inputFilename << std::endl;
+  std::cout << "Output file: " << outputFilename << std::endl;
+
+  // Initialize and process.
   try {
+    // initialize
     CProcessor processor(inputFilename, outputFilename, scriptFilename, persistFilename,
                          xmlSceneStateFilename);
+    // process
     processor.process();
   } catch (const std::exception& e) {
     std::cout << std::endl << "Error: " << e.what() << std::endl << std::endl;
-    return 1;
+    return FDK_EXITCODE_SOFTWARE;
   } catch (...) {
     std::cout << std::endl
               << "Error: An unknown error happened. The program will exit now." << std::endl
               << std::endl;
-    return 1;
+    return FDK_EXITCODE_UNAVAILABLE;
   }
+  return FDK_EXITCODE_OK;
+}
 
-  return 0;
+static void cmdlHelp(const char* progname) {
+  std::cout << std::endl
+            << "Usage: " << progname
+            << " -if <input file> -of <output file> [-script <interactivity "
+               "script>][-xmlSceneState <XML output>][-persistFile <filename>]"
+            << std::endl;
 }

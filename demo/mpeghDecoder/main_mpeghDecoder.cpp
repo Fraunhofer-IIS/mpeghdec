@@ -259,29 +259,29 @@ class CProcessor {
       }
 
       std::cout << std::endl;
-      std::cout << "Sample Info:" << std::endl;
       std::cout << "########################################" << std::endl;
-      std::cout << "Max Sample Size        : " << trackInfo.maxSampleSize << " Bytes" << std::endl;
-      std::cout << "Total number of samples: " << trackInfo.sampleCount << std::endl;
+      std::cout << "ISOBMFF/MP4 Samples Info:" << std::endl;
+      std::cout << "Max ISOBMFF/MP4 Sample Size         : " << trackInfo.maxSampleSize << " Bytes"
+                << std::endl;
+      std::cout << "Total number of ISOBMFF/MP4 Samples : " << trackInfo.sampleCount << std::endl;
       std::cout << std::endl;
-
-      std::cout << "Reading all samples of this track" << std::endl;
       std::cout << "########################################" << std::endl;
+      std::cout << "Reading all ISOBMFF/MP4 Samples of this track" << std::endl;
 
       // check if enough samples are available to start at requested sample
       if (startSample >= 0 && static_cast<uint32_t>(startSample) >= trackInfo.sampleCount) {
         throw std::runtime_error(
-            "[" + std::to_string(sampleCounter) + "] Error: Too few samples (" +
-            std::to_string(trackInfo.sampleCount) + ") in track for starting at sample " +
-            std::to_string(startSample));
+            "[" + std::to_string(sampleCounter) + "] Error: Too few ISOBMFF/MP4 Samples (" +
+            std::to_string(trackInfo.sampleCount) +
+            ") in track for starting at ISOBMFF/MP4 sample " + std::to_string(startSample));
       }
 
       // check if enough samples are available to seek to requested sample
       if (seekToSample >= 0 && static_cast<uint32_t>(seekToSample) >= trackInfo.sampleCount) {
         throw std::runtime_error(
-            "[" + std::to_string(sampleCounter) + "] Error: Too few samples (" +
-            std::to_string(trackInfo.sampleCount) + ") in track for seeking to sample " +
-            std::to_string(seekToSample));
+            "[" + std::to_string(sampleCounter) + "] Error: Too few ISOBMFF/MP4 Samples (" +
+            std::to_string(trackInfo.sampleCount) +
+            ") in track for seeking to ISOBMFF/MP4 sample " + std::to_string(seekToSample));
       }
 
       // Preallocate the sample with max sample size to avoid reallocation of memory.
@@ -311,11 +311,11 @@ class CProcessor {
         }
 
         sampleCounter++;
-        std::cout << "Samples processed: " << sampleCounter << "\r" << std::flush;
+        std::cout << "ISOBMFF/MP4 Samples processed: " << sampleCounter << "\r" << std::flush;
 
         if (!seekPerformed && sampleCounter == static_cast<uint32_t>(seekFromSample)) {
-          std::cout << "Performing seek from sample " << seekFromSample << " to sample "
-                    << seekToSample << std::endl;
+          std::cout << "Performing seek from ISOBMFF/MP4 Sample " << seekFromSample
+                    << " to ISOBMFF/MP4 Sample " << seekToSample << std::endl;
           err = mpeghdecoder_flush(m_decoder);
           if (err != MPEGH_DEC_OK) {
             throw std::runtime_error("[" + std::to_string(sampleCounter) +
@@ -409,13 +409,15 @@ class CProcessor {
       }
 
       mpeghTrackAlreadyProcessed = true;
-      std::cout << std::endl << "Written audio frames: " << frameCounter << std::endl;
+      std::cout << std::endl << "Written MPEG-H audio frames: " << frameCounter << std::endl;
     }
   }
 };
 
 int main(int argc, char* argv[]) {
-  // Parse command line arguments.
+  // Configure mmtisobmff logging to your liking (logging to file, system, console or disable)
+  disableLogging();
+
   uint32_t helpMode = 0;
   int32_t stopSample = std::numeric_limits<int32_t>::max();  // number of last sample which output
                                                              // is written to output file
@@ -426,31 +428,22 @@ int main(int argc, char* argv[]) {
   char inputFilename[CMDL_MAX_STRLEN] = {0};  /*!< Name of input bitstream file */
   char outputFilename[CMDL_MAX_STRLEN] = {0}; /*!< Name of audio output file */
 
-  // Configure mmtisobmff logging to your liking (logging to file, system, console or disable)
-  disableLogging();
-
-  IIS_ScanCmdl(argc, argv, "(-of %s) (-tl %d) (-y %d) (-z %d) (-sf %d) (-st %d) (-h %1)",
-               outputFilename, &cicpSetup, &startSample, &stopSample, &seekFromSample,
-               &seekToSample, &helpMode);
-
   // Check if helpMode was set.
+  IIS_ScanCmdl(argc, argv, "(-h %1)", &helpMode);
   if (helpMode) {
     cmdlHelp(argv[0]);
     return FDK_EXITCODE_OK;
   }
 
-  // Check if no arguments were given.
-  if (argc == 0 || argc == 1) {
+  // Check if we got the mandatory input and output parameters.
+  if (IIS_ScanCmdl(argc, argv, "-if %s -of %s", inputFilename, outputFilename) < 2) {
     cmdlHelp(argv[0]);
     return FDK_EXITCODE_USAGE;
   }
 
-  uint32_t i = IIS_ScanCmdl(argc, argv, "-if %s", inputFilename);
-  // Check if we got the mandatory input and output parameters.
-  if (i < 1) {
-    cmdlHelp(argv[0]);
-    return FDK_EXITCODE_USAGE;
-  }
+  // Parse optional command line parameters,
+  IIS_ScanCmdl(argc, argv, "(-tl %d) (-y %d) (-z %d) (-sf %d) (-st %d)", &cicpSetup, &startSample,
+               &stopSample, &seekFromSample, &seekToSample);
 
   // Check if from and to sample for seeking are defined
   if ((seekFromSample != -1 && seekToSample == -1) ||
@@ -462,7 +455,7 @@ int main(int argc, char* argv[]) {
   std::cout << "Input file:  " << inputFilename << std::endl;
   std::cout << "Output file: " << outputFilename << std::endl;
 
-  // initialize and configure
+  // Initialize, configure and process.
   try {
     // initialize
     CProcessor processor(inputFilename, outputFilename, cicpSetup);
@@ -471,18 +464,20 @@ int main(int argc, char* argv[]) {
     // process
     processor.process(startSample, stopSample, seekFromSample, seekToSample);
   } catch (const std::exception& e) {
-    std::cout << "std::runtime_error caught: " << e.what() << std::endl;
+    std::cout << std::endl << "Error: " << e.what() << std::endl << std::endl;
     return FDK_EXITCODE_SOFTWARE;
   } catch (...) {
-    std::cout << "Unknown error occured!" << std::endl;
+    std::cout << std::endl
+              << "Error: An unknown error happened. The program will exit now." << std::endl
+              << std::endl;
     return FDK_EXITCODE_UNAVAILABLE;
   }
-
   return FDK_EXITCODE_OK;
 }
 
 static void cmdlHelp(const char* progname) {
-  std::cout << "usage: " << progname
+  std::cout << std::endl
+            << "Usage: " << progname
             << " [options] -if infile -of outfile\n"
                "       options are:"
             << std::endl;
@@ -490,26 +485,28 @@ static void cmdlHelp(const char* progname) {
   for (uint32_t i = 0; i < (uint32_t)(sizeof(paramList) / sizeof(PARAMETER_ASSIGNMENT_TAB)); i++) {
     std::cout << "       " << paramList[i].swText << "\t" << paramList[i].desc << std::endl;
   }
-  std::cout << "       -y \tstart decoding at the provided sample number\n"
-               "          \t  NOTE: The decoding will start at the nearest sync sample!\n"
-               "       -z \tstop decoding at the provided sample number\n"
-               "       -sf\tseek in the bitstream from the provided sample number to the \n"
-               "          \t  sample number provided with '-st'\n"
-               "          \t  NOTE: '-st' must be set!\n"
-               "       -st\tseek in the bitstream from the sample number provided with '-sf'\n"
-               "          \t  to the provided sample number\n"
-               "          \t  NOTE: The decoding will resume at the nearest sync sample!\n"
-               "          \t  NOTE: '-sf' must be set!\n"
-               "\n"
-               "         \tSeeking example:\n"
-               "         \t  '"
-            << progname
-            << " -if in.mp4 -of out.wav -sf 50 -st 100'\n"
-               "         \t  will start decoding the input file from its first sample until sample"
-               " 50 is\n"
-               "         \t  reached. Afterwards it will seek to the nearest sync sample around"
-               " sample 100\n"
-               "         \t  and resume decoding until the end of the input file is reached.\n"
-               "       -h\tShow this help"
-            << std::endl;
+  std::cout
+      << "       -y \tStart decoding at the provided ISOBMFF/MP4 sample number\n"
+         "          \t  NOTE: The decoding will start at the nearest ISOBMFF/MP4 sync sample!\n"
+         "       -z \tStop decoding at the provided ISOBMFF/MP4 sample number\n"
+         "       -sf\tSeek in the bitstream from the provided ISOBMFF/MP4 sample number to the \n"
+         "          \t  ISOBMFF/MP4 sample number provided with '-st'\n"
+         "          \t  NOTE: '-st' must be set!\n"
+         "       -st\tSeek in the bitstream from the ISOBMFF/MP4 sample number provided with "
+         "'-sf'\n"
+         "          \t  to the provided ISOBMFF/MP4 sample number\n"
+         "          \t  NOTE: The decoding will resume at the nearest ISOBMFF/MP4 sync sample!\n"
+         "          \t  NOTE: '-sf' must be set!\n"
+         "\n"
+         "         \tSeeking example:\n"
+         "         \t  '"
+      << progname
+      << " -if in.mp4 -of out.wav -sf 50 -st 100'\n"
+         "         \t  will start decoding the input file from its first ISOBMFF/MP4 sample until\n"
+         "         \t  ISOBMFF/MP4 sample 50 is reached.\n"
+         "         \t  Afterwards it will seek to the nearest ISOBMFF/MP4 sync sample around\n"
+         "         \t  ISOBMFF/MP4 sample 100 and resume decoding until the end of the input file\n"
+         "         \t  is reached.\n"
+         "       -h\tShow this help"
+      << std::endl;
 }
