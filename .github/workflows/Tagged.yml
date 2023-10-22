@@ -1,0 +1,48 @@
+name: Tagged build
+
+on:
+  push:
+    tags:
+      - 'r*.*.*'
+    paths-ignore:
+      - '.github/workflows/Untagged.yaml'
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  Win64:
+    runs-on: windows-2019
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Get current date
+      run: echo "CurrentDate=$(date +'%Y-%m-%d')" >> $env:GITHUB_ENV
+
+    - name: Get tag
+      run: echo "CommitTag=$(git describe --tags --abbrev=0 --match *.*.*)" >> $env:GITHUB_ENV
+
+    - name: Configure CMake
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+
+    - name: Release folder
+      run: mkdir "Release"
+
+    - name: Compress artifacts
+      uses: vimtor/action-zip@v1.1
+      with:
+        files: 'build/bin/Release/'
+        dest: "Release/${{env.CurrentDate}}_MPEG-H_decoder_software_${{env.CommitTag}}.zip"
+
+    - name: GitHub Release
+      uses: "marvinpinto/action-automatic-releases@latest"
+      with:
+        repo_token: "${{secrets.GITHUB_TOKEN}}"
+        automatic_release_tag: "${{env.CommitTag}}"
+        prerelease: false
+        title: "[${{env.CurrentDate}}] MPEG-H decoder software ${{env.CommitTag}}"
+        files: "Release/*"
