@@ -410,11 +410,10 @@ MPEGH_DECODER_ERROR mpeghdecoder_process(HANDLE_MPEGH_DECODER_CONTEXT hCtx, cons
   while (validBytes != 0) {
     bool concealed = false;
     isDone = false;
-    uint8_t* tmpData = (uint8_t*)inData;
 
     // pass the MHAS frame to the MPEG-H decoder
     AAC_DECODER_ERROR err =
-        aacDecoder_Fill(hCtx->mpeghdec, &tmpData, (uint32_t*)&inLength, &validBytes);
+        aacDecoder_Fill(hCtx->mpeghdec, &inData, (uint32_t*)&inLength, &validBytes);
 
     if (err != AAC_DEC_OK) {
       deque_pop_back(&hCtx->timestampInQueue);  // remove timestamp as it was not

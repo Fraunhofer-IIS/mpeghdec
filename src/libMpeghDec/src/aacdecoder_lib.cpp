@@ -1099,7 +1099,7 @@ bail:
   return aacDec;
 }
 
-LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_Fill(HANDLE_AACDECODER self, UCHAR* pBuffer[],
+LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_Fill(HANDLE_AACDECODER self, const UCHAR* const pBuffer[],
                                                const UINT bufferSize[], UINT* pBytesValid) {
   AAC_DECODER_ERROR errorStatus = AAC_DEC_OK;
 

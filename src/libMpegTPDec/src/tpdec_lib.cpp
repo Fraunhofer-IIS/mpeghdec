@@ -594,7 +594,7 @@ int transportDec_SetAsiParsing(HANDLE_TRANSPORTDEC hTpDec, AUDIO_SCENE_INFO* pAS
   return 0;
 }
 
-TRANSPORTDEC_ERROR transportDec_FillData(const HANDLE_TRANSPORTDEC hTp, UCHAR* pBuffer,
+TRANSPORTDEC_ERROR transportDec_FillData(const HANDLE_TRANSPORTDEC hTp, const UCHAR* pBuffer,
                                          const UINT bufferSize, UINT* pBytesValid,
                                          const INT layer) {
   HANDLE_FDK_BITSTREAM hBs;
@@ -1714,17 +1714,8 @@ bail:
  */
 static TRANSPORTDEC_ERROR transportDec_readStream(HANDLE_TRANSPORTDEC hTp, const UINT layer) {
   TRANSPORTDEC_ERROR error = TRANSPORTDEC_OK;
-  HANDLE_FDK_BITSTREAM hBs = &hTp->bitStream[layer];
-
   INT headerBits;
-  INT bitDistance;
-
-  /* Obtain distance to next synch word */
-  bitDistance = FDKgetValidBits(hBs);
   error = synchronization(hTp, &headerBits);
-  bitDistance -= FDKgetValidBits(hBs);
-
-  FDK_ASSERT(bitDistance >= 0);
 
   hTp->missingAccessUnits = -1;
 

@@ -196,7 +196,9 @@ typedef __uint128_t UINT128;
 #if ((defined(__i686__) || defined(__i586__) || defined(__i386__) || defined(__x86_64__)) || \
      (defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64)))) &&                        \
     !defined(FDK_ASSERT_ENABLE)
+#if !defined(NDEBUG)
 #define FDK_ASSERT_ENABLE
+#endif
 #endif
 
 #if defined(FDK_ASSERT_ENABLE)

@@ -576,7 +576,9 @@ static int inverseDpcmAngleCoding(CMctPtr self, int pair, int bIsShortBlock, int
   CMctWorkPtr work = self->mctWork;
 
   /* split transmitted mct bands into short blocks */
-  if (!bIsShortBlock) FDK_ASSERT(windowsPerFrame == 1);
+  if (!bIsShortBlock) {
+    FDK_ASSERT(windowsPerFrame == 1);
+  }
   mctBandsPerWindow = work->numMctMaskBands[pair] >>
                       ((windowsPerFrame == 1) ? 0 : 3); /* Short: divide by 8, Long: divide by 1 */
 

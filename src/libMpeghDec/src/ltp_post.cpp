@@ -203,7 +203,7 @@ static void ltp_get_zir(FIXP_DBL* zir, int length, FIXP_SGL* synth_ltp, FIXP_SGL
   FIXP_DBL buf[LTP_LPC_ORDER];
   FIXP_SGL alpha, step;
   FIXP_SGL *x0, *x1;
-  FIXP_SGL *y0, *y1;
+  FIXP_SGL* y0;
   FIXP_DBL s, s2;
   const FIXP_SGL *w0, *w1, *v0;
   int i, j, k, L, L2;
@@ -213,7 +213,6 @@ static void ltp_get_zir(FIXP_DBL* zir, int length, FIXP_SGL* synth_ltp, FIXP_SGL
   x0 = &synth_ltp[-pitch_int];
   x1 = x0 - 1;
   y0 = synth;
-  y1 = y0 - 1;
 
   FDK_ASSERT(filtIdx >= 0);
 
@@ -244,7 +243,6 @@ static void ltp_get_zir(FIXP_DBL* zir, int length, FIXP_SGL* synth_ltp, FIXP_SGL
     x0++;
     x1++;
     y0++;
-    y1++;
   }
 
   FDKmemclear(zir, length * sizeof(FIXP_DBL));

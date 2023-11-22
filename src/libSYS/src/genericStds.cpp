@@ -322,7 +322,7 @@ INT FDKfseek(FDKFILE* fp, LONG OFFSET, int WHENCE) {
   return fseek((FILE*)fp, OFFSET, WHENCE);
 }
 INT FDKftell(FDKFILE* fp) {
-  return ftell((FILE*)fp);
+  return (INT)ftell((FILE*)fp);
 }
 #if !defined(FUNCTION_FDKfseek64)
 INT FDKfseek64(FDKFILE* fp, INT64 OFFSET, int WHENCE) {

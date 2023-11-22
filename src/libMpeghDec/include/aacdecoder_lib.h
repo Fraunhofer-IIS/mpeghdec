@@ -1202,7 +1202,7 @@ LINKSPEC_H AAC_DECODER_ERROR aacDecoder_ConfigRaw(HANDLE_AACDECODER self, UCHAR*
  * updated according to the amount of newly copied bytes.
  * \return            Error code.
  */
-LINKSPEC_H AAC_DECODER_ERROR aacDecoder_Fill(HANDLE_AACDECODER self, UCHAR* pBuffer[],
+LINKSPEC_H AAC_DECODER_ERROR aacDecoder_Fill(HANDLE_AACDECODER self, const UCHAR* const pBuffer[],
                                              const UINT bufferSize[], UINT* bytesValid);
 
 #define AACDEC_CONCEAL                                                                    \

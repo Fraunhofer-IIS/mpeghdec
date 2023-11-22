@@ -461,9 +461,8 @@ static TRANSPORTDEC_ERROR UsacMpegHDecoderConfig_Parse(CSAudioSpecificConfig* as
   TRANSPORTDEC_ERROR ErrorStatus = TRANSPORTDEC_OK;
   CSUsacConfig* usc = &asc->m_sc.m_usacConfig;
   int i, numberOfElements;
-  int channelElementIdx = 0; /* index for elements which contain audio channels (sce, cpe, lfe) */
-  int grp = 0;               /* index of current signal group */
-  int cntSignals = 0;        /* count number of signals according to one group */
+  int grp = 0;        /* index of current signal group */
+  int cntSignals = 0; /* count number of signals according to one group */
   int nbits;
   int mpeghMCTElement = -1;
   USAC_EXT_ELEMENT_TYPE lastExtElement =
@@ -534,7 +533,6 @@ static TRANSPORTDEC_ERROR UsacMpegHDecoderConfig_Parse(CSAudioSpecificConfig* as
           /* end of mpegh3daCoreConfig() */
         }
         usc->m_nUsacChannels += 1;
-        channelElementIdx++;
         break;
 
       case ID_USAC_CPE:
@@ -595,7 +593,6 @@ static TRANSPORTDEC_ERROR UsacMpegHDecoderConfig_Parse(CSAudioSpecificConfig* as
             usc->element[i].lpdStereoIndex = FDKreadBit(hBs);
           }
         }
-        channelElementIdx++;
         break;
 
       case ID_USAC_LFE:
@@ -612,7 +609,6 @@ static TRANSPORTDEC_ERROR UsacMpegHDecoderConfig_Parse(CSAudioSpecificConfig* as
         usc->element[i].enhancedNoiseFilling = 0;
         usc->element[i].m_noiseFilling = 0;
         usc->m_nUsacChannels += 1;
-        channelElementIdx++;
         break;
 
       case ID_USAC_EXT:

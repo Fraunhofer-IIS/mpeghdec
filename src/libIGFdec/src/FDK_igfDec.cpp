@@ -2488,8 +2488,12 @@ FIXP_DBL* iisIGFDecLibAccessSourceSpectrum(
   hGrid = &hPrivateStaticData->sGridInfoTab[window_sequence];
 
   FDK_ASSERT(win >= 0);
-  if (window_sequence == IGF_GRID_LONG_WINDOW) FDK_ASSERT(win == 0);
-  if (window_sequence == IGF_GRID_SHORT_WINDOW) FDK_ASSERT(win <= 7);
+  if (window_sequence == IGF_GRID_LONG_WINDOW) {
+    FDK_ASSERT(win == 0);
+  }
+  if (window_sequence == IGF_GRID_SHORT_WINDOW) {
+    FDK_ASSERT(win <= 7);
+  }
 
   if (tileIdx >= hGrid->iIGFNumTile) return NULL;
 

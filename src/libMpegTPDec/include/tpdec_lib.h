@@ -479,7 +479,7 @@ int transportDec_SetAsiParsing(HANDLE_TRANSPORTDEC hTpDec, AUDIO_SCENE_INFO* pAS
  * \param layer       The layer the bitstream belongs to.
  * \return            Error code.
  */
-TRANSPORTDEC_ERROR transportDec_FillData(const HANDLE_TRANSPORTDEC hTp, UCHAR* pBuffer,
+TRANSPORTDEC_ERROR transportDec_FillData(const HANDLE_TRANSPORTDEC hTp, const UCHAR* pBuffer,
                                          const UINT bufferSize, UINT* pBytesValid, const INT layer);
 
 /**
