@@ -564,8 +564,8 @@ static INT aacDecoder_EarconSetBSCallback(void* handle, HANDLE_FDK_BITSTREAM bs)
       return 0;
     }
     /*Sanity check for buffer fullness*/
-    if (((hAacDecoder->earconDecoder.AccumulatedFrameSize + frameSize * numPcmSignalsInFrame)) >=
-        EARCON_BUFFER_SIZE) {
+    if (((hAacDecoder->earconDecoder.AccumulatedFrameSize +
+          hAacDecoder->earconDecoder.BaseframeSize * numPcmSignalsInFrame)) >= EARCON_BUFFER_SIZE) {
       return 0;
     }
 
