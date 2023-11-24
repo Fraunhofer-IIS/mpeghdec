@@ -3200,7 +3200,7 @@ TRANSPORTDEC_ERROR PcmDataPayload(EarconDecoder* earconDecoder, FIXP_DBL* TimeDa
         FIXP_DBL* DecodedData2 = &TimeData[BaseframeSize * speakerPosIndices[1]];
 
         /* Limit samples read */
-        if (LoopCounterValue > 0) {
+        if (LoopCounterValue > 0 && numSpeakers > 0) {
           LoopCounterValue =
               fMin(LoopCounterValue, earconDecoder->AccumulatedFrameSize / numSpeakers);
         }
