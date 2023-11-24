@@ -97,7 +97,6 @@ amm-info@iis.fraunhofer.de
 #define __GENERICSTDS_CPP__
 
 #include "genericStds.h"
-#include <ctype.h>
 
 /* library info */
 #define SYS_LIB_VL0 3
@@ -112,6 +111,8 @@ amm-info@iis.fraunhofer.de
 #define SYS_LIB_BUILD_TIME __TIME__
 #endif
 
+#include <ctype.h>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -122,6 +123,14 @@ amm-info@iis.fraunhofer.de
  ***************************************************************/
 
 /* Include OS/System specific implementations. */
+
+INT FDKisalpha(INT c) {
+  return c < 0 ? 0 : c > 255 ? 0 : isalpha(c);
+}
+
+INT FDKtolower(INT c) {
+  return c < 0 ? 0 : c > 255 ? 0 : tolower(c);
+}
 
 #include <string.h>
 #include <stdlib.h>
@@ -141,8 +150,8 @@ void FDKprintfErr(const char* szFmt, ...) {
   va_end(ap);
 }
 
-int FDKgetchar(void) {
-  return getchar();
+INT FDKgetchar(void) {
+  return (INT)getchar();
 }
 
 INT FDKfprintf(FDKFILE* stream, const char* format, ...) {
@@ -169,9 +178,6 @@ char* FDKstrcpy(char* dest, const char* src) {
 }
 char* FDKstrncpy(char* dest, const char* src, UINT n) {
   return strncpy(dest, src, n);
-}
-INT FDKisalpha(INT c) {
-  return c < 0 ? 0 : c > 255 ? 0 : isalpha(c);
 }
 
 /*************************************************************************

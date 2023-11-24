@@ -90,7 +90,6 @@ amm-info@iis.fraunhofer.de
 
 #include "tpdec_lib.h"
 
-#include <ctype.h>
 #include "genericStds.h"
 #include "FDK_crc.h"
 
@@ -589,9 +588,9 @@ void asiMapISO639_2_T2B_and_tolower(char* buf) {
                                             */
   };
 
-  buf[0] = tolower(buf[0]);
-  buf[1] = tolower(buf[1]);
-  buf[2] = tolower(buf[2]);
+  buf[0] = FDKtolower(buf[0]);
+  buf[1] = FDKtolower(buf[1]);
+  buf[2] = FDKtolower(buf[2]);
 
   for (int i = 0; i < NUM_SPECIAL_LANG_CODES; i++) {
     if ((buf[0] == langCodes[i][1][0]) && (buf[1] == langCodes[i][1][1]) &&

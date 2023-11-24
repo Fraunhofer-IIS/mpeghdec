@@ -354,12 +354,18 @@ typedef enum {
 extern "C" {
 #endif
 
+/* Wrapper for <ctypes.h>'s isalpha(). */
+INT FDKisalpha(INT c);
+
+/* Wrapper for <ctypes.h>'s tolower(). */
+INT FDKtolower(INT c);
+
 void FDKprintf(const char* szFmt, ...);
 
 void FDKprintfErr(const char* szFmt, ...);
 
 /** Wrapper for <stdio.h>'s getchar(). */
-int FDKgetchar(void);
+INT FDKgetchar(void);
 
 INT FDKfprintf(void* stream, const char* format, ...);
 
@@ -463,8 +469,6 @@ void FDKmemset(void* memPtr, const INT value, const UINT size);
 INT FDKmemcmp(const void* s1, const void* s2, const UINT size);
 INT FDKstrcmp(const char* s1, const char* s2);
 INT FDKstrncmp(const char* s1, const char* s2, const UINT size);
-
-INT FDKisalpha(INT c);
 
 UINT FDKstrlen(const char* s);
 
