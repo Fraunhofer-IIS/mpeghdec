@@ -2012,16 +2012,11 @@ bail:
 
   /* Update Statistics */
   aacDecoder_UpdateBitStreamCounters(&self->streamInfo, hBs, nBits, ErrorStatus);
-  /* if no samples left return AAC_DEC_INTERMEDIATE_OK */
-  if (ErrorStatus == AAC_DEC_OK && self->streamInfo.frameSize == 0) {
-    ErrorStatus = AAC_DEC_INTERMEDIATE_OK;
-  }
-  if (((self->streamInfo.numChannels <= 0) || (self->streamInfo.frameSize <= 0) ||
-       (self->streamInfo.sampleRate <= 0)) &&
-      IS_OUTPUT_VALID(ErrorStatus)) {
-    /* Ensure consistency of IS_OUTPUT_VALID() macro. */
-    ErrorStatus = AAC_DEC_UNKNOWN;
-  }
+
+  /* Ensure consistency of IS_OUTPUT_VALID() macro. */
+  FDK_ASSERT((((self->streamInfo.numChannels <= 0) || (self->streamInfo.sampleRate <= 0)) &&
+              IS_OUTPUT_VALID(ErrorStatus)) == 0);
+
   if (!(IS_OUTPUT_VALID(ErrorStatus) || (ErrorStatus == AAC_DEC_INTERMEDIATE_OK))) {
     self->streamInfo.mpeghAUSize = -1;
     self->streamInfo.frameSize = 0;

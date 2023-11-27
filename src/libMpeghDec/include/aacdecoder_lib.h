@@ -246,7 +246,9 @@ audio either from error free bit stream data or successful error concealment. In
 false, the decoder output buffer does not contain meaningful audio samples and should not be passed
 to any output as it is. Most likely in case that a continuous audio output PCM stream is required,
 the output buffer must be filled with audio data from the calling framework. This might be e.g. an
-appropriate number of samples all zero.
+appropriate number of samples all zero. Remark: If IS_OUTPUT_VALID(err) is true, still the field
+CStreamInfo::frameSize can be zero in case of MPEG-H because of a truncation and the decoder
+internal delay. The field CStreamInfo::mpeghAUSize is also valid in that case.
 
 If error code ::AAC_DEC_TRANSPORT_SYNC_ERROR is returned by the decoder, under some particular
 conditions it is possible to estimate lost frames due to the bit stream error. In that case the bit
