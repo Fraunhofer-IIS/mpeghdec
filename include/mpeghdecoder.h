@@ -81,6 +81,7 @@ amm-info@iis.fraunhofer.de
 -----------------------------------------------------------------------------*/
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifndef MPEGH_DECODER_TIMING_HANDLING_WRAPPER
 #define MPEGH_DECODER_TIMING_HANDLING_WRAPPER
