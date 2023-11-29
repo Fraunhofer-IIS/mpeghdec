@@ -166,7 +166,7 @@ typedef enum {
  *
  * @return  UI manager handle
  */
-LINKSPEC_H HANDLE_MPEGH_UI_MANAGER mpegh_UI_Manager_Open();
+LINKSPEC_H HANDLE_MPEGH_UI_MANAGER mpegh_UI_Manager_Open(void);
 
 /**
  * @brief  De-allocate all resources of a mpegh UI manager instance.
