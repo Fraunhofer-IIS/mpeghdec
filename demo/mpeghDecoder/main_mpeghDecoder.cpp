@@ -94,8 +94,8 @@ amm-info@iis.fraunhofer.de
 
 // project includes
 #include "mpeghdecoder.h"
-#include "cmdl_parser.h"
-#include "wav_file.h"
+#include "sys/cmdl_parser.h"
+#include "sys/wav_file.h"
 
 using namespace mmt::isobmff;
 

@@ -99,7 +99,7 @@ amm-info@iis.fraunhofer.de
  * \brief  MPEG-H UI Manager library interface header file.
  */
 
-#include "machine_type.h"
+#include "sys/machine_type.h"
 
 #ifdef __cplusplus
 extern "C" {

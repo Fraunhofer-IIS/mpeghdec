@@ -97,8 +97,8 @@ amm-info@iis.fraunhofer.de
 // project includes
 #include "mpeghUIManager.h"
 #include "interactivityScriptParser.h"
-#include "cmdl_parser.h"
-#include "genericStds.h"
+#include "sys/cmdl_parser.h"
+#include "sys/genericStds.h"
 
 using namespace mmt::isobmff;
 
