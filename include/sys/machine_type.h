@@ -211,7 +211,7 @@ typedef __uint128_t UINT128;
 typedef LONG INT_PCM;
 #define MAXVAL_PCM MAXVAL_DBL
 #define MINVAL_PCM MINVAL_DBL
-#define WAV_BITS 32
+#define WAV_BITS 24
 #define SAMPLE_BITS 32
 #define SAMPLE_MAX ((INT_PCM)(((ULONG)1 << (SAMPLE_BITS - 1)) - 1))
 #define SAMPLE_MIN (~SAMPLE_MAX)
