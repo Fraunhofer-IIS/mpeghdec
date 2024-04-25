@@ -168,9 +168,9 @@ INT IIS_FormatConverter_Create(IIS_FORMATCONVERTER_HANDLE* self, IIS_FORMATCONVE
     _p->stftErbFreqIdx = erb_freq_idx_256_58;
   }
   FDKmemcpy(_p->GVH, GVH, 13 * 6 * sizeof(FIXP_DBL));
-  FDKmemcpy(_p->GVH_e, GVH_e, 13 * 6 * sizeof(INT));
   FDKmemcpy(_p->GVL, GVL, 13 * 6 * sizeof(FIXP_DBL));
-  FDKmemcpy(_p->GVL_e, GVL_e, 13 * 6 * sizeof(INT));
+  FDKmemclear(_p->GVH_e, sizeof(_p->GVH_e));
+  FDKmemclear(_p->GVL_e, sizeof(_p->GVH_e));
 
   _p->frameSize = frameSize;
 
@@ -185,8 +185,6 @@ INT IIS_FormatConverter_Create(IIS_FORMATCONVERTER_HANDLE* self, IIS_FORMATCONVE
   _p->numTotalInputChannels = 0;
   _p->numOutputChannels = numOutChannels;
   _p->samplingRate = sampleRate;
-  _p->channelVec = NULL;
-  _p->unknownChannelVec = NULL;
 
   _p->STFT_headroom_prescaling = 0;
 
@@ -198,7 +196,6 @@ INT IIS_FormatConverter_Create(IIS_FORMATCONVERTER_HANDLE* self, IIS_FORMATCONVE
   _p->immersiveDownmixFlag = 0;
 
   _p->cicpLayoutIndex = -1;
-  _p->dmxMatrixValid = 1;
   _p->amountOfAddedDmxMatricesAndEqualizers = 0;
 
   FDK_ASSERT((mode == IIS_FORMATCONVERTER_MODE_PASSIVE_TIME_DOMAIN) ||
@@ -245,8 +242,6 @@ INT IIS_FormatConverter_Config_AddInputSetup(IIS_FORMATCONVERTER_HANDLE self,
   _p->numTotalInputChannels += numChannels;
 
   _p->numInputChannels[_p->numInputChannelGroups] = numChannels;
-  _p->inputChannelGroupOffsets[_p->numInputChannelGroups] = channelOffset;
-
   _p->numInputChannelGroups++;
 
   return 0;
@@ -322,7 +317,6 @@ int IIS_FormatConverter_Open(IIS_FORMATCONVERTER_HANDLE self, INT* p_buffer, UIN
                                 MAX_NUM_DMX_RULES * 8))
     return -1;
 
-  _p->openSuccess = 0;
   _p->aes = self->aes;
   _p->pas = self->pas;
 
@@ -468,7 +462,6 @@ FC_OPEN_CLEANUP_AND_RETURN:
 
   if (err == 0) {
     err = _checkConfiguration(self);
-    if (err == 0) _p->openSuccess = 1;
     return err;
   } else {
     return err;
@@ -627,8 +620,6 @@ int IIS_FormatConverter_Close(IIS_FORMATCONVERTER_HANDLE* self) {
     FDKfree(_p->outputBufferStft);
   }
   formatConverterClose(_p);
-
-  if (_p->channelVec) FDKfree(_p->channelVec);
 
   FDKfree(_p);
 

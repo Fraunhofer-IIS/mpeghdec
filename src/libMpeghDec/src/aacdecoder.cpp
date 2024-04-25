@@ -573,6 +573,87 @@ static void CAacDecoder_DeInitRenderer(HANDLE_AACDECODER self, const int subStre
   }
 }
 
+static AAC_DECODER_ERROR applyDownmixMatrixPerSignalGroup(IIS_FORMATCONVERTER_INTERNAL_HANDLE _p,
+                                                          HANDLE_AACDECODER self,
+                                                          const CSUsacConfig* pUsacConfig,
+                                                          FIXP_DBL* p_buffer) {
+  int error = 0;
+  FIXP_DMX_H* dmx_sorted = _p->fcParams->dmxMtx_sorted;
+  INT* eqIndexVec_sorted = _p->fcParams->eqIndexVec_sorted;
+  for (INT grp = 0; grp < (INT)pUsacConfig->bsNumSignalGroups; grp++) {
+    /* Skip signal groups that are not active. */
+    if (!getOnOffFlag(self, pUsacConfig->m_signalGroupType[grp].firstSigIdx)) {
+      continue;
+    }
+
+    if (pUsacConfig->m_signalGroupType[grp].bUseCustomDownmixMatrix) {
+      /* Decode downmix matrix per signal group */
+      SpeakerInformation inputConfig[FDK_MPEGHAUDIO_DEC_MAX_OUTPUT_CHANNELS];
+      CICP2GEOMETRY_CHANNEL_GEOMETRY outputConfig_geo[FDK_MPEGHAUDIO_DEC_MAX_OUTPUT_CHANNELS];
+
+      INT numOutputCh = 0, numOutLfes = 0;
+      SpeakerInformation outputConfig[FDK_MPEGHAUDIO_DEC_MAX_OUTPUT_CHANNELS];
+
+      FDK_BITSTREAM bitbuf_init;
+      HANDLE_FDK_BITSTREAM bitbuf = &bitbuf_init;
+
+      const CSSignalGroup* signalGroupType = pUsacConfig->m_signalGroupType;
+      /* groupsDownmixMatrixSet was written by aacDecoder_ParseDmxMatrixCallback() into borrowed
+       * memory from self->pTimeData2 */
+      FDK_DOWNMIX_GROUPS_MATRIX_SET* groupsDownmixMatrixSet =
+          (FDK_DOWNMIX_GROUPS_MATRIX_SET*)self->pTimeData2;
+      UCHAR dmx_index = groupsDownmixMatrixSet->downmixMatrix[grp];
+      FDK_ASSERT(groupsDownmixMatrixSet->downmixMatrixSize[dmx_index] > 0);
+
+      /* use self->workBufferCore2 as scratch memory for temporary data */
+      eqConfigStruct* eqConfig = (eqConfigStruct*)p_buffer;
+      FIXP_DBL* scratchBuf =
+          (FIXP_DBL*)ALIGN_PTR(p_buffer + (sizeof(eqConfigStruct) / sizeof(FIXP_DBL) + 1));
+
+      FDKinitBitStream(bitbuf, groupsDownmixMatrixSet->downmixMatrixMemory[dmx_index],
+                       sizeof(groupsDownmixMatrixSet->downmixMatrixMemory[dmx_index]),
+                       groupsDownmixMatrixSet->downmixMatrixSize[dmx_index], BS_READER);
+
+      for (INT n = 0; n < (INT)signalGroupType[grp].count; n++) {
+        inputConfig[n].azimuth = signalGroupType[grp].speakers[n].Az;
+        inputConfig[n].elevation = signalGroupType[grp].speakers[n].El;
+        inputConfig[n].isLFE = signalGroupType[grp].speakers[n].Lfe;
+      }
+
+      error = cicp2geometry_get_geometry_from_cicp(self->targetLayout, outputConfig_geo,
+                                                   &numOutputCh, &numOutLfes);
+      if (error != 0) {
+        return AAC_DEC_UNSUPPORTED_CHANNELCONFIG;
+      }
+
+      for (INT n = 0; n < (numOutputCh + numOutLfes); n++) {
+        outputConfig[n].azimuth = outputConfig_geo[n].Az;
+        outputConfig[n].elevation = outputConfig_geo[n].El;
+        outputConfig[n].isLFE = outputConfig_geo[n].LFE;
+      }
+
+      error = DecodeDownmixMatrix(signalGroupType[grp].Layout, signalGroupType[grp].count,
+                                  inputConfig, self->targetLayout, (numOutputCh + numOutLfes),
+                                  outputConfig, bitbuf, dmx_sorted, eqConfig, scratchBuf);
+
+      if (error != 0) {
+        return AAC_DEC_UNSUPPORTED_CHANNELCONFIG;
+      }
+      formatConverterDmxMatrixExponent(_p);
+      error = formatConverterSetEQs(eqIndexVec_sorted, eqConfig->numEQs, eqConfig->eqParams,
+                                    eqConfig->eqMap, grp, _p, scratchBuf);
+      if (error != 0) {
+        return AAC_DEC_UNSUPPORTED_FORMAT;
+      }
+      _p->amountOfAddedDmxMatricesAndEqualizers += _p->numInputChannels[grp];
+    }
+    eqIndexVec_sorted += pUsacConfig->m_signalGroupType[grp].count * _p->numOutputChannels;
+    dmx_sorted += pUsacConfig->m_signalGroupType[grp].count * _p->numOutputChannels;
+  }
+
+  return AAC_DEC_OK;
+}
+
 /*!
  \brief Initialization of decoder instance
 
@@ -752,36 +833,12 @@ static AAC_DECODER_ERROR CAacDecoder_InitRenderer(HANDLE_AACDECODER self, const 
       }
 
       /* Applying the decoded downmix matrix and EQs for each signal group */
-      IIS_FORMATCONVERTER_INTERNAL_HANDLE _p =
-          (IIS_FORMATCONVERTER_INTERNAL_HANDLE)(self->pFormatConverter[streamIndex])->member;
-      FIXP_DMX_H* dmx_sorted = _p->fcParams->dmxMtx_sorted;
-      INT* eqIndexVec_sorted = _p->fcParams->eqIndexVec_sorted;
-      for (INT grp = 0; grp < (INT)self->pUsacConfig[streamIndex]->bsNumSignalGroups; grp++) {
-        /* Skip signal groups that are not active. */
-        if (!getOnOffFlag(self,
-                          self->pUsacConfig[streamIndex]->m_signalGroupType[grp].firstSigIdx)) {
-          continue;
-        }
-
-        if (self->pUsacConfig[streamIndex]->m_signalGroupType[grp].bUseCustomDownmixMatrix) {
-          formatConverterAddParsedDmxMtx(
-              self->downmixMatrix[grp], dmx_sorted,
-              self->pUsacConfig[streamIndex]->m_signalGroupType[grp].count, _p->numOutputChannels);
-          formatConverterDmxMatrixExponent(_p);
-          error = formatConverterSetEQs(eqIndexVec_sorted, self->eqConfig[grp].numEQs,
-                                        self->eqConfig[grp].eqParams, self->eqConfig[grp].eqMap,
-                                        grp, self->pUsacConfig[streamIndex]->bsNumSignalGroups, _p,
-                                        p_buffer);
-          if (error != 0) {
-            err = AAC_DEC_UNSUPPORTED_FORMAT;
-            goto bail;
-          }
-          _p->amountOfAddedDmxMatricesAndEqualizers += _p->numInputChannels[grp];
-        }
-        eqIndexVec_sorted +=
-            self->pUsacConfig[streamIndex]->m_signalGroupType[grp].count * _p->numOutputChannels;
-        dmx_sorted +=
-            self->pUsacConfig[streamIndex]->m_signalGroupType[grp].count * _p->numOutputChannels;
+      error = applyDownmixMatrixPerSignalGroup(
+          (IIS_FORMATCONVERTER_INTERNAL_HANDLE)(self->pFormatConverter[streamIndex])->member, self,
+          self->pUsacConfig[streamIndex], p_buffer);
+      if (error) {
+        err = AAC_DEC_OUT_OF_MEMORY;
+        goto bail;
       }
     }
 

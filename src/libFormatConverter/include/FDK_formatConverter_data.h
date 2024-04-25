@@ -144,7 +144,7 @@ int allocateFormatConverterParams(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt);
 
 /** Allocate Format Converter EQs.
     \param fcInt A pointer to Format Converter parameter struct.    */
-int allocateFormatConverterEQs(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, INT NumSignalGroups);
+int allocateFormatConverterEQs(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt);
 
 /** Free Format Converter parameter struct members.
     Free Format Converter parameter struct members.

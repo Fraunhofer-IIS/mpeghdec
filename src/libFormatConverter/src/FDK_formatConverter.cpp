@@ -532,23 +532,11 @@ INT formatConverterSetDmxMtx(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt) {
   return 0;
 }
 
-void formatConverterAddParsedDmxMtx(FIXP_DMX_H* dmxMtxIn, FIXP_DMX_H* dmxMtxOut, INT numChannelsIn,
-                                    INT numChannelsOut) {
-  INT j = 0;
-  INT column, row;
-  for (column = 0; column < numChannelsIn; column++) {
-    for (row = 0; row < numChannelsOut; row++) {
-      dmxMtxOut[j] = dmxMtxIn[j];
-      j++;
-    }
-  }
-}
-
 /**********************************************************************************************************************************/
 
-INT formatConverterSetEQs(INT* eqIndex_sorted, UCHAR numEQs, eqParamsStruct* eqParams, UINT* eqMap,
-                          UINT grp, UINT bsNumSignalGroups,
-                          IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, FIXP_DBL* p_buffer) {
+INT formatConverterSetEQs(INT* eqIndex_sorted, UCHAR numEQs, const eqParamsStruct* eqParams,
+                          const UINT* eqMap, UINT grp, IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt,
+                          FIXP_DBL* p_buffer) {
   INT i, k, m, n, err;
   /* Maximum number of EQs is the max input channels */
   FIXP_DBL(*eqGainsTmp)[58] = (FIXP_DBL(*)[58])p_buffer;
@@ -568,7 +556,7 @@ INT formatConverterSetEQs(INT* eqIndex_sorted, UCHAR numEQs, eqParamsStruct* eqP
     }
   }
 
-  err = allocateFormatConverterEQs(fcInt, bsNumSignalGroups);
+  err = allocateFormatConverterEQs(fcInt);
   if (err == -1) {
     return err;
   }
@@ -617,13 +605,11 @@ INT formatConverterSetEQs(INT* eqIndex_sorted, UCHAR numEQs, eqParamsStruct* eqP
         fcInt->eqGains[i][k] = FX_DBL2FX_EQ_H(scaleValueSaturate(
             eqGainsTmp[eqIdx - 1][k], eqGainsTmp_e[eqIdx - 1][k] - EQ_BITSTREAM_H_EXP));
       }
-      fcInt->eqGains_e[i] = EQ_BITSTREAM_H_EXP;
     } else { /* no EQ applied to this input channel - simply apply dmxMtx */
       for (k = 0; k < (INT)fcInt->stftNumErbBands; k++) {
         fcInt->eqGains[i][k] =
             FIXP_EQ_BITSTREAM_H_FORMAT_1_dot_0; /*fcInt->fcParams->dmxMtx[i][j];*/
       }
-      fcInt->eqGains_e[i] = EQ_BITSTREAM_H_EXP;
     }
     for (n = 0; n < (INT)fcInt->numOutputChannels; n++) {
       /* EQ index for the activeDmxProcess_STFT function */

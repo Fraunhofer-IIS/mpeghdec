@@ -137,14 +137,6 @@ extern const FIXP_DBL GVH[13][6];
  * initElevSptlParms. */
 extern const FIXP_DBL GVL[13][6];
 
-/* TABLE : INITIAL SPATIAL LOCALIZATION PANNING COEFFICIENTS G_VH. Modifiable by initElevSptlParms.
- */
-extern const INT GVH_e[13][6];
-
-/* TABLE : INITIAL SPATIAL LOCALIZATION PANNING COEFFICIENTS G_VL. Exponent = 1. Modifiable by
- * initElevSptlParms. */
-extern const INT GVL_e[13][6];
-
 extern const FIXP_DBL fc_StftErb[];
 
 #endif /*FDK_FORMATCONVERTER_CONSTANTS_H FDK_FORMATCONVERTER_CONSTANTS_H */

@@ -601,42 +601,6 @@ const FIXP_DBL GVL[13][6] = {
      FL2FXCONST_DBL(0.48822021), FL2FXCONST_DBL(0.48822021)} /* CH_T_000 */
 };
 
-/* TABLE : INITIAL SPATIAL LOCALIZATION PANNING COEFFICIENTS G_VH. Modifiable by initElevSptlParms.
- */
-const INT GVH_e[13][6] = {
-    {0, 0, 0, 0, 0, 0}, /* CH_U_0000 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_L045 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_R045 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_L030 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_R030 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_L090 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_R090 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_L110 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_R110 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_L135 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_R135 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_180 */
-    {0, 0, 0, 0, 0, 0}  /* CH_T_000 */
-};
-
-/* TABLE : INITIAL SPATIAL LOCALIZATION PANNING COEFFICIENTS G_VL. Exponent = 0. Modifiable by
- * initElevSptlParms. */
-const INT GVL_e[13][6] = {
-    {0, 0, 0, 0, 0, 0}, /* CH_U_0000 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_L045 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_R045 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_L030 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_R030 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_L090 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_R090 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_L110 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_R110 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_L135 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_R135 */
-    {0, 0, 0, 0, 0, 0}, /* CH_U_180 */
-    {0, 0, 0, 0, 0, 0}  /* CH_T_000 */
-};
-
 const FIXP_DBL fc_StftErb[58] = {
     FL2FXCONST_DBL(0.000000000000000f), FL2FXCONST_DBL(0.003891050583658f),
     FL2FXCONST_DBL(0.007782101167315f), FL2FXCONST_DBL(0.011673151750973f),

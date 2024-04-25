@@ -321,10 +321,7 @@ struct AAC_DECODER_INSTANCE {
   INT targetLayout_config; /*!< Applied Target layout index which can be either equal targetLayout
                               or referenceLayout (if targetLayout is 0). */
   IIS_FORMATCONVERTER_HANDLE pFormatConverter[TPDEC_MAX_TRACKS]; /*!< Format converter instances. */
-  FIXP_SGL downmixMatrix[TP_MPEGH_MAX_SIGNAL_GROUPS][FDK_FORMAT_CONVERTER_MAX_INPUT_CHANNELS *
-                                                     FDK_FORMAT_CONVERTER_MAX_OUTPUT_CHANNELS];
   INT downmixId;
-  eqConfigStruct eqConfig[TP_MPEGH_MAX_SIGNAL_GROUPS];
 
   IGF_PRIVATE_DATA_COMMON
   igf_private_data_common[2]; /*!< IGF scratch memory shared between elements but requires two

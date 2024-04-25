@@ -1102,6 +1102,9 @@ static void compute_eq(const FIXP_DBL* bands_nrm, const INT nbands, const INT sf
   }
 }
 
+static void initElevSptlParms(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, const FIXP_DBL fs,
+                              int nchanout);
+
 /* API functions
  * ************************************************************************** */
 
@@ -1134,6 +1137,7 @@ typedef INT dmx_rules_t[MAX_NUM_DMX_RULES][8];
 converter_status_t converter_init(
     IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt,
     converter_pr_t* params,                       /* out: initialized parameters */
+    converter_pr_tmp_t* params_tmp,               /* out: initialized temporary parameters */
     const FDK_converter_formatid_t input_format,  /* in:  input format id */
     const FDK_converter_formatid_t output_format, /* in:  output format id */
     const INT* randomization, /* in:  randomization angles [azi,ele,azi,ele, ... in degrees] */
@@ -1247,9 +1251,6 @@ converter_status_t converter_init(
     return FORMAT_CONVERTER_STATUS_OUTFORMAT;
   }
 
-  params->nchanin = nchanin;
-  params->nchanout = nchanout;
-
   /* copy channel angles (they may be modified for random setups) */
 
   for (i = 0; i < (CH_LFE2 + 1); i++) {
@@ -1258,10 +1259,7 @@ converter_status_t converter_init(
   }
 
   if ((fcInt->immersiveDownmixFlag == 1) && ((nchanout == 5) || (nchanout == 6))) {
-    /* 11.4.1.6.7.2  iar_initElevSptlParms : Initialization of elevation rendering parameters based
-     * on the input channel elevation */
-    fcInt->elv = FL2FXCONST_DBL(0.136718750000000); /* default elevation of the height channels */
-    initElevSptlParms(fcInt, fcInt->elv, nbands, sfreq_Hz, randomization, nchanout);
+    initElevSptlParms(fcInt, sfreq_Hz, nchanout);
     FDKmemcpy(dmx_rules, dmx_rules_immersive, sizeof(dmx_rules_immersive));
   } else {
     FDKmemcpy(dmx_rules, dmx_rules_classic, sizeof(dmx_rules_classic));
@@ -1564,25 +1562,27 @@ converter_status_t converter_init(
     ch = 0;
     while (in_out_src[ch] >= 0) {
       if (i == in_out_dst[ch]) {
-        params->in_out_src[ptr] = in_out_src[ch];
-        params->in_out_dst[ptr] = in_out_dst[ch];
-        params->in_out_gain[ptr] = in_out_gain[ch];
-        params->in_out_proc[ptr] = in_out_proc[ch];
-        params->in_out_gainL[ptr] = in_out_gainL[ch];
+        FDK_ASSERT((in_out_src[ch] < 128) && (in_out_dst[ch] < 128));
+        params_tmp->in_out_src[ptr] = (SCHAR)in_out_src[ch];
+        params_tmp->in_out_dst[ptr] = (SCHAR)in_out_dst[ch];
+        params_tmp->in_out_gain[ptr] = in_out_gain[ch];
+        FDK_ASSERT(in_out_proc[ch] < 128);
+        params_tmp->in_out_proc[ptr] = in_out_proc[ch];
+        params_tmp->in_out_gainL[ptr] = in_out_gainL[ch];
         ptr++;
       }
       ch++;
     }
   }
   FDK_ASSERT(ch == ptr);
-  params->in_out_src[ch] = -1;
-  params->in_out_dst[ch] = -1;
-  params->in_out_gain[ch] = (FIXP_DMX_H)-1;  //-1
-  params->in_out_proc[ch] = -1;
+  params_tmp->in_out_src[ch] = -1;
+  params_tmp->in_out_dst[ch] = -1;
+  params_tmp->in_out_gain[ch] = (FIXP_DMX_H)-1;  //-1
+  params_tmp->in_out_proc[ch] = -1;
 
   if (fcInt->immersiveDownmixFlag == 1 &&
       ((fcInt->numOutputChannels == 6) || (fcInt->numOutputChannels == 5))) {
-    params->in_out_gainL[ch] = (FIXP_DMX_H)-1;
+    params_tmp->in_out_gainL[ch] = (FIXP_DMX_H)-1;
 
     ch = 0;
     for (i = 0; i < nchanin; i++) {
@@ -1856,14 +1856,15 @@ converter_status_t converter_init(
       ch = 0;
       while (in_out_src2[ch] >= 0) {
         if (i == in_out_dst2[ch]) {
-          params->in_out_src2[ptr] = in_out_src2[ch];
-          params->in_out_dst2[ptr] = in_out_dst2[ch];
-          params->in_out_gain2[ptr] = in_out_gain2[ch];
-          params->in_out_gaini[ptr] = in_out_gaini[ch];
+          FDK_ASSERT((in_out_src2[ch] < 128) && (in_out_dst2[ch] < 128));
+          params_tmp->in_out_src2[ptr] = (SCHAR)in_out_src2[ch];
+          params_tmp->in_out_dst2[ptr] = (SCHAR)in_out_dst2[ch];
+          params_tmp->in_out_gain2[ptr] = in_out_gain2[ch];
+          FDK_ASSERT(in_out_proc2[ch] < 128);
           if (in_out_proc2[ch] == RULE_EQBTM)
-            params->in_out_proc2[ptr] = RULE_NOPROC;
+            params_tmp->in_out_proc2[ptr] = RULE_NOPROC;
           else
-            params->in_out_proc2[ptr] = in_out_proc2[ch];
+            params_tmp->in_out_proc2[ptr] = in_out_proc2[ch];
           ptr++;
         }
         ch++;
@@ -1872,11 +1873,10 @@ converter_status_t converter_init(
     if (ch != ptr) {
       return FORMAT_CONVERTER_STATUS_FAILED;
     }
-    params->in_out_src2[ch] = -1;
-    params->in_out_dst2[ch] = -1;
-    params->in_out_gain2[ch] = (FIXP_DMX_H)-1;
-    params->in_out_gaini[ch] = (FIXP_DMX_H)-1;
-    params->in_out_proc2[ch] = -1;
+    params_tmp->in_out_src2[ch] = -1;
+    params_tmp->in_out_dst2[ch] = -1;
+    params_tmp->in_out_gain2[ch] = (FIXP_DMX_H)-1;
+    params_tmp->in_out_proc2[ch] = -1;
   }
 
   /* random formats: adjust gains and eqs */
@@ -2045,49 +2045,20 @@ void normalizePG(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt) {
   }
 }
 
-void randElevSptlParms(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, const INT* randomization,
-                       int nchanout) {
+static void randElevSptlParms(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt) {
   /*  (6) power normalization */
   normalizePG(fcInt);
 }
 
-#define FIX_ANGLE_BIN(x) FL2FXCONST_DBL(x)
-#define ELV_ANGLE_E 8
-#define DBL_O_dot_O5 (0x66666666) /* 0.05 exp = -4 */
-#define DBL_O_dot_O5_e -4
-#define DBL_O_dot_O7 (0x47ae147b) /* 0.07 exp = -3 */
-#define DBL_O_dot_O7_e -3
-#define DBL_1_div_20 (0x47ae147b) /* 16*(1/20), exp = -4 */
-#define DBL_1_div_20_e -4
-#define DBL_10 (0x50000000) /* 16*(1/20), exp = 4 */
-#define DBL_10_e 4
-
-#define DBL_log_constant (0x53abbb45) /* 20 / (log(10.0f) * log2(10)) */
-#define DBL_log_constant_e 2
-
-#define DBL_O_dot_O55 (0x8ee8d10f) /* -0.05522f */
-#define DBL_O_dot_O55_e -4
-#define DBL_O_dot_41 (0x6b35d24a) /* 0.41879f */
-#define DBL_O_dot_41_e -1
-#define DBL_O_dot_O47 (0x9eec397a) /* -0.047401f */
-#define DBL_O_dot_O47_e -4
-#define DBL_O_dot_14 (0x4cb923a3) /* 0.14985f */
-#define DBL_O_dot_14_e -2
-
 /*
   fcInt: Format Converter internal handle.
-  elv: Azimuth in [0 ... 1] = [0 ... 180]
-  num_band: number of freq bands (STFT STFT_ERB_BANDS, QMF 71 )
   fs: Sample Freq. Q12 in FIXP_DBL
-  randomization: Randomization data for random set.
 */
-void initElevSptlParms(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, FIXP_DBL elv, const UINT num_band,
-                       const FIXP_DBL fs, const INT* randomization, int nchanout) {
+static void initElevSptlParms(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, const FIXP_DBL fs,
+                              int nchanout) {
   UINT CH;
 
-  /* setActiveDownmixRange(fcInt, fs); 71 bands QMF domanin */
   setActiveDownmixRange_StftErb(fcInt, fs); /*  */
-  /* fcInt->D2    = (int) ( fs * 0.003 / 64 + 0.5 );  Only needed in QMF domain */
 
   for (CH = 0; CH < 13; CH++) {
     fcInt->topIn[CH] = -1;
@@ -2101,7 +2072,7 @@ void initElevSptlParms(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, FIXP_DBL elv, 
     fcInt->midOut[4]++;
   }
   /* update panning coefficients if random ( normalizePG is called anyways ) */
-  randElevSptlParms(fcInt, randomization, nchanout);
+  randElevSptlParms(fcInt);
 
   return;
 }

@@ -142,9 +142,9 @@ int setFormatConverterParams(const FIXP_DBL* centerFrequenciesNormalized,
 
     if (fcInt->mode == IIS_FORMATCONVERTER_MODE_ACTIVE_FREQ_DOMAIN_STFT ||
         fcInt->mode == IIS_FORMATCONVERTER_MODE_CUSTOM_FREQ_DOMAIN_STFT) {
-      for (i = 0; i < fcInt->stftNumErbBands; i++) {
-        params->centerFrequenciesNormalized[i] = centerFrequenciesNormalized[i];
-      }
+      params->centerFrequenciesNormalized = centerFrequenciesNormalized;
+    } else {
+      params->centerFrequenciesNormalized = NULL;
     }
 
     /* aeq limits */
@@ -167,8 +167,6 @@ int setFormatConverterParams(const FIXP_DBL* centerFrequenciesNormalized,
   if (params->genericIOFmt) {
     params->applyEqFilters = 0;
   }
-
-  params->randomFlag = 0;
 
   /* init DMX matrix */
   for (i = 0; i < fcInt->numTotalInputChannels; i++) {
@@ -303,43 +301,13 @@ int allocateFormatConverterParams(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt) {
     status = -1;
   }
 
-  /* centerFrequenciesNormalized */
-  if (fcInt->mode == IIS_FORMATCONVERTER_MODE_ACTIVE_FREQ_DOMAIN_STFT ||
-      fcInt->mode == IIS_FORMATCONVERTER_MODE_CUSTOM_FREQ_DOMAIN_STFT) {
-    fcInt->fcParams->centerFrequenciesNormalized =
-        (FIXP_DBL*)FDKcalloc(fcInt->fcNumFreqBands, sizeof(FIXP_DBL));
-    if (fcInt->fcParams->centerFrequenciesNormalized == NULL) {
-      status = -1;
-    }
-  }
-
-  /* azimuthElevationDeviation */
-  fcInt->fcParams->azimuthElevationDeviation = (INT*)FDKcalloc(
-      2 * fcInt->numOutputChannels, sizeof *fcInt->fcParams->azimuthElevationDeviation);
-  if (fcInt->fcParams->azimuthElevationDeviation == NULL) {
-    status = -1;
-  }
-
-  /* distance */
-  fcInt->fcParams->distance =
-      (INT*)FDKcalloc(fcInt->numOutputChannels, sizeof *fcInt->fcParams->distance);
-  if (fcInt->fcParams->distance == NULL) {
-    status = -1;
-  }
-
   return status;
 }
 
 /**********************************************************************************************************************************/
 
-int allocateFormatConverterEQs(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, INT NumSignalGroups) {
-  /* Allocate new equalizers for every new signal group: */
-
-  INT numInputChannels = 0;
-
-  for (INT grp = 0; grp < NumSignalGroups; grp++) {
-    numInputChannels += fcInt->numInputChannels[grp];
-  }
+int allocateFormatConverterEQs(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt) {
+  const INT numInputChannels = fcInt->numTotalInputChannels;
 
   /* eqGains */
   if (fcInt->eqGains[0] == NULL) {
@@ -452,24 +420,6 @@ void freeFormatConverterParams(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt) {
     FDKfree(fcInt->fcParams->formatConverterParams_internal);
     fcInt->fcParams->formatConverterParams_internal = NULL;
   }
-
-  /* centerFrequenciesNormalized */
-  if (fcInt->fcParams->centerFrequenciesNormalized != NULL) {
-    FDKfree(fcInt->fcParams->centerFrequenciesNormalized);
-    fcInt->fcParams->centerFrequenciesNormalized = NULL;
-  }
-
-  /* azimuthElevationDeviation */
-  if (fcInt->fcParams->azimuthElevationDeviation != NULL) {
-    FDKfree(fcInt->fcParams->azimuthElevationDeviation);
-    fcInt->fcParams->azimuthElevationDeviation = NULL;
-  }
-
-  /* distance */
-  if (fcInt->fcParams->distance != NULL) {
-    FDKfree(fcInt->fcParams->distance);
-    fcInt->fcParams->distance = NULL;
-  }
 }
 
 /**********************************************************************************************************************************/
@@ -519,6 +469,8 @@ void freeFormatConverterState(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt) {
 int formatConverterInit_internal(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, INT* p_buffer) {
   UINT i, j;
   INT* randomization;
+  converter_pr_tmp_t* params_tmp = (converter_pr_tmp_t*)p_buffer;
+  p_buffer += sizeof(converter_pr_tmp_t) / sizeof(INT) + 1;
 
   converter_status_t converterState = FORMAT_CONVERTER_STATUS_OK;
 
@@ -540,19 +492,14 @@ int formatConverterInit_internal(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, INT*
       return 1;
   }
 
-  /* randomization */
-  if (fcInt->fcParams->randomFlag) {
-    randomization = fcInt->fcParams->azimuthElevationDeviation;
-  } else {
-    randomization = NULL;
-  }
+  randomization = NULL;
 
   /* init internal structure */
   if (fcInt->mode == IIS_FORMATCONVERTER_MODE_ACTIVE_FREQ_DOMAIN_STFT ||
       fcInt->mode == IIS_FORMATCONVERTER_MODE_CUSTOM_FREQ_DOMAIN_STFT ||
       fcInt->mode == IIS_FORMATCONVERTER_MODE_PASSIVE_TIME_DOMAIN) {
     converterState =
-        converter_init(fcInt, fcInt->fcParams->formatConverterParams_internal,
+        converter_init(fcInt, fcInt->fcParams->formatConverterParams_internal, params_tmp,
                        fcInt->fcParams->formatConverterInputFormat_internal,
                        fcInt->fcParams->formatConverterOutputFormat_internal, randomization,
                        fcInt->samplingRate, fcInt->frameSize, fcInt->stftNumErbBands,
@@ -567,10 +514,9 @@ int formatConverterInit_internal(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, INT*
     /* generate dmx matrix */
     if (fcInt->numOutputChannels != 1) {
       i = 0;
-      while ((fcInt->fcParams->formatConverterParams_internal)->in_out_src[i] >= 0) {
-        fcInt->fcParams->dmxMtx[(fcInt->fcParams->formatConverterParams_internal)->in_out_src[i]]
-                               [(fcInt->fcParams->formatConverterParams_internal)->in_out_dst[i]] =
-            (fcInt->fcParams->formatConverterParams_internal)->in_out_gain[i];
+      while (params_tmp->in_out_src[i] >= 0) {
+        fcInt->fcParams->dmxMtx[params_tmp->in_out_src[i]][params_tmp->in_out_dst[i]] =
+            params_tmp->in_out_gain[i];
         i++;
       }
     } else {
@@ -578,10 +524,8 @@ int formatConverterInit_internal(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, INT*
         fcInt->fcParams->dmxMtx[i][0] = (FIXP_DBL)0;
       }
       i = 0;
-      while ((fcInt->fcParams->formatConverterParams_internal)->in_out_src[i] >= 0) {
-        fcInt->fcParams
-            ->dmxMtx[(fcInt->fcParams->formatConverterParams_internal)->in_out_src[i]][0] +=
-            (fcInt->fcParams->formatConverterParams_internal)->in_out_gain[i];
+      while (params_tmp->in_out_src[i] >= 0) {
+        fcInt->fcParams->dmxMtx[params_tmp->in_out_src[i]][0] += params_tmp->in_out_gain[i];
         i++;
       }
     }
@@ -591,25 +535,22 @@ int formatConverterInit_internal(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, INT*
     /* generate dmx matrix gainL*/
 
     i = 0;
-    while ((fcInt->fcParams->formatConverterParams_internal)->in_out_src[i] >= 0) {
-      if ((fcInt->fcParams->formatConverterParams_internal)->in_out_gainL[i] > (FIXP_DMX_H)-1) {
-        fcInt->fcParams->dmxMtxL[(fcInt->fcParams->formatConverterParams_internal)->in_out_src[i]]
-                                [(fcInt->fcParams->formatConverterParams_internal)->in_out_dst[i]] =
-            (fcInt->fcParams->formatConverterParams_internal)->in_out_gainL[i];
+    while (params_tmp->in_out_src[i] >= 0) {
+      if (params_tmp->in_out_gainL[i] > (FIXP_DMX_H)-1) {
+        fcInt->fcParams->dmxMtxL[params_tmp->in_out_src[i]][params_tmp->in_out_dst[i]] =
+            params_tmp->in_out_gainL[i];
       } else {
-        fcInt->fcParams->dmxMtxL[(fcInt->fcParams->formatConverterParams_internal)->in_out_src[i]]
-                                [(fcInt->fcParams->formatConverterParams_internal)->in_out_dst[i]] =
-            (fcInt->fcParams->formatConverterParams_internal)->in_out_gain[i];
+        fcInt->fcParams->dmxMtxL[params_tmp->in_out_src[i]][params_tmp->in_out_dst[i]] =
+            params_tmp->in_out_gain[i];
       }
       i++;
     }
 
     /* generate dmx matrix 2 gain2*/
     i = 0;
-    while ((fcInt->fcParams->formatConverterParams_internal)->in_out_src2[i] >= 0) {
-      fcInt->fcParams->dmxMtx2[(fcInt->fcParams->formatConverterParams_internal)->in_out_src2[i]]
-                              [(fcInt->fcParams->formatConverterParams_internal)->in_out_dst2[i]] =
-          (fcInt->fcParams->formatConverterParams_internal)->in_out_gain2[i];
+    while (params_tmp->in_out_src2[i] >= 0) {
+      fcInt->fcParams->dmxMtx2[params_tmp->in_out_src2[i]][params_tmp->in_out_dst2[i]] =
+          params_tmp->in_out_gain2[i];
       i++;
     }
   }
@@ -618,22 +559,18 @@ int formatConverterInit_internal(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, INT*
       fcInt->mode == IIS_FORMATCONVERTER_MODE_CUSTOM_FREQ_DOMAIN_STFT) {
     /**** generate eq index matrix ****/
     i = 0;
-    while ((fcInt->fcParams->formatConverterParams_internal)->in_out_src[i] >= 0) {
-      fcInt->fcParams
-          ->eqIndexVec[(fcInt->fcParams->formatConverterParams_internal)->in_out_src[i]]
-                      [(fcInt->fcParams->formatConverterParams_internal)->in_out_dst[i]] =
-          (fcInt->fcParams->formatConverterParams_internal)->in_out_proc[i];
+    while (params_tmp->in_out_src[i] >= 0) {
+      fcInt->fcParams->eqIndexVec[params_tmp->in_out_src[i]][params_tmp->in_out_dst[i]] =
+          params_tmp->in_out_proc[i];
       i++;
     }
     if (fcInt->immersiveDownmixFlag &&
         ((fcInt->numOutputChannels == 6) || (fcInt->numOutputChannels == 5))) {
       /**** generate eq index matrix 2 ****/
       i = 0;
-      while ((fcInt->fcParams->formatConverterParams_internal)->in_out_src2[i] >= 0) {
-        fcInt->fcParams
-            ->eqIndexVec2[(fcInt->fcParams->formatConverterParams_internal)->in_out_src2[i]]
-                         [(fcInt->fcParams->formatConverterParams_internal)->in_out_dst2[i]] =
-            (fcInt->fcParams->formatConverterParams_internal)->in_out_proc2[i];
+      while (params_tmp->in_out_src2[i] >= 0) {
+        fcInt->fcParams->eqIndexVec2[params_tmp->in_out_src2[i]][params_tmp->in_out_dst2[i]] =
+            params_tmp->in_out_proc2[i];
         i++;
       }
     }

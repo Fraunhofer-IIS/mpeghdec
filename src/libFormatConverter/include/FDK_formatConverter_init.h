@@ -166,6 +166,7 @@ void converter_set_inout_format(
 converter_status_t converter_init(
     IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt,
     converter_pr_t* params,                       /* out: initialized parameters */
+    converter_pr_tmp_t* params_tmp,               /* out: initialized temporary parameters */
     const FDK_converter_formatid_t input_format,  /* in:  input format id */
     const FDK_converter_formatid_t output_format, /* in:  output format id */
     const INT* randomization, /* in:  randomization angles [azi,ele,azi,ele, ... in degrees] */
@@ -184,10 +185,7 @@ FIXP_DBL peak_filter(const FIXP_DBL f,          /* peak frequency [Hz] */
                      INT G_e, const FIXP_DBL b, /* band center frequency [Hz] */
                      INT b_e, INT* result_e);
 
-void setActiveDownmixRange(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, INT fs);
 void setActiveDownmixRange_StftErb(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, INT fs);
 void normalizePG(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt);
-void initElevSptlParms(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, FIXP_DBL elv, const UINT num_band,
-                       const FIXP_DBL fs, const INT* randomization, int nchanout);
 
 #endif /* FDK_FORMATCONVERTER_INIT_H */

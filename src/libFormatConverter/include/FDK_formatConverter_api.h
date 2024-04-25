@@ -298,24 +298,16 @@ INT formatConverterSetDmxMtx(
     /* FIXP_DMX_H **dmxMtx, */
     IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt);
 
-/** Set parsed DMX Matrix to Format Converter DMX Matrix.
-    Overwrite internal DMX Matrix with external DMX Matrix.
-    \param dmxMtx DMX Matrix in format (numInputChans x numOutputChans).
-    \param fcInt A pointer to a handle to Format Converter state struct.    */
-void formatConverterAddParsedDmxMtx(FIXP_DMX_H* dmxMtxIn, FIXP_DMX_H* dmxMtxOut, INT numChannelsIn,
-                                    INT numChannelsOut);
-
 /** Set EQs of Format Converter.
     \param eqIndex_sorted eq index for the active downmix process
     \param numEQs number of EQ definitions
     \param eqParams pointer to numEQs eqParamsStructs
     \param eqMap vector (length: numInputChans) indicating which EQ to apply to which input, 0 = no
-   EQ \param grp Curent signal group \param bsNumSignalGroups total number of signal groups \param
-   hFcInt A handle to the internal Format Converter state struct. \return Returns 0 on success,
-   otherwise 1.    */
-INT formatConverterSetEQs(INT* eqIndex_sorted, UCHAR numEQs, eqParamsStruct* eqParams, UINT* eqMap,
-                          UINT grp, UINT bsNumSignalGroups,
-                          IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, FIXP_DBL* p_buffer);
+   EQ \param grp Curent signal group \param hFcInt A handle to the internal Format Converter state
+   struct. \return Returns 0 on success, otherwise 1.    */
+INT formatConverterSetEQs(INT* eqIndex_sorted, UCHAR numEQs, const eqParamsStruct* eqParams,
+                          const UINT* eqMap, UINT grp, IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt,
+                          FIXP_DBL* p_buffer);
 
 /** Return processing delay of Format Converter.
     \param mode format converter processing mode.
