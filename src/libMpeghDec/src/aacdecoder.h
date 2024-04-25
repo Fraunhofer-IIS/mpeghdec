@@ -170,13 +170,6 @@ enum {
    << 2) /*!< Cross-fade at config change is demanded by pCtrlCFGChangeStruct->forceCrossfade */
 
 typedef struct {
-  /* Usac Extension Elements */
-  USAC_EXT_ELEMENT_TYPE usacExtElementType[(3)];
-  UINT usacExtElementDefaultLength[(3)];
-  UCHAR usacExtElementPayloadFrag[(3)];
-} CUsacCoreExtensions;
-
-typedef struct {
   EarconConfig earconConfig;
   EarconInfo earconInfo;
   UCHAR First_Frame;
@@ -278,12 +271,8 @@ struct AAC_DECODER_INSTANCE {
   CConcealParams concealCommonData;
   CConcealmentMethod concealMethodUser;
 
-  CUsacCoreExtensions
-      usacCoreExt; /*!< Data and handles to extend USAC FD/LPD core decoder (SBR, MPS, ...) */
   INT numUsacElements[TPDEC_MAX_TRACKS];
-  UCHAR usacStereoConfigIndex[(3 * ((28) * 2) + (((28) * 2)) / 2 + 4 * (1) + 1)];
   const CSUsacConfig* pUsacConfig[TPDEC_MAX_TRACKS];
-  INT nbDiv; /*!< number of frame divisions in LPD-domain */
 
   INT aacChannelsPrev; /*!< The amount of AAC core channels of the last successful decode call. */
   AUDIO_CHANNEL_TYPE channelTypePrev[(

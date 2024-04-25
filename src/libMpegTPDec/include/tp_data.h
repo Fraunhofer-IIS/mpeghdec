@@ -249,10 +249,6 @@ typedef struct {
   UCHAR igfNTiles;
   UCHAR shiftIndex1;
   UCHAR shiftChannel1;
-  UCHAR m_harmonicSBR;
-  UCHAR m_interTes;
-  UCHAR m_pvc;
-  UCHAR m_stereoConfigIndex;
   CSUsacExtElementConfig extElement;
 } CSUsacElementConfig;
 

@@ -563,7 +563,6 @@ static TRANSPORTDEC_ERROR UsacMpegHDecoderConfig_Parse(CSAudioSpecificConfig* as
             usc->element[i].igfIndependentTiling = FDKreadBits(hBs, 1);
           }
         }
-        { usc->element[i].m_stereoConfigIndex = 0; }
         usc->m_nUsacChannels += 2;
 
         if (asc->m_aot == AOT_MPEGH3DA) {

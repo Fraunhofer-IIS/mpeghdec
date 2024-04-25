@@ -180,17 +180,11 @@ void CAacDecoder_SignalInterruption(HANDLE_AACDECODER self) {
 
   \return  element channels
 */
-static int CAacDecoder_GetELChannels(MP4_ELEMENT_ID type, UCHAR usacStereoConfigIndex) {
+static int CAacDecoder_GetELChannels(MP4_ELEMENT_ID type) {
   int el_channels = 0;
 
   switch (type) {
     case ID_USAC_CPE:
-      if (usacStereoConfigIndex == 1) {
-        el_channels = 1;
-      } else {
-        el_channels = 2;
-      }
-      break;
     case ID_CPE:
       el_channels = 2;
       break;
@@ -1280,11 +1274,6 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
     }
 
     for (int el = 0; el < (INT)asc->m_sc.m_usacConfig.m_usacNumElements; el++) {
-      /* fix number of core channels aka ascChannels for stereoConfigIndex = 1 cases */
-      if (asc->m_sc.m_usacConfig.element[el].m_stereoConfigIndex == 1) {
-        ascChannels--; /* stereoConfigIndex == 1 stereo cases do actually contain only a mono core
-                          channel. */
-      }
     }
   }
 
@@ -1389,21 +1378,11 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
         if (self->elements[el] != self->pUsacConfig[streamIndex]->element[_el].usacElementType) {
           ascChanged = 1;
         }
-        if (self->usacStereoConfigIndex[el] !=
-            asc->m_sc.m_usacConfig.element[_el].m_stereoConfigIndex) {
-          ascChanged = 1;
-        }
         if (configMode & AC_CM_ALLOC_MEM) {
           self->elements[el] = self->pUsacConfig[streamIndex]->element[_el].usacElementType;
-          /* for Unified Stereo Coding */
-          self->usacStereoConfigIndex[el] = asc->m_sc.m_usacConfig.element[_el].m_stereoConfigIndex;
         }
 
         elFlags[el] |= (asc->m_sc.m_usacConfig.element[_el].m_noiseFilling) ? AC_EL_USAC_NOISE : 0;
-        elFlags[el] |=
-            (asc->m_sc.m_usacConfig.element[_el].m_stereoConfigIndex > 0) ? AC_EL_USAC_MPS212 : 0;
-        elFlags[el] |= (asc->m_sc.m_usacConfig.element[_el].m_interTes) ? AC_EL_USAC_ITES : 0;
-        elFlags[el] |= (asc->m_sc.m_usacConfig.element[_el].m_pvc) ? AC_EL_USAC_PVC : 0;
         elFlags[el] |= (asc->m_sc.m_usacConfig.element[_el].usacElementType == ID_USAC_LFE)
                            ? AC_EL_USAC_LFE
                            : 0;
@@ -1419,8 +1398,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
             (asc->m_sc.m_usacConfig.element[_el].lpdStereoIndex) ? AC_EL_LPDSTEREOIDX : 0;
         elFlags[el] |=
             (asc->m_sc.m_usacConfig.element[_el].usacElementType == ID_USAC_LFE) ? AC_EL_LFE : 0;
-        if ((asc->m_sc.m_usacConfig.element[_el].usacElementType == ID_USAC_CPE) &&
-            ((self->usacStereoConfigIndex[el] == 0))) {
+        if ((asc->m_sc.m_usacConfig.element[_el].usacElementType == ID_USAC_CPE)) {
           elFlags[el] |= AC_EL_USAC_CP_POSSIBLE;
         }
       }
@@ -1627,8 +1605,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
           case ID_USAC_CPE:
           case ID_USAC_LFE:
 
-            el_channels =
-                CAacDecoder_GetELChannels(self->elements[el], self->usacStereoConfigIndex[el]);
+            el_channels = CAacDecoder_GetELChannels(self->elements[el]);
 
             if (el_channels == 2) {
               /* The signal skip flag of both channels must be the same. */
@@ -1767,7 +1744,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
           int el2 = elementOffset + _el2;
           int elCh = 0, ch2;
 
-          if ((self->elements[el2] == ID_USAC_CPE) && !(self->usacStereoConfigIndex[el2] == 1)) {
+          if (self->elements[el2] == ID_USAC_CPE) {
             elCh = 2;
           } else if (IS_CHANNEL_ELEMENT(self->elements[el2])) {
             elCh = 1;
@@ -1848,9 +1825,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
           if (elCh > 0) {
             self->pAacDecoderStaticChannelInfo[ch - elCh]->nfRandomSeed = (ULONG)0x3039;
             if (self->elements[el2] == ID_USAC_CPE) {
-              if (asc->m_sc.m_usacConfig.element[el2].m_stereoConfigIndex != 1) {
-                self->pAacDecoderStaticChannelInfo[ch - elCh + 1]->nfRandomSeed = (ULONG)0x10932;
-              }
+              self->pAacDecoderStaticChannelInfo[ch - elCh + 1]->nfRandomSeed = (ULONG)0x10932;
             }
           }
         } /* for each element */
@@ -2199,7 +2174,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
       }
       if ((transportDec_GetAuBitsTotal(self->hInput, streamIndex) <= 0) &&
           (transportDec_GetFormat(self->hInput) != TT_MP4_ADIF)) {
-        el_channels = CAacDecoder_GetELChannels(type, self->usacStereoConfigIndex[element_count]);
+        el_channels = CAacDecoder_GetELChannels(type);
 
         if (el_channels > 0) {
           self->channel_elements[channel_element_count++] = type;
@@ -2239,7 +2214,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
           }
         }
 
-        el_channels = CAacDecoder_GetELChannels(type, self->usacStereoConfigIndex[element_count]);
+        el_channels = CAacDecoder_GetELChannels(type);
 
         if (self->flags[streamIndex] & AC_MPEGH3DA) {
           /* Create an elFlag array for use in MCT */
@@ -2666,7 +2641,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
       /* Skip sub streams not being present. */
       if ((transportDec_GetAuBitsTotal(self->hInput, streamIndex) <= 0) &&
           (transportDec_GetFormat(self->hInput) != TT_MP4_ADIF)) {
-        el_channels = CAacDecoder_GetELChannels(type, self->usacStereoConfigIndex[element_count]);
+        el_channels = CAacDecoder_GetELChannels(type);
         aacChannels += el_channels;
         aacChannelsIdx += el_channels;
         element_count++;
@@ -2681,7 +2656,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
         case ID_USAC_CPE:
         case ID_USAC_LFE:
 
-          el_channels = CAacDecoder_GetELChannels(type, self->usacStereoConfigIndex[element_count]);
+          el_channels = CAacDecoder_GetELChannels(type);
 
           /* Skip signals that are not enabled */
           if (!getOnOffFlag(self, aacChannelsIdx)) {
@@ -2828,7 +2803,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
       {
         int nElementChannels;
 
-        nElementChannels = CAacDecoder_GetELChannels(type, self->usacStereoConfigIndex[el]);
+        nElementChannels = CAacDecoder_GetELChannels(type);
 
         el_channels += nElementChannels;
 
