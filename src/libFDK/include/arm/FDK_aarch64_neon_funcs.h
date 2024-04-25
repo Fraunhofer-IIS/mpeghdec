@@ -2577,9 +2577,12 @@ static void __A64_st1x4_IA(INT width, INT size, INT64 &src1, INT64 &src2, INT64 
         INT *Src2 = (INT *) src2;
         INT *Src3 = (INT *) src3;
         INT *Src4 = (INT *) src4;
-        for (i=0; i < num; i++)   Dst[i] = Src1[i];  Dst += num;
-        for (i=0; i < num; i++)   Dst[i] = Src2[i];  Dst += num;
-        for (i=0; i < num; i++)   Dst[i] = Src3[i];  Dst += num;
+        for (i=0; i < num; i++)   Dst[i] = Src1[i];
+        Dst += num;
+        for (i=0; i < num; i++)   Dst[i] = Src2[i];
+        Dst += num;
+        for (i=0; i < num; i++)   Dst[i] = Src3[i];
+        Dst += num;
         for (i=0; i < num; i++)   Dst[i] = Src4[i];
       }
       break;
@@ -2590,9 +2593,12 @@ static void __A64_st1x4_IA(INT width, INT size, INT64 &src1, INT64 &src2, INT64 
         SHORT *Src2 = (SHORT *) src2;
         SHORT *Src3 = (SHORT *) src3;
         SHORT *Src4 = (SHORT *) src4;
-        for (i=0; i < num; i++)   Dst[i] = Src1[i];  Dst += num;
-        for (i=0; i < num; i++)   Dst[i] = Src2[i];  Dst += num;
-        for (i=0; i < num; i++)   Dst[i] = Src3[i];  Dst += num;
+        for (i=0; i < num; i++)   Dst[i] = Src1[i];
+        Dst += num;
+        for (i=0; i < num; i++)   Dst[i] = Src2[i];
+        Dst += num;
+        for (i=0; i < num; i++)   Dst[i] = Src3[i];
+        Dst += num;
         for (i=0; i < num; i++)   Dst[i] = Src4[i];
       }
       break;
@@ -2603,9 +2609,12 @@ static void __A64_st1x4_IA(INT width, INT size, INT64 &src1, INT64 &src2, INT64 
         SCHAR *Src2 = (SCHAR *) src2;
         SCHAR *Src3 = (SCHAR *) src3;
         SCHAR *Src4 = (SCHAR *) src4;
-        for (i=0; i < num; i++)   Dst[i] = Src1[i];  Dst += num;
-        for (i=0; i < num; i++)   Dst[i] = Src2[i];  Dst += num;
-        for (i=0; i < num; i++)   Dst[i] = Src3[i];  Dst += num;
+        for (i=0; i < num; i++)   Dst[i] = Src1[i];
+        Dst += num;
+        for (i=0; i < num; i++)   Dst[i] = Src2[i];
+        Dst += num;
+        for (i=0; i < num; i++)   Dst[i] = Src3[i];
+        Dst += num;
         for (i=0; i < num; i++)   Dst[i] = Src4[i];
       }
       break;
@@ -2627,8 +2636,10 @@ static void __A64_st1x3_IA(INT width, INT size, INT64 &src1, INT64 &src2, INT64 
         INT *Src1 = (INT *) src1;
         INT *Src2 = (INT *) src2;
         INT *Src3 = (INT *) src3;
-        for (i=0; i < num; i++)   Dst[i] = Src1[i];  Dst += num;
-        for (i=0; i < num; i++)   Dst[i] = Src2[i];  Dst += num;
+        for (i=0; i < num; i++)   Dst[i] = Src1[i];
+        Dst += num;
+        for (i=0; i < num; i++)   Dst[i] = Src2[i];
+        Dst += num;
         for (i=0; i < num; i++)   Dst[i] = Src3[i];
       }
         break;
@@ -2638,8 +2649,10 @@ static void __A64_st1x3_IA(INT width, INT size, INT64 &src1, INT64 &src2, INT64 
         SHORT *Src1 = (SHORT *) src1;
         SHORT *Src2 = (SHORT *) src2;
         SHORT *Src3 = (SHORT *) src3;
-        for (i=0; i < num; i++)   Dst[i] = Src1[i];  Dst += num;
-        for (i=0; i < num; i++)   Dst[i] = Src2[i];  Dst += num;
+        for (i=0; i < num; i++)   Dst[i] = Src1[i];
+        Dst += num;
+        for (i=0; i < num; i++)   Dst[i] = Src2[i];
+        Dst += num;
         for (i=0; i < num; i++)   Dst[i] = Src3[i];
       }
         break;
@@ -2649,8 +2662,10 @@ static void __A64_st1x3_IA(INT width, INT size, INT64 &src1, INT64 &src2, INT64 
         SCHAR *Src1 = (SCHAR *) src1;
         SCHAR *Src2 = (SCHAR *) src2;
         SCHAR *Src3 = (SCHAR *) src3;
-        for (i=0; i < num; i++)   Dst[i] = Src1[i];  Dst += num;
-        for (i=0; i < num; i++)   Dst[i] = Src2[i];  Dst += num;
+        for (i=0; i < num; i++)   Dst[i] = Src1[i];
+        Dst += num;
+        for (i=0; i < num; i++)   Dst[i] = Src2[i];
+        Dst += num;
         for (i=0; i < num; i++)   Dst[i] = Src3[i];
       }
         break;
@@ -3288,7 +3303,9 @@ void A64_check_move_immediate(int size, int datatype, int sign, INT64 immediate)
 #define __A64_smov_Wt(dst, src, lane)             "SMOV  " #dst ", " #src " [ " #lane " ]\n\t"
 #define __A64_mov_Xt_to_lane(dst, lane, src)      "MOV   " #dst " [ " #lane " ], " #src "\n\t"
 #define __A64_mov_Wt_to_lane(dst, lane, src)      "MOV   " #dst " [ " #lane " ], " #src "\n\t"
-#define __A64_umov_Wt(dest, src, lane)            "UMOV  " #dest ", " #src "[ " #lane " ]\n\t"
+#define __A64_umov_Wt(dst, src, lane)             "UMOV  " #dst ", " #src "[ " #lane " ]\n\t"
+#define __A64_umov_Xt(dst, src, lane)             "UMOV  " #dst ", " #src "[ " #lane " ]\n\t"
+#define __A64_sxtw_Xt(Xd, Wn)                     "SXTW  " #Xd ", " #Wn "\n\t"
 
 #define A64_mvni_i16(size, dst, imm)                     __A64_mvni_i16(size, dst, imm)
 #define A64_mvni_i32_lsl(size, dst, imm, lsl)            __A64_mvni_i32_lsl(size, dst, imm, lsl)
@@ -3297,7 +3314,7 @@ void A64_check_move_immediate(int size, int datatype, int sign, INT64 immediate)
 #define A64_movi(    width, size, dst, imm)              __A64_movi(dst, imm)
 #define A64_movi_lsl(width, size, dst, imm, lsl)         __A64_movi_lsl(dst, imm, lsl)
 #define A64_movi_msl(width, size, dst, imm, msl)         __A64_movi_msl(dst, imm, msl)
-#define A64_fmov(           size, dst, imm)              __A64_fmov(dst, imm);
+#define A64_fmov(           size, dst, imm)              __A64_fmov(dst, imm)
 
 #define A64_mov(width, size, dst, src)                   __A64_mov(dst, src)
 
@@ -3310,6 +3327,8 @@ void A64_check_move_immediate(int size, int datatype, int sign, INT64 immediate)
 #define A64_mov_Wt_to_lane(width, size, dst, lane, src)  __A64_mov_Wt_to_lane(dst, lane, src)
 #define A64_mov_Xt_to_lane(width, size, dst, lane, src)  __A64_mov_Xt_to_lane(dst, lane, src)
 #define A64_umov_Wt(dst, src, lane)                      __A64_umov_Wt(dst, src, lane)
+#define A64_umov_Xt(width, size, dst, src, lane)         __A64_umov_Xt(dst, src, lane)
+#define A64_sxtw_Xt(dst, src)                            __A64_sxtw_Xt(dst, src)
 
 #else
 /* Visual Studio / Linux gcc */
@@ -3324,7 +3343,7 @@ void A64_check_move_immediate(int size, int datatype, int sign, INT64 immediate)
 
 #define A64_mov(width, size, dst, src)                   __A64_mov((INT) width, (INT) size, (INT64 &) dst, (INT64 &) src);
 
-#define A64_mov_Xt_imm(dst, imm)                         __A64_mov_Xt_imm(&dst, (INT64) imm);
+#define A64_mov_Xt_imm(dst, imm)                         __A64_mov_Xt_imm((INT64 &)dst, (INT64) imm);
 #define A64_mov_Wt_imm(dst, imm)                         __A64_mov_Wt_imm((FIXP_DBL *) &dst, (INT64) imm);
 #define A64_mov_Xt(dst, src)                             __A64_mov_Xt((INT64 &) dst, (INT64 &) src);
 #define A64_smov_Wt(width, size, dst, src, lane)         __A64_smov_Wt((INT) width, (INT) size, (INT64 &) dst, (INT64 &) src, (INT) lane);
@@ -3333,6 +3352,8 @@ void A64_check_move_immediate(int size, int datatype, int sign, INT64 immediate)
 #define A64_mov_Wt_to_lane(width, size, dst, lane, src)  __A64_mov_Wt_to_lane((INT) width, (INT) size, (SCHAR *) dst, (INT) lane, (FIXP_DBL *) &src);
 #define A64_mov_Xt_to_lane(width, size, dst, lane, src)  __A64_mov_Xt_to_lane((INT) width, (INT) size, (INT64 &) dst, (INT) lane, (INT64 &) src);
 #define A64_umov_Wt(width, size, dst, src, lane)         __A64_umov_Wt((INT) width, (INT) size, (INT64 &) dst, (INT64 &) src, (INT) lane);
+#define A64_umov_Xt(width, size, dst, src, lane)         __A64_umov_Xt((INT) width, (INT) size, (INT64 &) dst, (INT64 &) src, (INT) lane);
+#define A64_sxtw_Xt(Xd, Wn)                              __A64_sxtw_Xt((INT64 &) Xd, (INT64 &) Wn);
 
 /* Move immediate to vector register, but not to any core registers */
 static inline void __A64_mvni_i16(int size, A64_H *dst, INT64 imm)
@@ -3634,6 +3655,32 @@ static inline void __A64_umov_Wt(INT width, INT size, INT64 &dst, INT64 &src, IN
     dst = (INT64) val;
 }
 
+/* Move a 64-bit vector lane zero-extended to Xt register, if not WZR */
+static inline void __A64_umov_Xt(INT width, INT size, INT64& dst, INT64& src, INT lane)
+{
+  extern INT64* __XZR;
+
+  FDK_ASSERT(width == 64);
+  FDK_ASSERT(size == 128);
+  FDK_ASSERT(lane == 0 || lane == 1);
+
+  UINT64 val;
+  UINT64* Src = (UINT64*)src;
+  val = Src[lane];
+  if (&dst != __XZR)
+    dst = (INT64)val;
+}
+
+static inline void __A64_sxtw_Xt(INT64& dst, INT64& src)
+{
+  extern INT64* __XZR;
+  INT val = (INT) src;
+
+  if (&dst != __XZR)
+    dst = (INT64)val;
+
+}
+
 /* SMOV Wd, Vn.<T>[index]  T = B with lane = 0..15 or T = H with lane = 0..7 */
 static inline void __A64_smov_Wt(INT width, INT size, INT64 &dst, INT64 &src, INT lane)
 {
@@ -3702,7 +3749,7 @@ static inline void __A64_smov_Xt(INT width, INT size, INT64 &dst, INT64 &src, IN
   }
 }
 
-
+#endif
 #ifdef __ARM_AARCH64_NEON__
 /* reference: ARM Cortex-A Series Version 1.0 Programmer's Guide for ARMv8-A */
 /* chapter  5.7.4 vector arithmetic */
@@ -3732,8 +3779,120 @@ static void __A64_fmul(INT size, INT width, A64_SP dst, A64_SP src1, A64_SP src2
 }
 #endif
 
+#ifdef __ARM_AARCH64_NEON__
+/* reference: ARM Cortex-A Series Version 1.0 Programmer's Guide for ARMv8-A */
+/* chapter  5.7.4 vector arithmetic */
+/* ARMv8 GCC */
+#define __A64_fadd(dst, src1, src2)                 "FADD  " #dst ", " #src1 ", " #src2 "\n\t"
+#define A64_fadd(size, width, dst, src1, src2)       __A64_fadd(dst, src1, src2)
+#else
+#define A64_fadd(size, width, dst, src1, src2)       __A64_fadd((INT) size, (INT) width, dst, src1, src2);
+
+static void __A64_fadd(INT size, INT width, A64_SP dst, A64_SP src1, A64_SP src2)
+{
+    INT i, num = size/width;
+    switch (width)
+    {
+    case 32:
+        for (i=0; i < num; i++)
+            dst[i] = src1[i] + src2[i];
+        break;
+    case 64:
+        A64_DP Dst  = (A64_DP) dst;
+        A64_DP Src1 = (A64_DP) src1;
+        A64_DP Src2 = (A64_DP) src2;
+        for (i=0; i < num; i++)
+            Dst[i] = Src1[i] + Src2[i];
+        break;
+    }
+}
 #endif
 
+#ifdef __ARM_AARCH64_NEON__
+/* reference: ARM Cortex-A Series Version 1.0 Programmer's Guide for ARMv8-A */
+/* chapter  5.7.4 vector arithmetic */
+/* ARMv8 GCC */
+#define __A64_fmls(dst, src1, src2)                 "FMLS  " #dst ", " #src1 ", " #src2 "\n\t"
+#define A64_fmls(size, width, dst, src1, src2)       __A64_fmls(dst, src1, src2)
+#else
+#define A64_fmls(size, width, dst, src1, src2)       __A64_fmls((INT) size, (INT) width, dst, src1, src2);
+
+static void __A64_fmls(INT size, INT width, A64_SP dst, A64_SP src1, A64_SP src2)
+{
+    INT i, num = size/width;
+    switch (width)
+    {
+    case 32:
+        for (i=0; i < num; i++)
+            dst[i] -= src1[i] * src2[i];
+        break;
+    case 64:
+        A64_DP Dst  = (A64_DP) dst;
+        A64_DP Src1 = (A64_DP) src1;
+        A64_DP Src2 = (A64_DP) src2;
+        for (i=0; i < num; i++)
+            Dst[i] -= Src1[i] * Src2[i];
+        break;
+    }
+}
+#endif
+
+#ifdef __ARM_AARCH64_NEON__
+/* reference: ARM Cortex-A Series Version 1.0 Programmer's Guide for ARMv8-A */
+/* chapter  5.7.4 vector arithmetic */
+/* ARMv8 GCC */
+#define __A64_fmla(dst, src1, src2)                 "FMLA  " #dst ", " #src1 ", " #src2 "\n\t"
+#define A64_fmla(size, width, dst, src1, src2)       __A64_fmls(dst, src1, src2)
+#else
+#define A64_fmla(size, width, dst, src1, src2)       __A64_fmla((INT) size, (INT) width, dst, src1, src2);
+
+static void __A64_fmla(INT size, INT width, A64_SP dst, A64_SP src1, A64_SP src2)
+{
+    INT i, num = size/width;
+    switch (width)
+    {
+    case 32:
+        for (i=0; i < num; i++)
+            dst[i] += src1[i] * src2[i];
+        break;
+    case 64:
+        A64_DP Dst  = (A64_DP) dst;
+        A64_DP Src1 = (A64_DP) src1;
+        A64_DP Src2 = (A64_DP) src2;
+        for (i=0; i < num; i++)
+            Dst[i] += Src1[i] * Src2[i];
+        break;
+    }
+}
+#endif
+#ifdef __ARM_AARCH64_NEON__
+/* reference: ARM Cortex-A Series Version 1.0 Programmer's Guide for ARMv8-A */
+/* chapter  5.7.4 vector arithmetic */
+/* ARMv8 GCC */
+#define __A64_fsub(dst, src1, src2)                 "FSUB  " #dst ", " #src1 ", " #src2 "\n\t"
+#define A64_fsub(size, width, dst, src1, src2)       __A64_fsub(dst, src1, src2)
+#else
+#define A64_fsub(size, width, dst, src1, src2)       __A64_fsub((INT) size, (INT) width, dst, src1, src2);
+
+static void __A64_fsub(INT size, INT width, A64_SP dst, A64_SP src1, A64_SP src2)
+{
+    INT i, num = size/width;
+    switch (width)
+    {
+    case 32:
+        for (i=0; i < num; i++)
+            dst[i] = src1[i] - src2[i];
+        break;
+    case 64:
+        A64_DP Dst  = (A64_DP) dst;
+        A64_DP Src1 = (A64_DP) src1;
+        A64_DP Src2 = (A64_DP) src2;
+        for (i=0; i < num; i++)
+            Dst[i] = Src1[i] - Src2[i];
+        break;
+    }
+}
+#endif
 
 /*#################################################################################*/
 /*
@@ -5912,7 +6071,7 @@ static inline void __A64_rev16(INT width, INT size, INT64 &dst, INT64 &src)
 
 #endif /*  __ARM_AARCH64_NEON__ */
 
-
+#ifndef __ARM_AARCH64_NEON__
 static inline FIXP_DBL ARMv8_sqdmulh(FIXP_DBL src1, FIXP_DBL src2)
 {
    /* Perform 32x32 MPY with doubling, high part result */
@@ -5934,7 +6093,7 @@ static inline FIXP_SGL ARMv8_sqdmulh(FIXP_SGL src1, FIXP_SGL src2)
    else
       return (FIXP_SGL) result;
 }
-
+#endif
 // Reference: ARMv8 Instruction Set Overview:
 //    5.7.4  Vector Arithmetic             Vd.<T>, Vn.<T>, Vm.<T>, where <T> is 4H, 8H, 2S, 4S
 //    5.7.5  Scalar Arithmetic             Vd.<T>, Vn.<T>, Vm.<T>, where <T> is H, S
@@ -5955,6 +6114,14 @@ static inline FIXP_SGL ARMv8_sqdmulh(FIXP_SGL src1, FIXP_SGL src2)
 #define   A64_mla_lane(width, size, dst, src1, src2, index)          __A64_mla_lane(dst, src1, src2, index)
 #define __A64_mls_lane(             dst, src1, src2, index)          "MLS " #dst ", " #src1 ", " #src2 "[" #index "]\n\t"
 #define   A64_mls_lane(width, size, dst, src1, src2, index)          __A64_mls_lane(dst, src1, src2, index)
+#define __A64_smull(dst, src1, src2)                                 "SMULL " #dst ", " #src1 ", " #src2 "\n\t"
+#define A64_smull(width, size, dst, src1, src2)                        __A64_smull(dst, src1, src2)
+#define __A64_smull2(dst, src1, src2)                                "SMULL2 " #dst ", " #src1 ", " #src2 "\n\t"
+#define A64_smull2(width, size, dst, src1, src2)                        __A64_smull2(dst, src1, src2)
+#define __A64_smlal(dst, src1, src2)                                 "SMLAL " #dst ", " #src1 ", " #src2 "\n\t"
+#define A64_smlal(width, size, dst, src1, src2)                        __A64_smlal(dst, src1, src2)
+#define __A64_smlal2(dst, src1, src2)                                "SMLAL2 " #dst ", " #src1 ", " #src2 "\n\t"
+#define A64_smlal2(width, size, dst, src1, src2)                        __A64_smlal2(dst, src1, src2)
 
 #else
 #define A64_sqdmulh(       width, size, dst, src1, src2)              __A64_sqdmulh(       (INT) width, (INT) size, (INT64 &)dst, (INT64 &)src1, (INT64 &)src2);
@@ -5964,7 +6131,10 @@ static inline FIXP_SGL ARMv8_sqdmulh(FIXP_SGL src1, FIXP_SGL src2)
 #define A64_mls(width, size, dst, src1, src2)                         __A64_mls(width, size, (INT64 &) dst, (INT64 &) src1, (INT64 &) src2);
 #define A64_mla_lane(width, size, dst, src1, src2, index)             __A64_mla_lane(width, size, (INT64 &) dst, (INT64 &) src1, (INT64 &) src2, (INT) index);
 #define A64_mls_lane(width, size, dst, src1, src2, index)             __A64_mls_lane(width, size, (INT64 &) dst, (INT64 &) src1, (INT64 &) src2, (INT) index);
-
+#define A64_smull(width, size, dst, src1, src2)                       __A64_smull(width, size, (INT64 &) dst, (INT64 &) src1, (INT64 &) src2);
+#define A64_smull2(width, size, dst, src1, src2)                      __A64_smull2(width, size, (INT64 &) dst, (INT64 &) src1, (INT64 &) src2);
+#define A64_smlal(width, size, dst, src1, src2)                       __A64_smlal(width, size, (INT64 &) dst, (INT64 &) src1, (INT64 &) src2);
+#define A64_smlal2(width, size, dst, src1, src2)                      __A64_smlal2(width, size, (INT64 &) dst, (INT64 &) src1, (INT64 &) src2);
 
 static inline void __A64_sqdmulh(INT width, INT size, INT64 &dst, INT64 &src1, INT64 &src2)
 {
@@ -6225,6 +6395,179 @@ static void __A64_mls_lane(INT width, INT size, INT64 &dst, INT64 &src1, INT64 &
   }
 }
 
+static void __A64_smull(INT width, INT size, INT64 &dst, INT64 &src1, INT64 &src2)
+{            /*  8H/8B, 4S/4H or 2D/2S */
+  FDK_ASSERT((width == 32) || (width == 16) || (width == 8));  /* width of MPY sources */
+  FDK_ASSERT((size == 128));                                   /* size of all MPY output, each of 2*width */
+  INT i, num = size / (2 * width);
+  switch (width)
+  {
+    case 32:
+    {
+      INT64* Dst = (INT64*)dst;
+      INT* Src1 = (INT*)src1;
+      INT* Src2 = (INT*)src2;
+      for (i = 0; i < num; i++)
+      {
+        Dst[i] = (INT64)Src1[i] * Src2[i];
+      }
+    }
+    break;
+    case 16:
+    {
+      INT* Dst = (INT*)dst;
+      SHORT* Src1 = (SHORT*)src1;
+      SHORT* Src2 = (SHORT*)src2;
+      for (i = 0; i < num; i++)
+      {
+        Dst[i] = (INT)Src1[i] * Src2[i];
+      }
+    }
+    break;
+    case 8:
+    {
+      SHORT* Dst = (SHORT*)dst;
+      SCHAR* Src1 = (SCHAR*)src1;
+      SCHAR* Src2 = (SCHAR*)src2;
+      for (i = 0; i < num; i++)
+      {
+        Dst[i] = (SHORT)Src1[i] * Src2[i];
+      }
+    }
+    break;
+  }
+}
+
+static void __A64_smull2(INT width, INT size, INT64 &dst, INT64 &src1, INT64 &src2)
+{
+  FDK_ASSERT((width == 32) || (width == 16) || (width == 8));  /* width of MPY sources */
+  FDK_ASSERT((size == 128));                                   /* size of all MPY output, each of 2*width */
+  INT i, num = size / (2 * width);
+  switch (width)
+  {
+  case 32:
+  {
+    INT64* Dst = (INT64*)dst;
+    INT* Src1 = (INT*)src1;
+    INT* Src2 = (INT*)src2;
+    for (i = 0; i < num; i++)
+    {
+      Dst[i] = (INT64)Src1[num+i] * Src2[num+i];
+    }
+  }
+  break;
+  case 16:
+  {
+    INT* Dst = (INT*)dst;
+    SHORT* Src1 = (SHORT*)src1;
+    SHORT* Src2 = (SHORT*)src2;
+    for (i = 0; i < num; i++)
+    {
+      Dst[i] = (INT)Src1[num+i] * Src2[num+i];
+    }
+  }
+  break;
+  case 8:
+  {
+    SHORT* Dst = (SHORT*)dst;
+    SCHAR* Src1 = (SCHAR*)src1;
+    SCHAR* Src2 = (SCHAR*)src2;
+    for (i = 0; i < num; i++)
+    {
+      Dst[i] = (SHORT)Src1[num+i] * Src2[num+i];
+    }
+  }
+  break;
+  }
+
+}
+
+static void __A64_smlal(INT width, INT size, INT64 &dst, INT64 &src1, INT64 &src2)
+{            /*  8H/8B, 4S/4H or 2D/2S */
+  FDK_ASSERT((width == 32) || (width == 16) || (width == 8));  /* width of MPY sources */
+  FDK_ASSERT((size == 128));                                   /* size of all MPY output, each of 2*width */
+  INT i, num = size / (2*width);
+  switch (width)
+  {
+    case 32:
+    {
+      INT64* Dst = (INT64*)dst;
+      INT* Src1 = (INT*)src1;
+      INT* Src2 = (INT*)src2;
+      for (i = 0; i < num; i++)
+      {
+        Dst[i] += (INT64) Src1[i] * Src2[i];
+      }
+    }
+    break;
+    case 16:
+    {
+      INT* Dst = (INT*)dst;
+      SHORT* Src1 = (SHORT*)src1;
+      SHORT* Src2 = (SHORT*)src2;
+      for (i = 0; i < num; i++)
+      {
+        Dst[i] += (INT) Src1[i] * Src2[i];
+      }
+    }
+    break;
+    case 8:
+    {
+      SHORT* Dst = (SHORT*)dst;
+      SCHAR* Src1 = (SCHAR*)src1;
+      SCHAR* Src2 = (SCHAR*)src2;
+      for (i = 0; i < num; i++)
+      {
+        Dst[i] += (SHORT) Src1[i] * Src2[i];
+      }
+    }
+    break;
+  }
+}
+
+static void __A64_smlal2(INT width, INT size, INT64& dst, INT64& src1, INT64& src2)
+{
+  FDK_ASSERT((width == 32) || (width == 16) || (width == 8));  /* width of MPY sources */
+  FDK_ASSERT((size == 128));                                   /* size of all MPY output, each of 2*width */
+  INT i, num = size / (2 * width);
+  switch (width)
+  {
+    case 32:
+    {
+      INT64* Dst = (INT64*)dst;
+      INT* Src1 = (INT*)src1;
+      INT* Src2 = (INT*)src2;
+      for (i = 0; i < num; i++)
+      {
+        Dst[i] += (INT64)Src1[num+i] * Src2[num+i];
+      }
+      break;
+    }
+    case 16:
+    {
+      INT* Dst = (INT*)dst;
+      SHORT* Src1 = (SHORT*)src1;
+      SHORT* Src2 = (SHORT*)src2;
+      for (i = 0; i < num; i++)
+      {
+        Dst[i] += (INT)Src1[num+i] * Src2[num+i];
+      }
+      break;
+    }
+    case 8:
+    {
+      SHORT* Dst = (SHORT*)dst;
+      SCHAR* Src1 = (SCHAR*)src1;
+      SCHAR* Src2 = (SCHAR*)src2;
+      for (i = 0; i < num; i++)
+      {
+        Dst[i] += (SHORT)Src1[num+i] * Src2[num+i];
+      }
+      break;
+    }
+  }
+}
+
 
 #endif /*  __ARM_AARCH64_NEON__ */
 
@@ -6333,6 +6676,21 @@ static inline void __A64_trn1(INT width, INT size, INT64 *dst, INT64 &src1, INT6
       {
           Dst[2*i+0] = Src1[2*i+0];
           Dst[2*i+1] = Src2[2*i+0];
+      }
+      dst[0] = tmp[0];
+      if (num == 2)
+        dst[1] = tmp[1];
+    }
+    break;
+    case 64:
+    {
+      INT64 *Dst  = (INT64 *)&tmp;
+      INT64 *Src1 = (INT64 *)src1;
+      INT64 *Src2 = (INT64 *)src2;
+      for (i = 0; i < num; i++)
+      {
+        Dst[2 * i + 0] = Src1[2 * i + 0];
+        Dst[2 * i + 1] = Src2[2 * i + 0];
       }
       dst[0] = tmp[0];
       if (num == 2)
@@ -6773,41 +7131,51 @@ static inline void __A64_uzp2(INT width, INT size, INT64 *dst, INT64 &src1, INT6
 #define __A64_sub_Xt_lsr_imm(Xd, Xn, Xm, uimm)     "SUB  " #Xd ", " #Xn ", " #Xm ", LSR # " #uimm " \n\t"
 #define __A64_add_Xt_sxtw(   Xd, Xn, Wm)           "ADD  " #Xd ", " #Xn ", " #Wm ", SXTW\n\t"
 
-#define A64_adds_Xt_asr_imm(Xd, Xn, Xm, uimm)    __A64_adds_Xt_asr_imm(Xd, Xn, Xm, uimm)
-#define A64_adds_Xt_lsl_imm(Xd, Xn, Xm, uimm)    __A64_adds_Xt_lsl_imm(Xd, Xn, Xm, uimm)
-#define A64_adds_Xt_lsr_imm(Xd, Xn, Xm, uimm)    __A64_adds_Xt_lsr_imm(Xd, Xn, Xm, uimm)
-#define A64_adds_Wt_asr_imm(Wd, Wn, Wm, uimm)    __A64_adds_Wt_asr_imm(Wd, Wn, Wm, uimm)
-#define A64_adds_Wt_lsl_imm(Wd, Wn, Wm, uimm)    __A64_adds_Wt_lsl_imm(Wd, Wn, Wm, uimm)
-#define A64_adds_Wt_lsr_imm(Wd, Wn, Wm, uimm)    __A64_adds_Wt_lsr_imm(Wd, Wn, Wm, uimm)
-#define A64_add_Xt_asr_imm(Xd, Xn, Xm, uimm)     __A64_add_Xt_asr_imm(Xd, Xn, Xm, uimm)
-#define A64_add_Xt_lsl_imm(Xd, Xn, Xm, uimm)     __A64_add_Xt_lsl_imm(Xd, Xn, Xm, uimm)
-#define A64_add_Xt_lsr_imm(Xd, Xn, Xm, uimm)     __A64_add_Xt_lsr_imm(Xd, Xn, Xm, uimm)
-#define A64_sub_Xt_asr_imm(Xd, Xn, Xm, uimm)     __A64_sub_Xt_asr_imm(Xd, Xn, Xm, uimm)
-#define A64_sub_Xt_lsl_imm(Xd, Xn, Xm, uimm)     __A64_sub_Xt_lsl_imm(Xd, Xn, Xm, uimm)
-#define A64_sub_Xt_lsr_imm(Xd, Xn, Xm, uimm)     __A64_sub_Xt_lsr_imm(Xd, Xn, Xm, uimm)
-#define A64_add_Xt_sxtw(Xd, Xn, Wm)              __A64_add_Xt_sxtw(Xd, Xn, Wm)
+#define A64_adds_Xt_asr_imm(Xd, Xn, Xm, uimm)     __A64_adds_Xt_asr_imm(Xd, Xn, Xm, uimm)
+#define A64_adds_Xt_lsl_imm(Xd, Xn, Xm, uimm)     __A64_adds_Xt_lsl_imm(Xd, Xn, Xm, uimm)
+#define A64_adds_Xt_lsr_imm(Xd, Xn, Xm, uimm)     __A64_adds_Xt_lsr_imm(Xd, Xn, Xm, uimm)
+#define A64_adds_Wt_asr_imm(Wd, Wn, Wm, uimm)     __A64_adds_Wt_asr_imm(Wd, Wn, Wm, uimm)
+#define A64_adds_Wt_lsl_imm(Wd, Wn, Wm, uimm)     __A64_adds_Wt_lsl_imm(Wd, Wn, Wm, uimm)
+#define A64_adds_Wt_lsr_imm(Wd, Wn, Wm, uimm)     __A64_adds_Wt_lsr_imm(Wd, Wn, Wm, uimm)
+#define A64_add_Xt_asr_imm(Xd, Xn, Xm, uimm)      __A64_add_Xt_asr_imm(Xd, Xn, Xm, uimm)
+#define A64_add_Xt_lsl_imm(Xd, Xn, Xm, uimm)      __A64_add_Xt_lsl_imm(Xd, Xn, Xm, uimm)
+#define A64_add_Xtp_lsl_imm(Xd, Xn, Xm, uimm, sc) __A64_add_Xt_lsl_imm(Xd, Xn, Xm, uimm)
+#define A64_add_Xt_lsr_imm(Xd, Xn, Xm, uimm)      __A64_add_Xt_lsr_imm(Xd, Xn, Xm, uimm)
+#define A64_sub_Xt_asr_imm(Xd, Xn, Xm, uimm)      __A64_sub_Xt_asr_imm(Xd, Xn, Xm, uimm)
+#define A64_sub_Xt_lsl_imm(Xd, Xn, Xm, uimm)      __A64_sub_Xt_lsl_imm(Xd, Xn, Xm, uimm)
+#define A64_sub_Xtp_lsl_imm(Xd, Xn, Xm, uimm, sc) __A64_sub_Xt_lsl_imm(Xd, Xn, Xm, uimm)
+#define A64_sub_Xt_lsr_imm(Xd, Xn, Xm, uimm)      __A64_sub_Xt_lsr_imm(Xd, Xn, Xm, uimm)
+#define A64_add_Xt_sxtw(Xd, Xn, Wm)               __A64_add_Xt_sxtw(Xd, Xn, Wm)
 
 
 #else
 /* Example: Add shifted register to any number/counter */
 #define A64_adds_Xt_asr_imm(Xd, Xn, Xm, uimm)  { FDK_ASSERT((uimm >= 0) && (uimm <= 63));  Xd = ARMv8_adds_Xt((INT64)Xn, (INT64)Xm >> uimm);  }
+#define A64_adds_Xt_lsr_imm(Xd, Xn, Xm, uimm)  { FDK_ASSERT((uimm >= 0) && (uimm <= 63));  Xd = ARMv8_adds_Xt((INT64)Xn,(UINT64)Xm >> uimm);  }
+#define A64_adds_Xt_lsl_imm(Xd, Xn, Xm, uimm)  { FDK_ASSERT((uimm >= 0) && (uimm <= 63));  Xd = ARMv8_adds_Xt((INT64)Xn, (INT64)Xm << uimm);  }
 /* Example: Add shifted offset to pointer: ptr = buffer + offset;  uimm-scale must be gretaer/equal zero */
 #define A64_add_Xt_asr_imm(Xd, Xn, Xm, uimm)  { FDK_ASSERT((uimm >= 0) && (uimm <= 63));  \
                                                        FDK_ASSERT((uimm) >= 0);            \
                                                        Xd = (INT64) Xn + ((INT64) Xm >> (uimm));  }
 #define A64_add_Xt_lsl_imm(Xd, Xn, Xm, uimm)  { FDK_ASSERT((uimm >= 0) && (uimm <= 63));  \
                                                        FDK_ASSERT((uimm) >= 0);            \
-                                                       Xd = (INT64) Xn + (INT64) ((INT64) Xm << (uimm));  }
+                                                       Xd = (INT64)Xn + (INT64)((INT64)Xm << (uimm));  }
+#define A64_add_Xtp_lsl_imm(Xd, Xn, Xm, uimm, sc) { FDK_ASSERT((uimm >= 0) && (uimm <= 63));  \
+                                                       FDK_ASSERT((uimm) >= 0);            \
+                                                       Xd = Xn + (INT64)(((INT64)Xm << (uimm))>>sc);  }
 #define A64_add_Xt_lsr_imm(Xd, Xn, Xm, uimm)  { FDK_ASSERT((uimm >= 0) && (uimm <= 63));  \
                                                        FDK_ASSERT((uimm) >= 0);            \
-                                                       Xd = (INT64)Xn + (INT64)((UINT64) Xm >> (uimm));  }
+                                                       Xd = ((INT64)Xn + (INT64)((UINT64) Xm >> (uimm)));  }
 /* Example: Subtract shifted offset from pointer: ptr = buffer - offset;  uimm-scale must be gretaer/equal zero */
 #define A64_sub_Xt_asr_imm(Xd, Xn, Xm, uimm)  { FDK_ASSERT((uimm >= 0) && (uimm <= 63));  \
                                                        FDK_ASSERT((uimm) >= 0);            \
                                                        Xd = (INT64)Xn - ((INT64)Xm >> (uimm));  }
 #define A64_sub_Xt_lsl_imm(Xd, Xn, Xm, uimm)  { FDK_ASSERT((uimm >= 0) && (uimm <= 63));  \
                                                        FDK_ASSERT((uimm) >= 0);            \
-                                                       Xd = (INT64)Xn - ((INT64)Xm << (uimm));  }
+                                                       Xd = ((INT64) Xn - (INT64)((INT64)Xm << (uimm)));  }
+#define A64_sub_Xtp_lsl_imm(Xd, Xn, Xm, uimm, sc) { FDK_ASSERT((uimm >= 0) && (uimm <= 63));  \
+                                                       FDK_ASSERT((uimm) >= 0);            \
+                                                       Xd = Xn - (INT64)(((INT64)Xm << (uimm)) >> sc);  }
 #define A64_sub_Xt_lsr_imm(Xd, Xn, Xm, uimm)  { FDK_ASSERT((uimm >= 0) && (uimm <= 63));  \
                                                        FDK_ASSERT((uimm) >= 0);            \
                                                        Xd = (INT64)Xn - (INT64)((UINT64) Xm >> (uimm));  }
@@ -6868,6 +7236,8 @@ static inline void __A64_uzp2(INT width, INT size, INT64 *dst, INT64 &src1, INT6
 #define __A64_sshl(dst, src1, src2)                  "SSHL " #dst ", " #src1 ", " #src2 " \n\t"
 #define A64_sshl(width, size, dst, src1, src2)        __A64_sshl(dst, src1, src2)
 #define A64_lsrv_Wt(dst, src1, src2)                  "LSRV " #dst ", " #src1 ", " #src2 " \n\t"
+#define __A64_ssra_imm(dst, src, imm)                 "SSRA " #dst ", " #src ", " #imm " \n\t"
+#define A64_ssra_imm(width, size, dst, src, imm)      __A64_ssra_imm(dst, src, imm)
 #else
 #define A64_shl_imm(width, size, dst, src, imm)      __A64_shl_imm((INT) width, (INT) size, (INT64 &) dst, (INT64 &) src, (INT64) imm);
 #define A64_sqshl(width, size, dst, src1, src2)      __A64_sqshl((INT) width, (INT) size, (INT64 &) dst, (INT64 &) src1, (INT64 &) src2);
@@ -6877,6 +7247,7 @@ static inline void __A64_uzp2(INT width, INT size, INT64 *dst, INT64 &src1, INT6
 #define A64_sshr_imm(width, size, dst, src, imm)     __A64_sshr_imm((INT) width, (INT) size, (INT64 &) dst, (INT64 &) src, (INT64) imm);
 #define A64_sshl(width, size, dst, src1, src2)       __A64_sshl((INT) width, (INT) size, (INT64 &) dst, (INT64 &) src1,(INT64 &) src2);
 #define A64_lsrv_Wt(dst, src1, src2)                 { dst = (UINT) src1 >> ((UINT) src2 & 0x1F); }
+#define A64_ssra_imm(width, size, dst, src, imm)     __A64_ssra_imm((INT) width, (INT) size, (INT64 &) dst, (INT64 &) src, (INT64) imm);
 
 static inline void __A64_shl_imm(INT width, INT size, INT64 &dst, INT64 &src, INT64 imm)
 {
@@ -7106,6 +7477,58 @@ static inline void __A64_sshr_imm(INT width, INT size, INT64 &dst, INT64 &src, I
   }
 }
 
+static inline void __A64_ssra_imm(INT width, INT size, INT64& dst, INT64& src, INT64 imm)
+{
+  FDK_ASSERT((width == 64) || (width == 32) || (width == 16) || (width == 8));
+  FDK_ASSERT((size == 128) || (size == 64));
+  FDK_ASSERT((imm >= 0) && (imm < width));
+  INT i, num = size / width;
+  switch (width)
+  {
+  case 64:
+  {
+    INT64* Dst = (INT64*)dst;
+    INT64* Src = (INT64*)src;
+    for (i = 0; i < num; i++)
+    {
+      Dst[i] += Src[i] >> imm;
+    }
+  }
+  break;
+  case 32:
+  {
+    INT* Dst = (INT*)dst;
+    INT* Src = (INT*)src;
+    for (i = 0; i < num; i++)
+    {
+      Dst[i] += Src[i] >> imm;
+    }
+  }
+  break;
+  case 16:
+  {
+    SHORT* Dst = (SHORT*)dst;
+    SHORT* Src = (SHORT*)src;
+    for (i = 0; i < num; i++)
+    {
+      Dst[i] += Src[i] >> imm;
+    }
+  }
+  break;
+  case 8:
+  {
+    SCHAR* Dst = (SCHAR*)dst;
+    SCHAR* Src = (SCHAR*)src;
+    for (i = 0; i < num; i++)
+    {
+      Dst[i] += Src[i] >> imm;
+    }
+  }
+  break;
+  }
+}
+
+
 static inline void __A64_sshl(INT width, INT size, INT64 &dst, INT64 &src1, INT64 &src2)
 {
   FDK_ASSERT((width == 64) || (width == 32) || (width == 16) || (width == 8));
@@ -7234,19 +7657,30 @@ static inline void __A64_sshr(INT width, INT size, INT64 &dst, INT64 &src1, INT6
 #endif
 
 #ifdef __ARM_AARCH64_NEON__
-#define __A64_ands_Xt_imm(dst, src, imm)    "ANDS " #dst ", " #src ",  # " #imm "  \n\t"
-#define __A64_ands_Wt_imm(dst, src, imm)    "ANDS " #dst ", " #src ",  # " #imm "  \n\t"
-#define A64_ands_Xt_imm(dst, src, imm)      __A64_ands_Xt_imm(dst, src, imm)
-#define A64_ands_Wt_imm(dst, src, imm)      __A64_ands_Wt_imm(dst, src, imm)
-#define __A64_and_Xt_imm(dst, src, imm)    "AND " #dst ", " #src ",  # " #imm "  \n\t"
-#define __A64_and_Wt_imm(dst, src, imm)    "AND " #dst ", " #src ",  # " #imm "  \n\t"
-#define A64_and_Xt_imm(dst, src, imm)      __A64_and_Xt_imm(dst, src, imm)
-#define A64_and_Wt_imm(dst, src, imm)      __A64_and_Wt_imm(dst, src, imm)
+#define __A64_ands_Xt_imm(dst, src, imm)           "ANDS " #dst ", " #src ",  # " #imm "  \n\t"
+#define __A64_ands_Wt_imm(dst, src, imm)           "ANDS " #dst ", " #src ",  # " #imm "  \n\t"
+#define A64_ands_Xt_imm(dst, src, imm)             __A64_ands_Xt_imm(dst, src, imm)
+#define A64_ands_Wt_imm(dst, src, imm)             __A64_ands_Wt_imm(dst, src, imm)
+
+#define __A64_and_Xt_imm(dst, src, imm)            "AND " #dst ", " #src ",  # " #imm "  \n\t"
+#define __A64_and_Wt_imm(dst, src, imm)            "AND " #dst ", " #src ",  # " #imm "  \n\t"
+#define A64_and_Xt_imm(dst, src, imm)              __A64_and_Xt_imm(dst, src, imm)
+#define A64_and_Wt_imm(dst, src, imm)              __A64_and_Wt_imm(dst, src, imm)
+
+#define __A64_and_Xt_lsl_imm(Xd, Xn, Xm, imm)      "AND  " #Xd ", " #Xn ", " #Xm ", LSL # " #imm " \n\t"
+#define __A64_and_Xt_lsr_imm(Xd, Xn, Xm, imm)      "AND  " #Xd ", " #Xn ", " #Xm ", LSR # " #imm " \n\t"
+#define A64_and_Xt_lsl_imm(Xd, Xn, Xm, imm)        __A64_and_Xt_lsl_imm(Xd, Xn, Xm, imm)
+#define A64_and_Xt_lsr_imm(Xd, Xn, Xm, imm)        __A64_and_Xt_lsr_imm(Xd, Xn, Xm, imm)
+
 #else
-#define A64_and_Xt_imm(Xd, Xm, imm)       __A64_and_Xt_imm((INT64 &) Xd, (INT64 &) Xm, (INT64) imm);
-#define A64_and_Wt_imm(Wd, Wm, imm)       __A64_and_Wt_imm((INT &) Wd, (INT &) Wm, (INT64) imm);
-#define A64_ands_Xt_imm(Xd, Xm, imm)      __A64_ands_Xt_imm((INT64 &) Xd, (INT64 &) Xm, (INT64) imm);
-#define A64_ands_Wt_imm(Wd, Wm, imm)      __A64_ands_Wt_imm((INT &) Wd, (INT &) Wm, (INT64) imm);
+#define A64_and_Xt_imm(Xd, Xm, imm)          __A64_and_Xt_imm((INT64 &) Xd, (INT64 &) Xm, (INT64) imm);
+#define A64_and_Wt_imm(Wd, Wm, imm)          __A64_and_Wt_imm((INT &) Wd, (INT &) Wm, (INT64) imm);
+#define A64_ands_Xt_imm(Xd, Xm, imm)         __A64_ands_Xt_imm((INT64 &) Xd, (INT64 &) Xm, (INT64) imm);
+#define A64_ands_Wt_imm(Wd, Wm, imm)         __A64_ands_Wt_imm((INT &) Wd, (INT &) Wm, (INT64) imm);
+#define A64_and_Xt_lsl_imm(Xd, Xn, Xm, imm)  { FDK_ASSERT((imm >= 0) && (imm <= 63));  \
+                                                Xd = (INT64) Xn & (INT64)((INT64) Xm << (imm));  }
+#define A64_and_Xt_lsr_imm(Xd, Xn, Xm, imm)  { FDK_ASSERT((imm >= 0) && (imm <= 63));  \
+                                                Xd = (INT64) Xn & (INT64)((INT64) Xm >> (imm));  }
 
 static inline void __A64_and_Xt_imm(INT64 &Xd, INT64 &Xm, INT64 imm)
 {
@@ -7275,7 +7709,6 @@ extern INT* __WZR;
       Wd = result;
     }
 }
-
 
 static inline void __A64_ands_Xt_imm(INT64 &Xd, INT64 &Xm, INT64 imm)
 {
@@ -7557,11 +7990,19 @@ static inline UINT __A64_rbit_Wt(UINT Wm)
 
 
 #if defined (__ARM_AARCH64_NEON__) && defined (__GNUC__)
+#ifdef __cplusplus
 #define A64_ASM_ROUTINE_START(proc_type, proc_name, proc_args)   \
                              extern "C" { proc_type proc_name proc_args;   }  \
                              asm ( "\n\t" \
                              ".section .text\n\t" \
                              "" #proc_name ": \n\t"
+#else
+#define A64_ASM_ROUTINE_START(proc_type, proc_name, proc_args)   \
+                             proc_type proc_name proc_args;    \
+                             __asm__ ( "\n\t" \
+                             ".section .text\n\t" \
+                             "" #proc_name ": \n\t"
+#endif                             
 #define A64_ASM_ROUTINE_END()               A64_return()  );
 #define A64_ASM_ROUTINE_RETURN(proc_type)   A64_return()  \
                                            );

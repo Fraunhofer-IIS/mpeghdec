@@ -161,6 +161,13 @@ amm-info@iis.fraunhofer.de
 #define __ARM_AARCH64_NEON__
 #endif
 
+#if defined(__THUMBEL__) && defined(__ARM_ARCH_7_A__)
+#undef __ARM_ARCH_6__
+#undef __ARM_ARCH_7_A__
+#undef __ARM_NEON__
+#define __ARM_ARCH_7EM__
+#endif
+
 #if defined(__APPLE__)
 #undef __ARM_NEON__         /* disable use of ARMv7 legacy NEON */
 #undef __ARM_AARCH64_NEON__ /* disable use of ARMv8 NEON */

@@ -1514,13 +1514,13 @@ static void inline FDK_vstr_32(const FIXP_D src, FIXP_DBL *dst, int offset)
               else if (size ==  32) { FDK_vldm6_32 ((FIXP_D) dst1,(FIXP_D) dst2,(FIXP_D) dst3,(FIXP_D) dst4,(FIXP_D) dst5,(FIXP_D) dst6,(FIXP_D) src); }         \
             }
 #define FDK_vldm6_ia(size, dst1, dst2, dst3, dst4, dst5, dst6, src) { FDK_vldm6(size, dst1, dst2, dst3, dst4, dst5, dst6, src);  src += 6*(size>>3)/(INT)sizeof(*src); }
-#define FDK_vldm6_db(size, dst1, dst2, dst3, dst4, dst5, dst6, src) { src -= 6*(size>>3)/(INT)sizeof(*src);  FDK_vldm6(size, dst1, dst2, ds3, dst4, dst5, dst6, src); }
+#define FDK_vldm6_db(size, dst1, dst2, dst3, dst4, dst5, dst6, src) { src -= 6*(size>>3)/(INT)sizeof(*src);  FDK_vldm6(size, dst1, dst2, dst3, dst4, dst5, dst6, src); }
 #define FDK_vldm6_cond_ia(cond, size, dst1, dst2, dst3, dst4, dst5, dst6, src) { if (__FDK_coreflags_ ## cond) { FDK_vldm6_ia(size, dst1, dst2, dst3, dst4, dst5, dst6, src); } }
 
 #define FDK_vldm7(size, dst1, dst2, dst3, dst4, dst5, dst6, dst7, src)    \
             { if      (size == 128) { FDK_vldm7_128((FIXP_Q) dst1,(FIXP_Q) dst2,(FIXP_Q) dst3,(FIXP_Q) dst4,(FIXP_Q) dst5,(FIXP_Q) dst6,(FIXP_Q) dst7,(FIXP_D) src); }   \
-              else if (size ==  64) { FDK_vldm7_64 ((FIXP_H) dst1,(FIXP_H) dst2,(FIX_H) dst3,(FIXP_H) dst4,(FIXP_H) dst5,(FIXP_H) dst6,(FIXP_H) dst7,(FIXP_D) src); }   \
-              else if (size ==  32) { FDK_vldm7_32 ((FIXP_D) dst1,(FIXP_D) dst2,(FIXP_D) dst3,(IXP_D) dst4,(FIXP_D) dst5,(FIXP_D) dst6,(FIXP_D) dst7,(FIXP_D) src); }   \
+              else if (size ==  64) { FDK_vldm7_64 ((FIXP_H) dst1,(FIXP_H) dst2,(FIXP_H) dst3,(FIXP_H) dst4,(FIXP_H) dst5,(FIXP_H) dst6,(FIXP_H) dst7,(FIXP_D) src); }   \
+              else if (size ==  32) { FDK_vldm7_32 ((FIXP_D) dst1,(FIXP_D) dst2,(FIXP_D) dst3,(FIXP_D) dst4,(FIXP_D) dst5,(FIXP_D) dst6,(FIXP_D) dst7,(FIXP_D) src); }   \
             }
 #define FDK_vldm7_ia(size, dst1, dst2, dst3, dst4, dst5, dst6, dst7, src) { FDK_vldm7(size, dst1, dst2, dst3, dst4, dst5, dst6, dst7, src);  src += 7*(size>>3)/(INT)sizeof(*src); }
 #define FDK_vldm7_db(size, dst1, dst2, dst3, dst4, dst5, dst6, dst7, src) { src -= 7*(size>>3)/(INT)sizeof(*src);  FDK_vldm7(size, dst1, dst2, dst3, dst4, dst5, dst6, dst7, src); }
@@ -3231,15 +3231,29 @@ static void inline FDK_vqneg_s16_d (FIXP_H dst, FIXP_H src)
 #endif
 
 #ifdef __ARM_NEON__
+#define FDK_vabs_f32_d(dst, src)     "VABS.F32 " #dst ", " #src "\n\t"
+#define FDK_vabs_f32_q(dst, src)     "VABS.F32 " #dst ", " #src "\n\t"
 #define FDK_vabs_q( size, dst, src)  "VABS.S" #size " " #dst ", " #src " \n\t"
 #define FDK_vabs_d( size, dst, src)  "VABS.S" #size " " #dst ", " #src " \n\t"
 #define FDK_vqabs_q(size, dst, src)  "VQABS.S" #size " " #dst ", " #src " \n\t"
 #define FDK_vqabs_d(size, dst, src)  "VQABS.S" #size " " #dst ", " #src " \n\t"
 #else
+#define FDK_vabs_f32_d(dst, src)   { FDK_vabs_f32((INT) 64,  (FLOAT *) dst, (FLOAT *)src); }
+#define FDK_vabs_f32_q(dst, src)   { FDK_vabs_f32((INT) 128, (FLOAT *) dst, (FLOAT *)src); }
 #define FDK_vabs_q(size, dst, src) { if (size == 32)  FDK_vabs_s32_q(dst, src);   else if (size == 16) FDK_vabs_s16_q(dst, src); }
 #define FDK_vabs_d(size, dst, src) { if (size == 32)  FDK_vabs_s32_d(dst, src);   else if (size == 16) FDK_vabs_s16_d(dst, src); }
 #define FDK_vqabs_q(size, dst, src){ if (size == 32)  FDK_vqabs_s32_q(dst, src);  else if (size == 16) FDK_vqabs_s16_q(dst, src); }
 #define FDK_vqabs_d(size, dst, src){ if (size == 32)  FDK_vqabs_s32_d(dst, src);  else if (size == 16) FDK_vqabs_s16_d(dst, src); }
+
+static void  FDK_vabs_f32(INT size, FLOAT *dst, FLOAT *src)
+{
+  int i;
+  INT num = size >> 5;
+  for (i = 0; i < num; i++)
+  {
+      dst[i] = src[i];
+  }
+}
 
 static void inline FDK_vabs_s32_q(FIXP_Q dst, FIXP_Q src)
 {
@@ -4276,7 +4290,7 @@ static inline void __FDK_vraddhn_i32(FIXP_H dst, FIXP_Q src1, FIXP_Q src2)
   FIXP_D Src2 = (FIXP_D) src2;
   for (int i = 0; i < 4; i++)
   {
-    Dst[i] = (FIXP_S)( ( (FIXP_DBL) Src1[i] + (FIXP_DBL) Src2[i] + (FIXP_DBL) 0x000080000) >> 16 );
+    Dst[i] = (FIXP_SGL)( ( (FIXP_DBL) Src1[i] + (FIXP_DBL) Src2[i] + (FIXP_DBL) 0x000080000) >> 16 );
   }
 }
 

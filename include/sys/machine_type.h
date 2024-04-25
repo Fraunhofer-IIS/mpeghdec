@@ -297,8 +297,8 @@ typedef LONG INT_PCM;
  *       FDK_PRAGMA_DATA_SECTION(".L1ram")
  *       Note: Use this macro without an ending semicolon
  */
-#if defined(__arm__)
-#define RESTRICT __restrict
+#if defined(__arm__) || defined(__aarch64__)
+#define RESTRICT __restrict__
 #define WORD_ALIGNED(name)                                                      \
   const FIXP_SGL* __attribute__((aligned(4))) __##name = (const FIXP_SGL*)name; \
   (void)__##name;
@@ -341,10 +341,13 @@ typedef LONG INT_PCM;
            ((((INT)ALIGNMENT_DEFAULT - ((size_t)(a) & (ALIGNMENT_DEFAULT - 1))) & \
              (ALIGNMENT_DEFAULT - 1)))))
 
-/* Alignment macro for libSYS heap implementation */
+/* Alignment macros for libSYS heap implementation */
 #define ALIGNMENT_EXTRES (ALIGNMENT_DEFAULT)
+/* aligned size required for FDKcalloc() / FDKmalloc() */
 #define ALGN_SIZE_EXTRES(a) \
   ((a) + (((INT)ALIGNMENT_EXTRES - ((INT)(a) & (ALIGNMENT_EXTRES - 1))) & (ALIGNMENT_EXTRES - 1)))
+/* aligned size required for FDKaalloc() */
+#define A_ALGN_SIZE_EXTRES(a) (ALGN_SIZE_EXTRES((a) + ALIGNMENT_DEFAULT + sizeof(void*)))
 
 /*!
  * \def  FDK_FORCEINLINE

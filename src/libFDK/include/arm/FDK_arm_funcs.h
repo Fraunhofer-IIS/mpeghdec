@@ -247,8 +247,10 @@ amm-info@iis.fraunhofer.de
 #define FDK_movs_reg(dst, src)            { dst = src; \
                                            __FDK_coreflags_NE = (dst!=0) ? 1 : 0; \
                                            __FDK_coreflags_EQ = (dst==0) ? 1 : 0; \
+                                           __FDK_coreflags_GT = (dst> 0) ? 1 : 0; \
                                            __FDK_coreflags_PL = (dst>=0) ? 1 : 0; \
                                            __FDK_coreflags_MI = (dst< 0) ? 1 : 0; \
+                                           __FDK_coreflags_LE = (dst<=0) ? 1 : 0; \
                                           }
 #endif
 
@@ -403,9 +405,13 @@ amm-info@iis.fraunhofer.de
 
 
 #if defined(__GNUC__)
-#define FDK_lsr_imm(dst, src, imm)     "LSR " #dst ", " #src ", # " #imm " \n\t"
+#define FDK_lsr_imm(dst, src, imm)             "LSR " #dst ", " #src ", # " #imm " \n\t"
+#define FDK_lsr_op_lsl(dst, src1, src2, imm)   "LSR " #dst ", " #src1 ", " #src2 ", LSL # " #imm "\n\t"
+#define FDK_lsr(dst, src1, src2)               "LSR " #dst ", " #src1 ", " #src2 "\n\t"
 #else
-#define FDK_lsr_imm(dst, src, imm)      dst = (ULONG) src >> imm;
+#define FDK_lsr_imm(dst, src, imm)            dst = (ULONG) src >> imm;
+#define FDK_lsr_op_lsl(dst, src1, src2, imm)  dst = (ULONG) src1 >> (src2 << imm);
+#define FDK_lsr(dst, src1, src2)              dst = (ULONG) src1 >> src2;
 #endif
 
 #if defined(__GNUC__)
@@ -435,6 +441,7 @@ amm-info@iis.fraunhofer.de
 #define FDK_and_imm(dst, src, imm)    "AND " #dst ", " #src ",  # " #imm "  \n\t"
 #define FDK_and(dst, src1, src2)      "AND " #dst ", " #src1 ", " #src2 " \n\t"
 #define FDK_bic(dst, src1, src2)      "BIC " #dst ", " #src1 ", " #src2 " \n\t"
+#define FDK_bic_imm(dst, src, imm)    "BIC " #dst ", " #src ",  # " #imm "  \n\t"
 #define FDK_eor(dst, src1, src2)      "EOR " #dst ", " #src1 ", " #src2 " \n\t"
 #define FDK_eor_op_asr(dst, src1, src2, imm, scale)      "EOR " #dst ", " #src1 ", " #src2 ", ASR #" #imm " \n\t"
 #define FDK_eor_imm(dst, src, imm)    "EOR " #dst ", " #src ",  # " #imm "  \n\t"
@@ -444,6 +451,7 @@ amm-info@iis.fraunhofer.de
 #define FDK_and_imm(dst, src, imm)    dst = src  & imm;
 #define FDK_and(dst, src1, src2)      dst = src1 &  src2;
 #define FDK_bic(dst, src1, src2)      dst = src1 & (~src2);
+#define FDK_bic_imm(dst, src, imm)    dst = src & (~(imm));
 #define FDK_eor(dst, src1, src2)      dst = src1 ^  src2;
 #define FDK_eor_op_asr(dst, src1, src2)      dst = src1 ^ (src2>>(imm-scale));
 #define FDK_eor_imm(dst, src, imm)    dst = src ^ imm;
@@ -715,11 +723,19 @@ amm-info@iis.fraunhofer.de
 
 #if defined (__GNUC__)
 #ifdef __llvm__
+#ifdef __cplusplus
 #define FDK_ASM_ROUTINE_START(proc_type, proc_name, proc_args)   \
                              extern "C" { proc_type proc_name proc_args;   }  \
                              asm ( "\n\t" \
                              ".text\n\t" \
                              "" #proc_name ": \n\t"
+#else
+#define FDK_ASM_ROUTINE_START(proc_type, proc_name, proc_args)   \
+                             proc_type proc_name proc_args;  \
+                             __asm__ ( "\n\t" \
+                             ".text\n\t" \
+                             "" #proc_name ": \n\t"
+#endif /* __cplusplus */
 #else
 #ifdef __cplusplus
 #define FDK_ASM_ROUTINE_START(proc_type, proc_name, proc_args)   \
@@ -730,18 +746,20 @@ amm-info@iis.fraunhofer.de
 #else
 #define FDK_ASM_ROUTINE_START(proc_type, proc_name, proc_args)   \
                              proc_type proc_name proc_args;   \
-                             asm ( "\n\t" \
+                             __asm__ ( "\n\t" \
                              ".section .text\n\t" \
                              "" #proc_name ": \n\t"
 #endif /* __cplusplus */
 #endif /* __llvm__ */
 #define FDK_ASM_ROUTINE_END()              );
 #define FDK_ASM_ROUTINE_RETURN(proc_type)  );
+#define FDK_ASM_ROUTINE_RETURN_64(proc_type)  );
 #else
 #define FDK_ASM_ROUTINE_START(proc_type, proc_name, proc_args)   \
                               proc_type  proc_name  proc_args {
 #define FDK_ASM_ROUTINE_END()              }
 #define FDK_ASM_ROUTINE_RETURN(proc_type)  return (proc_type) r0; }
+#define FDK_ASM_ROUTINE_RETURN_64(proc_type)  return (proc_type) ((UINT64) r1 << 32) | (UINT64) ((UINT)r0); }
 #endif
 
 
