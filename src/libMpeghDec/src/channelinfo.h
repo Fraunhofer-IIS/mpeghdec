@@ -224,8 +224,6 @@ typedef struct {
   }
   specificTo;
 
-  IGF_PRIVATE_DATA_COMMON IGF_Common_channel_data;
-
 } CAacDecoderDynamicData;
 
 typedef shouldBeUnion {

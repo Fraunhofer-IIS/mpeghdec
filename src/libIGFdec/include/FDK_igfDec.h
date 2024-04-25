@@ -184,18 +184,11 @@ typedef struct igf_private_data_static_struct {
 
   WHITENING_LEVEL igfWhiteningLevelPrev[IGF_MAX_TILES];
 
-  INT aacFrameLength;
   INT igfMinSubbandLB;
   INT igfMinSubbandSB;
-  INT igfMinSubbandTCX10;
-  INT igfMinSubbandTCX20;
   INT igfTilesLB[IGF_MAX_TILES];
   INT igfTilesSB[IGF_MAX_TILES];
-  INT igfTilesTCX10[IGF_MAX_TILES];
-  INT igfTilesTCX20[IGF_MAX_TILES];
   UCHAR prevPatchNum[IGF_MAX_TILES]; /**< indices of the best matching patch */
-  SHORT shortBlockSize;
-  SHORT longBlockSize;
   UCHAR numSfbLB;
   const SHORT* sfbOffsetLB;
   UCHAR numSfbSB;
@@ -211,8 +204,6 @@ typedef struct igf_private_data_static_struct {
   UCHAR igfStopSfbSB;
   UCHAR igfNTilesLB;
   UCHAR igfNTilesSB;
-  UCHAR igfNTilesTCX10;
-  UCHAR igfNTilesTCX20;
 
 } IGF_PRIVATE_STATIC_DATA, *IGF_PRIVATE_STATIC_DATA_HANDLE;
 
@@ -225,13 +216,13 @@ typedef struct {
 } IGF_BITSTREAM_DATA;
 
 typedef struct igf_private_data_common_struct {
-  FIXP_DBL Spectrum_tab_array[IGF_MAX_TILES * 1024];
-  FIXP_DBL virtualSpec[1024];
+  FIXP_DBL* virtualSpec; /* scratch memory with 1024 FIXP_DBL values required */
   IGF_WORK_MEMORY IGF_WorkingMem[IGF_MAX_TILES];
 
 } IGF_PRIVATE_DATA_COMMON, *IGF_PRIVATE_DATA_COMMON_HANDLE;
 
 typedef struct igf_private_data_struct {
+  FIXP_DBL Spectrum_tab_array[IGF_MAX_TILES * 1024];
   IGF_PRIVATE_DATA_COMMON_HANDLE IGF_Common_channel_data_handle;
   IGF_BITSTREAM_DATA bitstreamData[N_IGF_FRAME_DIVISION];
   UCHAR tileNum[IGF_MAX_TILES]; /**< indices of the best matching patch */

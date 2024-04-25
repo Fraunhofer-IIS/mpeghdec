@@ -1734,11 +1734,13 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
 
           for (ch2 = 0; ch2 < elCh; ch2++) {
             /* IGF decoder config */
+            self->igf_private_data_common[ch2].virtualSpec =
+                &self->pTimeData2[1024 *
+                                  ch2]; /* required: 1024 for each channel of a channel element */
             if (asc->m_sc.m_usacConfig.element[_el2].enhancedNoiseFilling) {
               iisIGFDecLibInit(
                   &(self->pAacDecoderStaticChannelInfo[ch]->IGF_StaticData),
-                  &(self->pAacDecoderChannelInfo[ch]->IGFdata),
-                  &(self->pAacDecoderChannelInfo[ch]->pDynData->IGF_Common_channel_data),
+                  &(self->pAacDecoderChannelInfo[ch]->IGFdata), &self->igf_private_data_common[ch2],
                   asc->m_sc.m_usacConfig.element[_el2].igfStartIndex,   /* igfStartIndex        */
                   asc->m_sc.m_usacConfig.element[_el2].igfStopIndex,    /* igfStopIndex         */
                   asc->m_sc.m_usacConfig.element[_el2].igfUseHighRes,   /* igfUseHighRes        */
@@ -1770,7 +1772,8 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
                   ->pCpeStaticData->jointStereoPersistentData.scratchBuffer =
                   self->pAacDecoderChannelInfo[ch]->pComStaticData->pWorkBufferCore1->workBuffer;
               self->pAacDecoderStaticChannelInfo[ch]
-                  ->pCpeStaticData->jointStereoPersistentData.scratchBuffer2 = self->pTimeData2;
+                  ->pCpeStaticData->jointStereoPersistentData.scratchBuffer2 =
+                  &self->pTimeData2[2 * 1024]; /* required size: 1024 */
             }
             chIdx++;
             ch++;

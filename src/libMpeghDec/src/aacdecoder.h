@@ -326,6 +326,9 @@ struct AAC_DECODER_INSTANCE {
   INT downmixId;
   eqConfigStruct eqConfig[TP_MPEGH_MAX_SIGNAL_GROUPS];
 
+  IGF_PRIVATE_DATA_COMMON
+  igf_private_data_common[2]; /*!< IGF scratch memory shared between elements but requires two
+                                 instances in case of CPE */
   CMctPtr pMCTdec[TP_MPEGH_MAX_SIGNAL_GROUPS];
 
   UCHAR flushStatus;     /*!< Indicates flush status: on|off */

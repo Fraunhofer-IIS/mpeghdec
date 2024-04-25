@@ -1588,8 +1588,8 @@ static void iisIGFDecLibCheckTileTransition(
       case IGF_GRID_LONG_WINDOW:
         /* AAC long blocks */
         iisIGFDecLibInitGridInfo(
-            hPrivateData->IGF_Common_channel_data_handle->Spectrum_tab_array, hGrid,
-            IGF_GRID_LONG_WINDOW, hPrivateStaticData->sfbOffsetLB, hPrivateStaticData->numSfbLB,
+            hPrivateData->Spectrum_tab_array, hGrid, IGF_GRID_LONG_WINDOW,
+            hPrivateStaticData->sfbOffsetLB, hPrivateStaticData->numSfbLB,
             hPrivateStaticData->igfStartSfbLB, hPrivateStaticData->igfStopSfbLB,
             hPrivateStaticData->igfMinSubbandLB, hPrivateStaticData->useHighRes,
             hPrivateStaticData->igfNTilesLB, hPrivateStaticData->igfTilesLB,
@@ -1598,12 +1598,12 @@ static void iisIGFDecLibCheckTileTransition(
       case IGF_GRID_SHORT_WINDOW:
         /* AAC short blocks */
         iisIGFDecLibInitGridInfo(
-            hPrivateData->IGF_Common_channel_data_handle->Spectrum_tab_array, hGrid,
-            IGF_GRID_SHORT_WINDOW, (const SHORT*)hPrivateStaticData->sfbOffsetSB,
-            hPrivateStaticData->numSfbSB, hPrivateStaticData->igfStartSfbSB,
-            hPrivateStaticData->igfStopSfbSB, hPrivateStaticData->igfMinSubbandSB,
-            hPrivateStaticData->useHighRes, hPrivateStaticData->igfNTilesSB,
-            hPrivateStaticData->igfTilesSB, hPrivateData->bitstreamData[frameType].iCurrTileIdxTab);
+            hPrivateData->Spectrum_tab_array, hGrid, IGF_GRID_SHORT_WINDOW,
+            (const SHORT*)hPrivateStaticData->sfbOffsetSB, hPrivateStaticData->numSfbSB,
+            hPrivateStaticData->igfStartSfbSB, hPrivateStaticData->igfStopSfbSB,
+            hPrivateStaticData->igfMinSubbandSB, hPrivateStaticData->useHighRes,
+            hPrivateStaticData->igfNTilesSB, hPrivateStaticData->igfTilesSB,
+            hPrivateData->bitstreamData[frameType].iCurrTileIdxTab);
         break;
       default:
         FDK_ASSERT(0);
@@ -1928,9 +1928,9 @@ void CIgf_apply(IGF_PRIVATE_STATIC_DATA_HANDLE hPrivateStaticData,
   INT numMdctLines;
   /* Set parameters for long and short blocks */
   if (window_sequence != IGF_GRID_SHORT_WINDOW) {
-    numMdctLines = hPrivateStaticData->longBlockSize;
+    numMdctLines = 1024;
   } else {
-    numMdctLines = hPrivateStaticData->shortBlockSize;
+    numMdctLines = 128;
   }
 
   /* Clean computational error in the IGF frequency range so that computed zeroes be recognized by
@@ -2064,9 +2064,9 @@ void CIgf_apply_stereo(IGF_PRIVATE_STATIC_DATA_HANDLE hPrivateStaticDataL,
   INT numMdctLines;
   /*Set parameters for long and short blocks*/
   if (window_sequence != IGF_GRID_SHORT_WINDOW) {
-    numMdctLines = hPrivateStaticDataL->longBlockSize;
+    numMdctLines = 1024;
   } else {
-    numMdctLines = hPrivateStaticDataL->shortBlockSize;
+    numMdctLines = 128;
   }
 
   /* Clean computational error in the IGF frequency range so that computed zeroes be recognized by
@@ -2390,8 +2390,6 @@ void iisIGFDecLibInit(
 
   UCHAR fixedTileIdx[IGF_MAX_TILES] = {3, 3, 3, 3};
 
-  hPrivateStaticData->aacFrameLength = aacFrameLength;
-
   hPrivateStaticData->useHighRes = igfUseHighRes;
 
   hPrivateStaticData->igfStartSfbLB = (UCHAR)iisIGFGetStartSfbLB(igfStartIndex, len_LB);
@@ -2406,9 +2404,6 @@ void iisIGFDecLibInit(
   hPrivateStaticData->igfStartSfbSB = (UCHAR)iisIGFGetStartSfbSB(startLine, sfb_offset_SB, len_SB);
 
   hPrivateStaticData->igfStopSfbSB = (UCHAR)iisIGFGetStopSfbSB(stopLine, sfb_offset_SB, len_SB);
-
-  hPrivateStaticData->shortBlockSize = 128;
-  hPrivateStaticData->longBlockSize = 1024;
 
   hPrivateStaticData->numSfbLB = len_LB;
   hPrivateStaticData->sfbOffsetLB = sfb_offset_LB;
@@ -2455,22 +2450,20 @@ void iisIGFDecLibInit(
                       hPrivateStaticData->igfStopSfbSB - hPrivateStaticData->igfStartSfbSB);
 
   /* AAC long blocks */
-  iisIGFDecLibInitGridInfo(hPrivateData->IGF_Common_channel_data_handle->Spectrum_tab_array,
-                           &hPrivateStaticData->sGridInfoTab[IGF_GRID_LONG_WINDOW],
-                           IGF_GRID_LONG_WINDOW, hPrivateStaticData->sfbOffsetLB,
-                           hPrivateStaticData->numSfbLB, hPrivateStaticData->igfStartSfbLB,
-                           hPrivateStaticData->igfStopSfbLB, hPrivateStaticData->igfMinSubbandLB,
-                           hPrivateStaticData->useHighRes, hPrivateStaticData->igfNTilesLB,
-                           hPrivateStaticData->igfTilesLB, fixedTileIdx);
+  iisIGFDecLibInitGridInfo(
+      hPrivateData->Spectrum_tab_array, &hPrivateStaticData->sGridInfoTab[IGF_GRID_LONG_WINDOW],
+      IGF_GRID_LONG_WINDOW, hPrivateStaticData->sfbOffsetLB, hPrivateStaticData->numSfbLB,
+      hPrivateStaticData->igfStartSfbLB, hPrivateStaticData->igfStopSfbLB,
+      hPrivateStaticData->igfMinSubbandLB, hPrivateStaticData->useHighRes,
+      hPrivateStaticData->igfNTilesLB, hPrivateStaticData->igfTilesLB, fixedTileIdx);
 
   /* AAC short blocks */
-  iisIGFDecLibInitGridInfo(hPrivateData->IGF_Common_channel_data_handle->Spectrum_tab_array,
-                           &hPrivateStaticData->sGridInfoTab[IGF_GRID_SHORT_WINDOW],
-                           IGF_GRID_SHORT_WINDOW, hPrivateStaticData->sfbOffsetSB,
-                           hPrivateStaticData->numSfbSB, hPrivateStaticData->igfStartSfbSB,
-                           hPrivateStaticData->igfStopSfbSB, hPrivateStaticData->igfMinSubbandSB,
-                           hPrivateStaticData->useHighRes, hPrivateStaticData->igfNTilesSB,
-                           hPrivateStaticData->igfTilesSB, fixedTileIdx);
+  iisIGFDecLibInitGridInfo(
+      hPrivateData->Spectrum_tab_array, &hPrivateStaticData->sGridInfoTab[IGF_GRID_SHORT_WINDOW],
+      IGF_GRID_SHORT_WINDOW, hPrivateStaticData->sfbOffsetSB, hPrivateStaticData->numSfbSB,
+      hPrivateStaticData->igfStartSfbSB, hPrivateStaticData->igfStopSfbSB,
+      hPrivateStaticData->igfMinSubbandSB, hPrivateStaticData->useHighRes,
+      hPrivateStaticData->igfNTilesSB, hPrivateStaticData->igfTilesSB, fixedTileIdx);
 
   /* reset IGF */
   iisIGFDecLibResetIGF(hPrivateStaticData, hPrivateData, IGF_FRAME_DIVISION_AAC_OR_TCX_LONG);
