@@ -91,7 +91,6 @@ amm-info@iis.fraunhofer.de
 #include "drcDec_types.h"
 #include "drcDec_gainDecoder.h"
 #include "drcGainDec_preprocess.h"
-#include "drcGainDec_multiband.h"
 #include "drcGainDec_init.h"
 #include "drcGainDec_process.h"
 #include "drcDec_tools.h"

@@ -122,7 +122,7 @@ amm-info@iis.fraunhofer.de
 INT activeDmxStftInit(void** handle, UINT numInChans, UINT numOutChans, FIXP_DBL** inputBufferStft,
                       FIXP_DBL** prevInputBufferStft, FIXP_DBL** outputBufferStft, UINT frameSize,
                       UINT fftLength, FIXP_DBL eqLimitMax, FIXP_DBL eqLimitMin, UINT numStftBands,
-                      UINT numErbBands, UINT* stftErbFreqIdx, INT aes) {
+                      UINT numErbBands, const UINT* stftErbFreqIdx, INT aes) {
   UINT ch;
   INT status = 0;
   activeDownmixer* h;
@@ -149,7 +149,6 @@ INT activeDmxStftInit(void** handle, UINT numInChans, UINT numOutChans, FIXP_DBL
   h->eqLimitMin = eqLimitMin;
   h->inBufStftHeadroomPrev = 31;   /* start value */
   h->realizedSigHeadroomPrev = 31; /* start value */
-  h->eneSmoothingAlpha = alpha_aeq_256_t120;
   h->erbFreqIdx = stftErbFreqIdx;
 
   h->targetEnePrev = (FIXP_DBL**)FDKcalloc(numOutChans, sizeof(FIXP_DBL*));
@@ -315,8 +314,8 @@ void activeDmxProcess_STFT(void* handle) {
 
   UINT i, chIn, numInChans, chOut, numOutChans, erb;
   FIXP_DBL** realizedSig = h->outputBufferStft;
-  FIXP_DBL Alpha = h->eneSmoothingAlpha;
-  FIXP_DBL One_subAlpha = FIXP_DBL(MAXVAL_DBL) - Alpha;
+  const FIXP_DBL Alpha = ALPHA_AEQ;
+  const FIXP_DBL One_subAlpha = FIXP_DBL(MAXVAL_DBL) - Alpha;
 
   INT inBufStftHeadroom;
 

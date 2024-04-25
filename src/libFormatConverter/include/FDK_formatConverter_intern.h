@@ -432,7 +432,7 @@ typedef struct {
   UINT stftFrameSize;
   UINT stftLength;
   UINT stftNumErbBands;
-  UINT* stftErbFreqIdx;
+  const UINT* stftErbFreqIdx;
 
   AFC_FORMAT_CONVERTER_CHANNEL_ID* channelVec;
   int* unknownChannelVec;

@@ -92,7 +92,6 @@ amm-info@iis.fraunhofer.de
 #include "drcDec_gainDecoder.h"
 #include "drcGainDec_preprocess.h"
 #include "drcDec_tools.h"
-#include "FDK_matrixCalloc.h"
 #include "drcDec_rom.h"
 
 #define SLOPE_FACTOR_DB_TO_LINEAR FL2FXCONST_DBL(0.1151f * (float)(1 << 3)) /* ln(10) / 20 */

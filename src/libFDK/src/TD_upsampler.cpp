@@ -111,7 +111,7 @@ struct filter {
 /* biquad coefficient tables */
 RAM_ALIGN
 LNK_SECTION_CONSTDATA
-static struct filter sos_2 = {
+static const struct filter sos_2 = {
     /* Filter for upsampling factor: 2
 
     Filter parameters:
@@ -203,7 +203,7 @@ static struct filter sos_2 = {
 
 RAM_ALIGN
 LNK_SECTION_CONSTDATA
-static struct filter sos_3 = {
+static const struct filter sos_3 = {
 
     /* Filter for upsampling factor: 1.5; 3
 
@@ -309,7 +309,7 @@ static struct filter sos_3 = {
  */
 
 #ifndef FUNCTION_TD_applyFilter
-static FIXP_DBL TD_applyFilter(FIXP_DBL sampleIn, filter* sosData, FIXP_DBL* states) {
+static FIXP_DBL TD_applyFilter(FIXP_DBL sampleIn, const filter* sosData, FIXP_DBL* states) {
   int s;
   FIXP_DBL input, output, state0, state1, state2;
 

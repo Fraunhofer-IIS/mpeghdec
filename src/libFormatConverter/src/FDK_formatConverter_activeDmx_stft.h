@@ -136,7 +136,7 @@ typedef struct {
   UINT numOutChans;            /* number output channels */
   UINT numStftBands;           /* number of fft bands */
   UINT numErbBands;            /* number of ERB bands */
-  UINT* erbFreqIdx;            /* frequency band stop indices corresponding to ERB bands */
+  const UINT* erbFreqIdx;      /* frequency band stop indices corresponding to ERB bands */
   FIXP_DBL** inputBufferStft;  /* STFT input data with interleaved real and imaginary parts */
   FIXP_DBL** outputBufferStft; /* STFT output data with interleaved real and imaginary parts */
   FIXP_DBL**
@@ -149,7 +149,6 @@ typedef struct {
   INT* targetEnePrevExp;
   INT inBufStftHeadroomPrev;
   INT realizedSigHeadroomPrev;
-  FIXP_DBL eneSmoothingAlpha;
 } activeDownmixer;
 
 void activeDmxProcess_STFT(void* handle);
@@ -157,7 +156,7 @@ void activeDmxProcess_STFT(void* handle);
 INT activeDmxStftInit(void** handle, UINT numInChans, UINT numOutChans, FIXP_DBL** inputBufferStft,
                       FIXP_DBL** prevInputBufferStft, FIXP_DBL** outputBufferStft, UINT frameSize,
                       UINT fftLength, FIXP_DBL eqLimitMax, FIXP_DBL eqLimitMin, UINT numStftBands,
-                      UINT numErbBands, UINT* stftErbFreqIdx, INT aes);
+                      UINT numErbBands, const UINT* stftErbFreqIdx, INT aes);
 
 void activeDmxSetAES(INT AES, void* handle);
 void activeDmxClose_STFT(void* handle);

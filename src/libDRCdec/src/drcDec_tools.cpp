@@ -88,7 +88,6 @@ amm-info@iis.fraunhofer.de
 
 *******************************************************************************/
 
-#include "drcDec_types.h"
 #include "drcDec_tools.h"
 #include "fixpoint_math.h"
 #include "drcDecoder.h"

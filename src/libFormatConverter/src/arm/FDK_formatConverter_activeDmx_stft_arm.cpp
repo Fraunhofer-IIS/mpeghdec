@@ -132,7 +132,7 @@ FDK_ASM_ROUTINE_START(void, activeDmxProcess_STFT_func1,
    (FIXP_DBL *inputBuffer,       /* r0 */
     FIXP_DBL *realizedSig,       /* r1 */
     FIXP_DBL *targetEneArr,      /* r2 */
-    UINT *erbFreqIdx,            /* r3 */
+    const UINT *erbFreqIdx,      /* r3 */
     FIXP_DBL *eq_ptr,
     FIXP_DMX_H dmxMatrixL_FDK,
     FIXP_DMX_H dmxMatrixH_FDK,
@@ -141,7 +141,7 @@ FDK_ASM_ROUTINE_START(void, activeDmxProcess_STFT_func1,
     INT chOut_exp,
     INT dmx_iterations,
     INT inBufStftHeadroom,
-    INT *erb_freq_idx_256_58_exp))
+    const INT *erb_freq_idx_256_58_exp))
 
 #ifndef __ARM_NEON__
     FIXP_DBL        * r0 = inputBuffer;

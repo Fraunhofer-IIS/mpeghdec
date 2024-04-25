@@ -284,14 +284,6 @@ enum { MPE = 0, RPE = 1, fs8KHz = 0, fs16KHz = 1 };
 /* Defintion of flags that can be passed to transportDecOpen() */
 #define TP_FLAG_MPEG4 1
 
-/* Capability flags */
-#define CAPF_TPDEC_ADIF 0x00001000 /**< Flag indicating support for ADIF transport format. */
-#define CAPF_TPDEC_ADTS 0x00002000 /**< Flag indicating support for ADTS transport format. */
-#define CAPF_TPDEC_LOAS 0x00004000 /**< Flag indicating support for LOAS transport format. */
-#define CAPF_TPDEC_LATM 0x00008000 /**< Flag indicating support for LATM transport format. */
-#define CAPF_TPDEC_RAWPACKETS \
-  0x00010000 /**< Flag indicating support for raw packets transport format. */
-
 #define CSAUDIOSPECIFICCONFIG_SIZE (TPDEC_MAX_TRACKS + 1)
 
 typedef struct TRANSPORTDEC* HANDLE_TRANSPORTDEC;

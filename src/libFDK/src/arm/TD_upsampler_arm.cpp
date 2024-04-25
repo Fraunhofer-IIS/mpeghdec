@@ -436,7 +436,7 @@ short TD_upsampler_3_1(
 
 
 FDK_ASM_ROUTINE_START(
-void ,TD_upsampler_3_1_neonv7,(const FIXP_DBL * RESTRICT sigIn, FIXP_DBL * RESTRICT sigOut, FIXP_DBL * RESTRICT states, INT lenIn, INT facUpsample, FIXP_DBL *coeff, FIXP_DBL *gain, INT scaleFacMantissa))
+void ,TD_upsampler_3_1_neonv7,(const FIXP_DBL * RESTRICT sigIn, FIXP_DBL * RESTRICT sigOut, FIXP_DBL * RESTRICT states, INT lenIn, INT facUpsample, const FIXP_DBL *coeff, const FIXP_DBL *gain, INT scaleFacMantissa))
 #ifndef __ARM_NEON__
   const FIXP_DBL * RESTRICT r0 = sigIn;                    // input buffer:  may not be 64-bit aligned
         FIXP_DBL * RESTRICT r1 = sigOut;                   // output buffer: may not be 64-bit aligned
@@ -1084,7 +1084,7 @@ short TD_upsampler_3_1(
 {
    if (lenIn > 0)
      /* The reinterpret_cast is used to suppress a compiler warning. We know that sos_3.sos_gain and sos_3.scaleFacMantissa are sufficiently aligned, so the cast is safe */
-     TD_upsampler_3_1_neonv7(sigIn, sigOut, states, (INT) lenIn, (INT) facUpsample, reinterpret_cast<FIXP_DBL *>(reinterpret_cast<void *>(sos_3.coeff)), reinterpret_cast<FIXP_DBL *>(reinterpret_cast<void *>(sos_3.sos_gain)), (INT) sos_3.scaleFacMantissa);
+     TD_upsampler_3_1_neonv7(sigIn, sigOut, states, (INT) lenIn, (INT) facUpsample, reinterpret_cast<const FIXP_DBL *>(reinterpret_cast<const void *>(sos_3.coeff)), reinterpret_cast<const FIXP_DBL *>(reinterpret_cast<const void *>(sos_3.sos_gain)), (INT) sos_3.scaleFacMantissa);
    return (lenIn*3) >> ((facUpsample == TD_FAC_UPSAMPLE_3_2) ? 1 : 0);
 }
 

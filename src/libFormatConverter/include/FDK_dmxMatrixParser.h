@@ -209,7 +209,7 @@ void DecodeFlatCompactMatrix(HANDLE_FDK_BITSTREAM hBs, signed char* flatCompactM
 
 void CoderStateGenerateGainTable(CoderState* cs);
 
-signed char* FindCompactTemplate(int inputIndex, int outputIndex);
+const signed char* FindCompactTemplate(int inputIndex, int outputIndex);
 
 void CoderStateInit(CoderState* cs);
 

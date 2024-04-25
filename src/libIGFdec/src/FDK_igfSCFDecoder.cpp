@@ -371,7 +371,7 @@ static INT arith_decode_bits(IGFSCFDEC_PRIVATE_DATA_HANDLE hPrivateData, /**< in
                              INT nBits /**< number of bits to decode */
 ) {
   INT i;
-  static SHORT cf_for_bit[2] = {8192, 0};
+  const SHORT cf_for_bit[2] = {8192, 0};
   INT x = 0;
 
   /* ari_start_decoding_14bits */
@@ -382,7 +382,6 @@ static INT arith_decode_bits(IGFSCFDEC_PRIVATE_DATA_HANDLE hPrivateData, /**< in
   }
 
   for (i = nBits - 1; i >= 0; --i) {
-    // int bit = arith_decode(cf_for_bit, 2, hPrivateData);
     INT bit = ari_decode_14bits(hPrivateData->hBs, &(hPrivateData->st), cf_for_bit, 2);
     x = x + (bit << i);
   }

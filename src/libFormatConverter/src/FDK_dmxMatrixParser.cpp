@@ -105,52 +105,53 @@ static const FIXP_DBL eqMinRanges[2][4] = {
      FL2FXCONST_DBL(-12.8 / 32.0)}};
 
 /* 22_2 to 5_1 */
-static char compactTemplate_CICP13_to_CICP6[15 * 4] = {
+static const char compactTemplate_CICP13_to_CICP6[15 * 4] = {
     1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0,
     0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0};
 
 /* 5_2_1 to 5_1 */
-static char compactTemplate_CICP14_to_CICP6[5 * 4] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
-                                                      1, 0, 0, 0, 0, 1, 1, 0, 0, 0};
+static const char compactTemplate_CICP14_to_CICP6[5 * 4] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                                                            1, 0, 0, 0, 0, 1, 1, 0, 0, 0};
 
 /* 7_1 to 5_1 */
-static char compactTemplate_CICP12_to_CICP6[5 * 4] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
-                                                      1, 0, 0, 0, 0, 1, 0, 0, 0, 1};
+static const char compactTemplate_CICP12_to_CICP6[5 * 4] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                                                            1, 0, 0, 0, 0, 1, 0, 0, 0, 1};
 
 /* 7_1_ALT to 5_1 */
-static char compactTemplate_CICP7_to_CICP6[5 * 4] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
-                                                     1, 0, 0, 0, 0, 1, 1, 0, 0, 1};
+static const char compactTemplate_CICP7_to_CICP6[5 * 4] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                                                           1, 0, 0, 0, 0, 1, 1, 0, 0, 1};
 
 /* 22_2 to 5_2_1 */
-static char compactTemplate_CICP13_to_CICP14[15 * 5] = {
+static const char compactTemplate_CICP13_to_CICP14[15 * 5] = {
     1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0,
     0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
     0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0};
 
 /* 22_2 to 7_1 */
-static char compactTemplate_CICP13_to_CICP12[15 * 5] = {
+static const char compactTemplate_CICP13_to_CICP12[15 * 5] = {
     1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0,
     0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 1, 1,
     0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0};
 
 /* 22_2 to 7_1_ALT */
-static char compactTemplate_CICP13_to_CICP7[15 * 5] = {
+static const char compactTemplate_CICP13_to_CICP7[15 * 5] = {
     0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0,
     0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 1, 1,
     0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0};
 
 /* 22_2 to 2_0 */
-static char compactTemplate_CICP13_to_CICP2[15 * 1] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+static const char compactTemplate_CICP13_to_CICP2[15 * 1] = {1, 1, 1, 1, 1, 1, 1, 1,
+                                                             1, 1, 1, 1, 1, 1, 1};
 
 static const SHORT compactTemplates_InputIndex[] = {13, 13, 13, 13, 14, 12, 7, 13};
 
 static const SHORT compactTemplates_OutputIndex[] = {6, 14, 12, 7, 6, 6, 6, 2};
 
-static char* compactTemplates_Data[] = {
-    (char*)&compactTemplate_CICP13_to_CICP6,  (char*)&compactTemplate_CICP13_to_CICP14,
-    (char*)&compactTemplate_CICP13_to_CICP12, (char*)&compactTemplate_CICP13_to_CICP7,
-    (char*)&compactTemplate_CICP14_to_CICP6,  (char*)&compactTemplate_CICP12_to_CICP6,
-    (char*)&compactTemplate_CICP7_to_CICP6,   (char*)&compactTemplate_CICP13_to_CICP2};
+static const char* const compactTemplates_Data[] = {
+    (const char*)&compactTemplate_CICP13_to_CICP6,  (const char*)&compactTemplate_CICP13_to_CICP14,
+    (const char*)&compactTemplate_CICP13_to_CICP12, (const char*)&compactTemplate_CICP13_to_CICP7,
+    (const char*)&compactTemplate_CICP14_to_CICP6,  (const char*)&compactTemplate_CICP12_to_CICP6,
+    (const char*)&compactTemplate_CICP7_to_CICP6,   (const char*)&compactTemplate_CICP13_to_CICP2};
 
 /*
   ReadRange()
@@ -447,7 +448,7 @@ void CoderStateGenerateGainTable(CoderState* cs) {
   FDK_ASSERT(cs->gainTableSize == ((cs->maxGain - cs->minGain) << cs->precisionLevel) + 2);
 }
 
-signed char* FindCompactTemplate(int inputIndex, int outputIndex) {
+const signed char* FindCompactTemplate(int inputIndex, int outputIndex) {
   INT i;
 
   /* a compact template should be used only for CICP speaker layouts */
@@ -458,7 +459,7 @@ signed char* FindCompactTemplate(int inputIndex, int outputIndex) {
     if (compactTemplates_OutputIndex[i] != outputIndex) continue;
 
     /* a matching template was found */
-    return (signed char*)compactTemplates_Data[i];
+    return (const signed char*)compactTemplates_Data[i];
   }
 
   /* a matching template was not found */
@@ -495,8 +496,9 @@ INT DecodeDownmixMatrix(INT inputIndex, INT inputCount, SpeakerInformation* inpu
   [DMX_MATRIX_MAX_SPEAKER_COUNT] = (INT(*)[DMX_MATRIX_MAX_SPEAKER_COUNT])p_buffer;
   p_buffer =
       (FIXP_DBL*)((INT*)p_buffer + (DMX_MATRIX_MAX_SPEAKER_COUNT * DMX_MATRIX_MAX_SPEAKER_COUNT));
-  signed char* compactTemplate = NULL; /* compactTemplate[compactInputCount][compactOutputCount]
-                                          stored in the C array layout */
+  const signed char* compactTemplate =
+      NULL; /* compactTemplate[compactInputCount][compactOutputCount]
+               stored in the C array layout */
 
   INT useCompactTemplate = 1;
   INT fullForAsymmetricInputs = 1;

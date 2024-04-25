@@ -96,15 +96,12 @@ amm-info@iis.fraunhofer.de
 #define STFT_ERB_BANDS 58
 #define IIS_FORMATCONVERTER_MAX_OUT_CH FDK_FORMAT_CONVERTER_MAX_OUTPUT_CHANNELS
 
-extern FIXP_DBL alpha_aeq_256_t120;
-
-extern INT erb_freq_idx_58[];
+#define ALPHA_AEQ (FL2FXCONST_DBL(0.0435f))
 
 /*-------------------------------------------------------------*/
 /*   constants for fft transform size of 512 coefficients      */
 /*-------------------------------------------------------------*/
-extern UINT erb_freq_idx_256_58[];
-
-extern INT erb_freq_idx_256_58_exp[];
+extern const UINT erb_freq_idx_256_58[];
+extern const INT erb_freq_idx_256_58_exp[];
 
 #endif
