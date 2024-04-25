@@ -824,29 +824,28 @@ FIXP_DBL fixp_truncate(FIXP_DBL f_inp, INT sf) {
     round [typical rounding]
 
     See fct roundRef() [which is the reference]
+    Full-range test available in FDK_tools_test.cpp
   returns INT
 *****************************************************************************/
 INT fixp_roundToInt(FIXP_DBL f_inp, INT sf) {
   FDK_ASSERT(sf >= 0);
-  INT sx = DFRACT_BITS - 1 - sf;
-  INT inp = (INT)f_inp;
-  INT mask1 = (0x1 << (sx - 1));
-  INT mask2 = (0x1 << (sx)) - 1;
-  INT mask3 = 0x7FFFFFFF;
-  INT iam = inp & mask2;
+  FDK_ASSERT(sf <= (DFRACT_BITS - 1));
   INT rnd;
-
-  if ((inp < 0) && !(iam == mask1))
-    rnd = inp + mask1;
-  else if ((inp > 0) && !(inp == mask3))
-    rnd = inp + mask1;
-  else
-    rnd = inp;
-
-  rnd = rnd >> sx;
-
-  if (inp == mask3) rnd++;
-
+  INT sx = DFRACT_BITS - 1 - sf;
+  rnd = (INT)((UINT)(0x1 << sx) >> 1); /* rnd becomes 0, if sf==31 and 0x40000000, if sf==0 */
+  INT inp = (INT)f_inp;
+  if (inp >= 0) {
+    if (inp > ((INT)0x7FFFFFFF - rnd)) {
+      rnd = (inp >> sx) + 1;
+    } else {
+      rnd = (inp + rnd) >> sx;
+    }
+  } else {
+    if (inp >= ((INT)0x80000000 + rnd))
+      rnd = -(INT)((UINT)(-inp + rnd) >> sx);
+    else
+      rnd = (INT)0x80000000 >> sx;
+  }
   return rnd;
 }
 
