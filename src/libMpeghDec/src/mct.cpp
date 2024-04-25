@@ -97,6 +97,7 @@ amm-info@iis.fraunhofer.de
 #define CODE_BOOK_BETA_LAV 65
 #define DEFAULT_BETA (48) /*equals 45 degrees */
 #define DEFAULT_ALPHA (0)
+#define READ_MASK(a, b) ((a) & (UINT64)1 << (63 - (b)))
 
 /* huffman tables */
 
@@ -208,7 +209,6 @@ static inline WHITENING_LEVEL GetTileWhiteningLevel(IGF_PRIVATE_DATA_HANDLE hPri
 
 int CMct_Initialize(CMctPtr* pCMctPtr, const CSUsacExtElementConfig* extElementConfig,
                     int firstSigIdx, int signalsInGroup) {
-  int err = 0;
   int j;
   CMctPtr mct;
 
@@ -220,8 +220,7 @@ int CMct_Initialize(CMctPtr* pCMctPtr, const CSUsacExtElementConfig* extElementC
 
   mct->mctWork = (CMctWorkPtr)FDKcalloc(sizeof(CMctWork), 1);
   if (!mct->mctWork) {
-    FDKfree(mct);
-    return AAC_DEC_OUT_OF_MEMORY;
+    goto bail;
   }
 
   /* get channelmap/mask for which channels the tool is active */
@@ -234,9 +233,22 @@ int CMct_Initialize(CMctPtr* pCMctPtr, const CSUsacExtElementConfig* extElementC
     }
   }
 
+  mct->prevOutSpec = (FIXP_DBL*)FDKmalloc(mct->numMctChannels * 1024 * sizeof(FIXP_DBL));
+  if (!mct->prevOutSpec) goto bail;
+  mct->prevOutSpec_exp = (SHORT*)FDKmalloc(mct->numMctChannels * 8 * 16 * sizeof(SHORT));
+  if (!mct->prevOutSpec_exp) goto bail;
+
   (*pCMctPtr) = mct;
 
-  return err;
+  return AAC_DEC_OK;
+
+bail:
+  if (mct->mctWork != NULL) FDKfree(mct->mctWork);
+  if (mct->prevOutSpec != NULL) FDKfree(mct->prevOutSpec);
+  /* if (mct->prevOutSpec_exp != NULL) FDKfree(mct->prevOutSpec_exp); */
+  FDKfree(mct);
+
+  return AAC_DEC_OUT_OF_MEMORY;
 }
 
 void CMct_Destroy(CMctPtr self) {
@@ -244,11 +256,17 @@ void CMct_Destroy(CMctPtr self) {
     if (self->mctWork != NULL) {
       FDKfree(self->mctWork);
     }
+    if (self->prevOutSpec != NULL) {
+      FDKfree(self->prevOutSpec);
+    }
+    if (self->prevOutSpec_exp != NULL) {
+      FDKfree(self->prevOutSpec_exp);
+    }
     FDKfree(self);
   }
 }
 
-static int CMct_inverseMctParseChannelPair(HANDLE_FDK_BITSTREAM hbitBuffer, SHORT* pCodePairs,
+static int CMct_inverseMctParseChannelPair(HANDLE_FDK_BITSTREAM hbitBuffer, UCHAR* pCodePairs,
                                            unsigned int nChannels) {
   int err = 1;
   unsigned int chan0 = 0, chan1;
@@ -309,6 +327,89 @@ static int CMct_decodeHuffman(HANDLE_FDK_BITSTREAM hbitBuffer, const int* const 
   return tabIdx;
 }
 
+static int Read_MultichannelCodingBox(const int MCTSignalingType, const int usacIndepFlag,
+                                      HANDLE_FDK_BITSTREAM hbitBuffer, const CMctPtr self,
+                                      CMctWorkPtr work, const int i, const int* huff_ctab,
+                                      const int* huff_ltab, const int huff_ltab_max_val,
+                                      const int code_book_lav) {
+  int retVal = 0;
+
+  /* read channel pair */
+  if (work->keepTree == 0) {
+    retVal = CMct_inverseMctParseChannelPair(hbitBuffer, work->codePairs[i], self->numMctChannels);
+    if (retVal > 0) {
+      return 1;
+    }
+  }
+
+  /* read flags */
+  work->bHasMctMask[i] = FDKreadBit(hbitBuffer);
+  work->bHasBandwiseCoeffs[i] = FDKreadBit(hbitBuffer);
+
+  /* read number of bands for non-fullband boxes */
+  work->numMctMaskBands[i] = MAX_NUM_MCT_BANDS;
+  if (work->bHasMctMask[i] || work->bHasBandwiseCoeffs[i]) {
+    int pairIsShort;
+    pairIsShort = FDKreadBit(hbitBuffer);
+    work->numMctMaskBands[i] = FDKreadBits(hbitBuffer, 5);
+    if (pairIsShort) {
+      work->numMctMaskBands[i] *= 8;
+    }
+    if (work->numMctMaskBands[i] > MAX_NUM_MCT_BANDS) {
+      return 1;
+    }
+  }
+
+  /* evaluate mctMask flag */
+  if (work->bHasMctMask[i] && work->numMctMaskBands[i]) {
+    /* parse mct mask: read work->numMctMaskBands[i] (= 1...64) bits and left align them in UINT64
+     */
+    const UINT64 bits_hi =
+        (UINT64)FDKreadBits(hbitBuffer, fMin((int)32, (int)work->numMctMaskBands[i]))
+        << fMax(32, (64 - work->numMctMaskBands[i]));
+    const UINT64 bits_lo =
+        (UINT64)FDKreadBits(hbitBuffer, fMax((int)0, (int)work->numMctMaskBands[i] - 32))
+        << (64 - work->numMctMaskBands[i]);
+    work->mctMask[i] = bits_hi | bits_lo;
+  } else {
+    /* all bands active */
+    work->mctMask[i] = 0xffffffffffffffffULL;
+  }
+
+  work->predDir[i] = (MCTSignalingType == 0) ? FDKreadBit(hbitBuffer) : 0;
+
+  if (usacIndepFlag > 0) {
+    work->bDeltaTime[i] = 0;
+  } else {
+    work->bDeltaTime[i] = FDKreadBit(hbitBuffer);
+  }
+
+  /*Sanity check*/
+  if ((work->bDeltaTime[i]) && (self->MCCSignalingType != self->MCTSignalingTypePrev)) {
+    return 1;
+  }
+
+  if (work->bHasBandwiseCoeffs[i] == 0) {
+    /* use fullband angle */
+    int val =
+        CMct_decodeHuffman(hbitBuffer, huff_ctab, huff_ltab, huff_ltab_max_val, code_book_lav);
+    FDK_ASSERT(val >= 0 && val < 256);
+    work->pairCoeffDeltaFb[i] = val;
+  } else {
+    /* use bandwise angles */
+    for (int j = 0; j < work->numMctMaskBands[i]; j++) {
+      if (READ_MASK(work->mctMask[i], j) > 0) {
+        int val =
+            CMct_decodeHuffman(hbitBuffer, huff_ctab, huff_ltab, huff_ltab_max_val, code_book_lav);
+        FDK_ASSERT(val >= 0 && val < 256);
+        work->pairCoeffDeltaSfb[i][j] = val;
+      }
+    }
+  }
+
+  return 0;
+}
+
 int CMct_inverseMctParseBS(CMctPtr self, HANDLE_FDK_BITSTREAM hbitBuffer, int usacIndepFlag,
                            int nChannels) {
   int i = 0, j = 0, default_value = 0;
@@ -320,7 +421,7 @@ int CMct_inverseMctParseBS(CMctPtr self, HANDLE_FDK_BITSTREAM hbitBuffer, int us
 
   work = self->mctWork;
 
-  self->MCTStereoFilling = FDKreadBit(hbitBuffer);
+  UINT MCTStereoFilling = FDKreadBit(hbitBuffer);
   self->MCCSignalingType = FDKreadBit(hbitBuffer);
   work->keepTree = 0;
   if (!usacIndepFlag) {
@@ -337,7 +438,6 @@ int CMct_inverseMctParseBS(CMctPtr self, HANDLE_FDK_BITSTREAM hbitBuffer, int us
     FDK_ASSERT(work->keepTree == 0);
 
     /* reset coefficient memory on indepFlag */
-    self->numPairsPrev = 0;
     for (i = 0; i < MAX_NUM_MCT_BOXES; i++) {
       self->pairCoeffQFbPrev[i] = default_value;
       for (j = 0; j < MAX_NUM_MCT_BANDS; j++) {
@@ -353,168 +453,40 @@ int CMct_inverseMctParseBS(CMctPtr self, HANDLE_FDK_BITSTREAM hbitBuffer, int us
       self->pairCoeffQSfbPrev[i][j] = default_value;
     }
   }
-  self->numPairsPrev = work->numPairs;
 
   if (work->keepTree == 0) {
-    work->numPairs = escapedValue(hbitBuffer, 5, 8, 16);
-  }
-  if (work->numPairs > MAX_NUM_MCT_BOXES) {
-    return 1;
+    UINT tmp = escapedValue(hbitBuffer, 5, 8, 16);
+    if (tmp > MAX_NUM_MCT_BOXES) {
+      return 1;
+    }
+    work->numPairs = (UCHAR)tmp;
   }
 
   for (i = 0; i < work->numPairs; i++) {
-    FDKmemclear(work->mctMask[i], MAX_NUM_MCT_BANDS * sizeof(UCHAR));
-
-    if (self->MCTStereoFilling) {
+    if (MCTStereoFilling) {
       work->hasStereoFilling[i] = FDKreadBit(hbitBuffer);
     } else {
       work->hasStereoFilling[i] = 0;
     }
 
     if (self->MCCSignalingType == 0) {
-      /* read channel pair */
-      if (work->keepTree == 0) {
-        retVal =
-            CMct_inverseMctParseChannelPair(hbitBuffer, work->codePairs[i], self->numMctChannels);
-        if (retVal > 0) {
-          return 1;
-        }
-      }
-
-      /* read flags */
-      work->bHasMctMask[i] = FDKreadBit(hbitBuffer);
-      work->bHasBandwiseCoeffs[i] = FDKreadBit(hbitBuffer);
-
-      /* read number of bands for non-fullband boxes */
-      work->numMctMaskBands[i] = MAX_NUM_MCT_BANDS;
-      if (work->bHasMctMask[i] || work->bHasBandwiseCoeffs[i]) {
-        int pairIsShort;
-        pairIsShort = FDKreadBit(hbitBuffer);
-        work->numMctMaskBands[i] = FDKreadBits(hbitBuffer, 5);
-        if (pairIsShort) {
-          work->numMctMaskBands[i] *= 8;
-        }
-        if (work->numMctMaskBands[i] > MAX_NUM_MCT_BANDS) {
-          return 1;
-        }
-      }
-
-      /* evaluate mctMask flag */
-      if (work->bHasMctMask[i]) {
-        /* parse mct mask*/
-        for (j = 0; j < work->numMctMaskBands[i]; j++) {
-          work->mctMask[i][j] = FDKreadBit(hbitBuffer);
-        }
-      } else {
-        /* all bands active */
-        for (j = 0; j < MAX_NUM_MCT_BANDS; j++) {
-          work->mctMask[i][j] = 1;
-        }
-      }
-
-      work->predDir[i] = FDKreadBit(hbitBuffer);
-
-      if (usacIndepFlag > 0) {
-        work->bDeltaTime[i] = 0;
-      } else {
-        work->bDeltaTime[i] = FDKreadBit(hbitBuffer);
-      }
-
-      /*Sanity check*/
-      if ((work->bDeltaTime[i]) && (self->MCCSignalingType != self->MCTSignalingTypePrev)) {
-        return 1;
-      }
-
-      if (work->bHasBandwiseCoeffs[i] == 0) {
-        /* use fullband angle */
-        work->pairCoeffDeltaFb[i] = CMct_decodeHuffman(hbitBuffer, huff_ctabscf, huff_ltabscf,
-                                                       HUFF_LTABSCF_MAX_VALUE, CODE_BOOK_ALPHA_LAV);
-        FDK_ASSERT(work->pairCoeffDeltaFb[i] >= 0);
-      } else {
-        /* use bandwise angles */
-        for (j = 0; j < work->numMctMaskBands[i]; j++) {
-          if (work->mctMask[i][j] > 0) {
-            work->pairCoeffDeltaSfb[i][j] =
-                CMct_decodeHuffman(hbitBuffer, huff_ctabscf, huff_ltabscf, HUFF_LTABSCF_MAX_VALUE,
-                                   CODE_BOOK_ALPHA_LAV);
-            FDK_ASSERT(work->pairCoeffDeltaSfb[i][j] >= 0);
-          }
-        }
+      retVal = Read_MultichannelCodingBox(self->MCCSignalingType, usacIndepFlag, hbitBuffer, self,
+                                          work, i, huff_ctabscf, huff_ltabscf,
+                                          HUFF_LTABSCF_MAX_VALUE, CODE_BOOK_ALPHA_LAV);
+      if (retVal) {
+        return retVal;
       }
     } else if (self->MCCSignalingType == 1) {
-      /* read channel pair */
-      if (work->keepTree == 0) {
-        retVal =
-            CMct_inverseMctParseChannelPair(hbitBuffer, work->codePairs[i], self->numMctChannels);
-        if (retVal > 0) {
-          return 1;
-        }
-      }
-
-      /* read flags */
-      work->bHasMctMask[i] = FDKreadBit(hbitBuffer);
-      work->bHasBandwiseCoeffs[i] = FDKreadBit(hbitBuffer);
-
-      /* read number of bands for non-fullband boxes */
-      work->numMctMaskBands[i] = MAX_NUM_MCT_BANDS;
-      if (work->bHasMctMask[i] || work->bHasBandwiseCoeffs[i]) {
-        int pairIsShort;
-        pairIsShort = FDKreadBit(hbitBuffer);
-        work->numMctMaskBands[i] = FDKreadBits(hbitBuffer, 5);
-        if (pairIsShort) {
-          work->numMctMaskBands[i] *= 8;
-        }
-        if (work->numMctMaskBands[i] > MAX_NUM_MCT_BANDS) {
-          return 1;
-        }
-      }
-
-      /* evaluate mctMask flag */
-      if (work->bHasMctMask[i]) {
-        /* parse mct mask*/
-        for (j = 0; j < work->numMctMaskBands[i]; j++) {
-          work->mctMask[i][j] = FDKreadBit(hbitBuffer);
-        }
-      } else {
-        /* all bands active */
-        for (j = 0; j < work->numMctMaskBands[i]; j++) work->mctMask[i][j] = 1;
-      }
-
-      work->predDir[i] = 0; /* only needed for prediction based stereo processing */
-
-      if (usacIndepFlag > 0) {
-        work->bDeltaTime[i] = 0;
-      } else {
-        work->bDeltaTime[i] = FDKreadBit(hbitBuffer);
-      }
-
-      /*Sanity check*/
-      if ((work->bDeltaTime[i]) && (self->MCCSignalingType != self->MCTSignalingTypePrev)) {
-        return 1;
-      }
-
-      if (work->bHasBandwiseCoeffs[i] == 0) {
-        /* use fullband angle */
-        work->pairCoeffDeltaFb[i] =
-            CMct_decodeHuffman(hbitBuffer, huff_ctabAngle, huff_ltabAngle, HUFF_LTABANGLE_MAX_VALUE,
-                               CODE_BOOK_BETA_LAV);
-        FDK_ASSERT(work->pairCoeffDeltaFb[i] >= 0);
-      } else {
-        /* use bandwise angles */
-        for (j = 0; j < work->numMctMaskBands[i]; j++) {
-          if (work->mctMask[i][j] > 0) {
-            work->pairCoeffDeltaSfb[i][j] =
-                CMct_decodeHuffman(hbitBuffer, huff_ctabAngle, huff_ltabAngle,
-                                   HUFF_LTABANGLE_MAX_VALUE, CODE_BOOK_BETA_LAV);
-            FDK_ASSERT(work->pairCoeffDeltaSfb[i][j] >= 0);
-          }
-        }
+      Read_MultichannelCodingBox(self->MCCSignalingType, usacIndepFlag, hbitBuffer, self, work, i,
+                                 huff_ctabAngle, huff_ltabAngle, HUFF_LTABANGLE_MAX_VALUE,
+                                 CODE_BOOK_BETA_LAV);
+      if (retVal) {
+        return retVal;
       }
     }
   }
 
   self->MCTSignalingTypePrev = self->MCCSignalingType;
-  self->numPairsPrev = work->numPairs;
 
   return 0;
 }
@@ -567,7 +539,8 @@ static void clean_sfb_band_MCT_STEFI_DMX(FIXP_DBL* outCoefficient, INT outCoeffi
   }
 }
 
-static int inverseDpcmAngleCoding(CMctPtr self, int pair, int bIsShortBlock, int windowsPerFrame) {
+static int inverseDpcmAngleCoding(CMctPtr self, SHORT pairCoeffQSfb[], SHORT* pairCoeffQFb,
+                                  int pair, int bIsShortBlock, int windowsPerFrame) {
   int lastVal;
   int coeffQ;
   int band = 0;
@@ -613,10 +586,10 @@ static int inverseDpcmAngleCoding(CMctPtr self, int pair, int bIsShortBlock, int
       band_mod_mctBandsPerWindow = 0;
       for (band = 0; band < work->numMctMaskBands[pair]; band++) {
         /* set all coeffs to fullband coeff */
-        work->pairCoeffQSfb[pair][band] = coeffQ;
+        pairCoeffQSfb[band] = coeffQ;
 
         /* set previous coeffs according to mctMask */
-        if (work->mctMask[pair][band] > 0) {
+        if (READ_MASK(work->mctMask[pair], band) > 0) {
           self->pairCoeffQSfbPrev[pair][band_mod_mctBandsPerWindow] = coeffQ;
         } else {
           self->pairCoeffQSfbPrev[pair][band_mod_mctBandsPerWindow] = DEFAULT_ALPHA;
@@ -641,11 +614,11 @@ static int inverseDpcmAngleCoding(CMctPtr self, int pair, int bIsShortBlock, int
           }
         }
 
-        if (work->mctMask[pair][band] > 0) {
+        if (READ_MASK(work->mctMask[pair], band) > 0) {
           /* inverse dpcm */
           coeffQ = lastVal - work->pairCoeffDeltaSfb[pair][band] + 60;
 
-          work->pairCoeffQSfb[pair][band] = coeffQ;
+          pairCoeffQSfb[band] = coeffQ;
           lastVal = coeffQ;
           /* shortblock modulo operation only for previous values */
           self->pairCoeffQSfbPrev[pair][band_mod_mctBandsPerWindow] = coeffQ;
@@ -695,17 +668,17 @@ static int inverseDpcmAngleCoding(CMctPtr self, int pair, int bIsShortBlock, int
         return -1;
       }
 
-      work->pairCoeffQFb[pair] = coeffQ;
+      *pairCoeffQFb = coeffQ;
 
       self->pairCoeffQFbPrev[pair] = coeffQ;
 
       band_mod_mctBandsPerWindow = 0;
       for (band = 0; band < work->numMctMaskBands[pair]; band++) {
         /* set all coeffs to fullband coeff */
-        work->pairCoeffQSfb[pair][band] = coeffQ;
+        pairCoeffQSfb[band] = coeffQ;
 
         /* set previous coeffs according to mctMask */
-        if (work->mctMask[pair][band] > 0) {
+        if (READ_MASK(work->mctMask[pair], band) > 0) {
           self->pairCoeffQSfbPrev[pair][band_mod_mctBandsPerWindow] = coeffQ;
         } else {
           self->pairCoeffQSfbPrev[pair][band_mod_mctBandsPerWindow] = DEFAULT_BETA;
@@ -732,7 +705,7 @@ static int inverseDpcmAngleCoding(CMctPtr self, int pair, int bIsShortBlock, int
           }
         }
 
-        if (work->mctMask[pair][band] > 0) {
+        if (READ_MASK(work->mctMask[pair], band) > 0) {
           /* inverse dpcm */
           coeffQ = lastVal + work->pairCoeffDeltaSfb[pair][band];
 
@@ -745,7 +718,7 @@ static int inverseDpcmAngleCoding(CMctPtr self, int pair, int bIsShortBlock, int
             return -1;
           }
 
-          work->pairCoeffQSfb[pair][band] = coeffQ;
+          pairCoeffQSfb[band] = coeffQ;
           lastVal = coeffQ;
           /* shortblock modulo operation only for previous values */
           self->pairCoeffQSfbPrev[pair][band_mod_mctBandsPerWindow] = coeffQ;
@@ -941,7 +914,7 @@ static void applyMctPrediction(FIXP_DBL* dmx, SHORT* dmxExp, FIXP_DBL* res, SHOR
 
 static void applyMctRotationWrapper(const CMctPtr self, FIXP_DBL* RESTRICT dmx, SHORT* dmxSfbExp,
                                     FIXP_DBL* RESTRICT res, SHORT* resSfbExp, SHORT* alphaQSfb,
-                                    UCHAR* mctMask, const int numMctBands, const SHORT alphaQ,
+                                    const UINT64 mctMask, const int numMctBands, const SHORT alphaQ,
                                     const int totalSfb, const int pair, const SHORT* BandOffsets) {
   CMctWorkPtr work = self->mctWork;
 
@@ -968,7 +941,7 @@ static void applyMctRotationWrapper(const CMctPtr self, FIXP_DBL* RESTRICT dmx, 
       int predDir = work->predDir[pair];
       for (int sfb = 0; sfb < sfb_max; sfb++) {
         int i = sfb / 2;
-        if (mctMask[i] == 0) continue;
+        if (READ_MASK(mctMask, i) == 0) continue;
         INT startLine = BandOffsets[sfb];
         INT stopLine = BandOffsets[sfb + 1];
         INT nSamples = stopLine - startLine;
@@ -997,7 +970,7 @@ static void applyMctRotationWrapper(const CMctPtr self, FIXP_DBL* RESTRICT dmx, 
       int sfb_max = fMin(totalSfb, numMctBands * 2);
       for (int sfb = 0; sfb < sfb_max; sfb++) {
         int i = sfb / 2;
-        if (mctMask[i] == 0) continue;
+        if (READ_MASK(mctMask, i) == 0) continue;
         INT startLine = BandOffsets[sfb];
         INT stopLine = BandOffsets[sfb + 1];
         INT nSamples = stopLine - startLine;
@@ -1009,7 +982,8 @@ static void applyMctRotationWrapper(const CMctPtr self, FIXP_DBL* RESTRICT dmx, 
 }
 
 static void CMct_StereoFilling_GetPreviousDmx(
-    CMctPtr self, CAacDecoderStaticChannelInfo* pAacDecoderStaticChannelInfo,
+    CMctPtr self, const SHORT pairCoeffQSfb[], const SHORT* pairCoeffQFb,
+    CAacDecoderStaticChannelInfo* pAacDecoderStaticChannelInfo,
     CAacDecoderChannelInfo* pAacDecoderChannelInfo, FIXP_DBL* prevSpec1, SHORT* prevSpec1_exp,
     FIXP_DBL* prevSpec2, SHORT* prevSpec2_exp, FIXP_DBL* dmx_prev, SHORT* dmx_prev_win_exp,
     INT pair, const SHORT* pScaleFactorBandOffsets, const UCHAR* pWindowGroupLength,
@@ -1085,7 +1059,7 @@ static void CMct_StereoFilling_GetPreviousDmx(
   } /*  if(self->MCCSignalingType == 0) */
 
   else if (!work->bHasBandwiseCoeffs[pair] && !work->bHasMctMask[pair]) {
-    SHORT alphaQ = work->pairCoeffQSfb[pair][0];
+    SHORT alphaQ = pairCoeffQSfb[0];
 
     for (window = 0, group = 0; group < windowGroups; group++) {
       for (int groupwin = 0; groupwin < pWindowGroupLength[group]; groupwin++, window++) {
@@ -1146,7 +1120,7 @@ static void CMct_StereoFilling_GetPreviousDmx(
           FIXP_DBL* rightCoefficient = &rightSpectrum[pScaleFactorBandOffsets[sfb]];
           FIXP_DBL* outCoefficient = &outSpectrum[pScaleFactorBandOffsets[sfb]];
 
-          if (work->mctMask[pair][sfb >> 1]) {
+          if (READ_MASK(work->mctMask[pair], sfb >> 1)) {
             /* Find if a difference between the scalings exists. */
             temp = prevSpec1_exp[window * 16 + sfb] - prevSpec2_exp[window * 16 + sfb];
             if (temp > 0) {
@@ -1159,7 +1133,7 @@ static void CMct_StereoFilling_GetPreviousDmx(
               dmx_prev_win_exp[window * 16 + sfb] = prevSpec2_exp[window * 16 + sfb] + 1;
             }
 
-            SHORT alphaQ = work->pairCoeffQSfb[pair][sfb >> 1];
+            SHORT alphaQ = pairCoeffQSfb[sfb >> 1];
 
             applyMctInverseRotationFrame(
                 leftCoefficient, lScale, rightCoefficient, rScale, outCoefficient, alphaQ,
@@ -1601,15 +1575,13 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
   int pair;
   SHORT alphaQ = 0;
   SHORT* alphaQSfb = NULL;
-  UCHAR* mctMask = NULL;
 
   CMctWorkPtr work = self->mctWork;
 
-  SHORT* chTag = self->channelMap;
+  UCHAR* chTag = self->channelMap;
 
   /* Sanity check */
   if (work->numPairs > MAX_NUM_MCT_BOXES) {
-    self->numPairsPrev = 0;
     return -1;
   }
 
@@ -1622,6 +1594,8 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
     CAacDecoderChannelInfo *chInfo1, *chInfo2;
     CAacDecoderStaticChannelInfo *stChInfo1, *stChInfo2;
     CIcsInfo *icsInfo1, *icsInfo2;
+    SHORT pairCoeffQSfb[MAX_NUM_MCT_BANDS];
+    SHORT pairCoeffQFb;
 
     ch1 = work->codePairs[pair][0];
     ch2 = work->codePairs[pair][1];
@@ -1637,7 +1611,6 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
 
     /* sanity check */
     if (windowsPerFrame != GetWindowsPerFrame(icsInfo2)) {
-      self->numPairsPrev = 0;
       return -1;
     }
 
@@ -1646,7 +1619,8 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
       bIsShortBlock = 1;
     }
 
-    mctBandsPerWindow = inverseDpcmAngleCoding(self, pair, bIsShortBlock, windowsPerFrame);
+    mctBandsPerWindow = inverseDpcmAngleCoding(self, pairCoeffQSfb, &pairCoeffQFb, pair,
+                                               bIsShortBlock, windowsPerFrame);
 
     if (mctBandsPerWindow < 0) {
       return -1;
@@ -1674,10 +1648,10 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
         FDKmemclear(prevDmx, sizeof(FIXP_DBL) * 1024);
         FDKmemclear(prevDmx_exp, sizeof(SHORT) * (8 * 16));
 
-        FIXP_DBL* prevSpec1 = self->prevOutSpec[work->codePairs[pair][0]];
-        FIXP_DBL* prevSpec2 = self->prevOutSpec[work->codePairs[pair][1]];
-        SHORT* prevSpec1_exp = self->prevOutSpec_exp[work->codePairs[pair][0]];
-        SHORT* prevSpec2_exp = self->prevOutSpec_exp[work->codePairs[pair][1]];
+        FIXP_DBL* prevSpec1 = &self->prevOutSpec[work->codePairs[pair][0] * 1024];
+        FIXP_DBL* prevSpec2 = &self->prevOutSpec[work->codePairs[pair][1] * 1024];
+        SHORT* prevSpec1_exp = &self->prevOutSpec_exp[work->codePairs[pair][0] * (8 * 16)];
+        SHORT* prevSpec2_exp = &self->prevOutSpec_exp[work->codePairs[pair][1] * (8 * 16)];
 
         /* If one can not compute previous dmx from both of the previous elements */
         if ((zeroPrevOutSpec1 && zeroPrevOutSpec2) || bNoFrameMemory) {
@@ -1698,8 +1672,9 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
           }
 
           CMct_StereoFilling_GetPreviousDmx(
-              self, stChInfo2, chInfo2, prevSpec1, prevSpec1_exp, prevSpec2, prevSpec2_exp, prevDmx,
-              prevDmx_exp, pair, GetScaleFactorBandOffsets(icsInfo1, samplingRateInfo),
+              self, pairCoeffQSfb, &pairCoeffQFb, stChInfo2, chInfo2, prevSpec1, prevSpec1_exp,
+              prevSpec2, prevSpec2_exp, prevDmx, prevDmx_exp, pair,
+              GetScaleFactorBandOffsets(icsInfo1, samplingRateInfo),
               GetWindowGroupLengthTable(icsInfo1), GetWindowGroups(icsInfo1), icsInfo2->MaxSfBands,
               band_is_noise, zeroPrevOutSpec1 && zeroPrevOutSpec2);
 
@@ -1707,8 +1682,9 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
         /* General case: both of the previous elements are available for computing previous dmx */
         else {
           CMct_StereoFilling_GetPreviousDmx(
-              self, stChInfo2, chInfo2, prevSpec1, prevSpec1_exp, prevSpec2, prevSpec2_exp, prevDmx,
-              prevDmx_exp, pair, GetScaleFactorBandOffsets(icsInfo1, samplingRateInfo),
+              self, pairCoeffQSfb, &pairCoeffQFb, stChInfo2, chInfo2, prevSpec1, prevSpec1_exp,
+              prevSpec2, prevSpec2_exp, prevDmx, prevDmx_exp, pair,
+              GetScaleFactorBandOffsets(icsInfo1, samplingRateInfo),
               GetWindowGroupLengthTable(icsInfo1), GetWindowGroups(icsInfo1), icsInfo2->MaxSfBands,
               band_is_noise, 1);
         } /* else */
@@ -1761,9 +1737,8 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
 
     } /* if(work->hasStereoFilling[pair]) */
 
-    alphaQ = work->pairCoeffQFb[pair];
-    alphaQSfb = work->pairCoeffQSfb[pair];
-    mctMask = work->mctMask[pair];
+    alphaQ = pairCoeffQFb;
+    alphaQSfb = pairCoeffQSfb;
 
     icsInfo1->MaxSfBands = icsInfo2->MaxSfBands = fMax(icsInfo1->MaxSfBands, icsInfo2->MaxSfBands);
 
@@ -1782,8 +1757,8 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
         SHORT* resSfbExp = &(chInfo2->pDynData->aSfbScale[win * 16]);
 
         applyMctRotationWrapper(self, dmx, dmxSfbExp, res, resSfbExp, &alphaQSfb[mctBandOffset],
-                                &mctMask[mctBandOffset], mctBandsPerWindow, alphaQ, totalSfb, pair,
-                                BandOffsets);
+                                work->mctMask[pair] << mctBandOffset, mctBandsPerWindow, alphaQ,
+                                totalSfb, pair, BandOffsets);
 
         if ((MCT_elFlags[chTag[ch1]] & AC_EL_ENHANCED_NOISE) &&
             (MCT_elFlags[chTag[ch2]] & AC_EL_ENHANCED_NOISE)) {
@@ -1814,8 +1789,9 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
 
               /* apply mct */
               applyMctRotationWrapper(self, dmx, &dmxSfbExp[win * 16], res, &resSfbExp[win * 16],
-                                      &alphaQSfb[mctBandOffset], &mctMask[mctBandOffset],
-                                      mctBandsPerWindow, alphaQ, totalSfb, pair, BandOffsets);
+                                      &alphaQSfb[mctBandOffset],
+                                      work->mctMask[pair] << mctBandOffset, mctBandsPerWindow,
+                                      alphaQ, totalSfb, pair, BandOffsets);
 
             } /* for(int tileIdx=0;tileIdx<NumTiles;tileIdx++) */
 
@@ -1835,18 +1811,17 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
 void CMct_StereoFilling_save_prev(CMctPtr self, CAacDecoderChannelInfo** pAacDecoderChannelInfo) {
   CAacDecoderChannelInfo* chInfo;
 
-  SHORT* chTag = self->channelMap;
+  UCHAR* chTag = self->channelMap;
 
   for (int i = 0; i < self->numMctChannels; i++) {
     chInfo = pAacDecoderChannelInfo[chTag[i]];
-    FDKmemcpy(self->prevOutSpec[i], chInfo->pSpectralCoefficient, 1024 * sizeof(FIXP_DBL));
-    FDKmemcpy(self->prevOutSpec_exp[i], chInfo->pDynData->aSfbScale, (8 * 16) * sizeof(SHORT));
+    FDKmemcpy(&self->prevOutSpec[i * 1024], chInfo->pSpectralCoefficient, 1024 * sizeof(FIXP_DBL));
+    FDKmemcpy(&self->prevOutSpec_exp[i * (8 * 16)], chInfo->pDynData->aSfbScale,
+              (8 * 16) * sizeof(SHORT));
   }
 }
 
 void CMct_StereoFilling_clear_prev(CMctPtr self, CAacDecoderChannelInfo** pAacDecoderChannelInfo) {
-  for (int i = 0; i < self->numMctChannels; i++) {
-    FDKmemclear(self->prevOutSpec[i], 1024 * sizeof(FIXP_DBL));
-    FDKmemclear(self->prevOutSpec_exp[i], (8 * 16) * sizeof(SHORT));
-  }
+  FDKmemclear(&self->prevOutSpec[0], self->numMctChannels * 1024 * sizeof(FIXP_DBL));
+  FDKmemclear(&self->prevOutSpec_exp[0], self->numMctChannels * (8 * 16) * sizeof(SHORT));
 }

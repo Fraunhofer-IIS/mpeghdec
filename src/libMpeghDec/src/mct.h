@@ -102,16 +102,14 @@ extern "C" {
 #endif
 
 typedef struct CMctWork {
-  int keepTree;
-  int numPairs;
-  SHORT codePairs[MAX_NUM_MCT_BOXES][2];
-  SHORT pairCoeffQSfb[MAX_NUM_MCT_BOXES][MAX_NUM_MCT_BANDS];
-  SHORT pairCoeffQFb[MAX_NUM_MCT_BOXES];
-  SHORT bDeltaTime[MAX_NUM_MCT_BOXES];
-  SHORT pairCoeffDeltaSfb[MAX_NUM_MCT_BOXES][MAX_NUM_MCT_BANDS];
-  SHORT pairCoeffDeltaFb[MAX_NUM_MCT_BOXES];
-  SHORT numMctMaskBands[MAX_NUM_MCT_BOXES];
-  UCHAR mctMask[MAX_NUM_MCT_BOXES][MAX_NUM_MCT_BANDS];
+  UCHAR keepTree;
+  UCHAR numPairs;
+  UCHAR codePairs[MAX_NUM_MCT_BOXES][2];
+  UCHAR bDeltaTime[MAX_NUM_MCT_BOXES];
+  UCHAR pairCoeffDeltaSfb[MAX_NUM_MCT_BOXES][MAX_NUM_MCT_BANDS];
+  UCHAR pairCoeffDeltaFb[MAX_NUM_MCT_BOXES];
+  UCHAR numMctMaskBands[MAX_NUM_MCT_BOXES];
+  UINT64 mctMask[MAX_NUM_MCT_BOXES];
   UCHAR bHasMctMask[MAX_NUM_MCT_BOXES];
   UCHAR bHasBandwiseCoeffs[MAX_NUM_MCT_BOXES];
   UCHAR predDir[MAX_NUM_MCT_BOXES];
@@ -120,18 +118,16 @@ typedef struct CMctWork {
 
 typedef struct CMct {
   CMctWorkPtr mctWork;
-  int MCTStereoFilling;
-  int MCCSignalingType;
-  int MCTSignalingTypePrev;
-  int numPairsPrev;
+  UCHAR MCCSignalingType;
+  UCHAR MCTSignalingTypePrev;
   UCHAR windowSequenceIsShortPrev[MAX_NUM_MCT_BOXES];
   UCHAR channelMask[MAX_NUM_MCT_CHANNELS];
-  SHORT channelMap[MAX_NUM_MCT_CHANNELS];
-  int numMctChannels;
+  UCHAR channelMap[MAX_NUM_MCT_CHANNELS];
+  UCHAR numMctChannels;
   SHORT pairCoeffQSfbPrev[MAX_NUM_MCT_BOXES][MAX_NUM_MCT_BANDS];
   SHORT pairCoeffQFbPrev[MAX_NUM_MCT_BOXES]; /* fullband coeff */
-  FIXP_DBL prevOutSpec[MAX_NUM_MCT_CHANNELS][1024];
-  SHORT prevOutSpec_exp[MAX_NUM_MCT_CHANNELS][8 * 16];
+  FIXP_DBL* prevOutSpec;
+  SHORT* prevOutSpec_exp;
   UCHAR Mct_group_parsed;
 } CMct, *CMctPtr;
 
