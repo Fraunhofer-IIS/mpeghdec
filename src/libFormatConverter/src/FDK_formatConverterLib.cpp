@@ -338,6 +338,11 @@ int IIS_FormatConverter_Open(IIS_FORMATCONVERTER_HANDLE self, INT* p_buffer, UIN
     _p->numTotalInputChannels += _p->numInputChannels[i];
   }
 
+  if (_p->numTotalInputChannels == 0) {
+    /* nothing to be done: avoid allocation of the full FormatConverter */
+    goto FC_OPEN_CLEANUP_AND_RETURN;
+  }
+
   cicp2geometry_get_number_of_lfes(_p->outChannelGeo, self->numLocalSpeaker, &numLfes);
 
   /* Error can be ignored, because _p->cicpLayoutIndex is only required to detect target layout 5
@@ -538,10 +543,13 @@ INT IIS_FormatConverter_Process(IIS_FORMATCONVERTER_HANDLE self, HANDLE_DRC_DECO
 
   _p = (IIS_FORMATCONVERTER_INTERNAL*)self->member;
 
-  activeDownmixer* h = (activeDownmixer*)_p->fcState->handleActiveDmxStft;
+  if (_p->numTotalInputChannels == 0) {
+    return 0;
+  }
 
   switch (_p->mode) {
     case IIS_FORMATCONVERTER_MODE_CUSTOM_FREQ_DOMAIN_STFT: {
+      activeDownmixer* h = (activeDownmixer*)_p->fcState->handleActiveDmxStft;
       FIXP_DBL* deinBuffer[FDK_FORMAT_CONVERTER_MAX_INPUT_CHANNELS];
       FIXP_DBL* deoutBuffer[FDK_FORMAT_CONVERTER_MAX_OUTPUT_CHANNELS];
 
@@ -948,17 +956,21 @@ static INT _initSTFT(IIS_FORMATCONVERTER_INTERNAL* _p) {
     }
   }
 
-  /* Initialize prevInputBufferStft */
-  _p->prevInputBufferStft = (FIXP_DBL**)FDKcalloc((TFRA + 1), sizeof(FIXP_DBL*));
-  if (_p->prevInputBufferStft == NULL) {
-    return status = -1;
-  }
-  for (ch = 0; ch < (TFRA + 1); ch++) {
-    _p->prevInputBufferStft[ch] =
-        (FIXP_DBL*)FDKaalloc(_p->stftLength * sizeof(FIXP_DBL), ALIGNMENT_DEFAULT);
-    if (_p->prevInputBufferStft[ch] == NULL) {
-      status = -1;
+  if (_p->immersiveDownmixFlag) {
+    /* Initialize prevInputBufferStft */
+    _p->prevInputBufferStft = (FIXP_DBL**)FDKcalloc((TFRA + 1), sizeof(FIXP_DBL*));
+    if (_p->prevInputBufferStft == NULL) {
+      return status = -1;
     }
+    for (ch = 0; ch < (TFRA + 1); ch++) {
+      _p->prevInputBufferStft[ch] =
+          (FIXP_DBL*)FDKaalloc(_p->stftLength * sizeof(FIXP_DBL), ALIGNMENT_DEFAULT);
+      if (_p->prevInputBufferStft[ch] == NULL) {
+        status = -1;
+      }
+    }
+  } else {
+    _p->prevInputBufferStft = NULL;
   }
 
   for (ch = 0; ch < _p->numTotalInputChannels; ch++) {

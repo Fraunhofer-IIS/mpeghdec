@@ -572,6 +572,11 @@ static AAC_DECODER_ERROR applyDownmixMatrixPerSignalGroup(IIS_FORMATCONVERTER_IN
                                                           const CSUsacConfig* pUsacConfig,
                                                           FIXP_DBL* p_buffer) {
   int error = 0;
+
+  if (_p->numTotalInputChannels == 0) {
+    return AAC_DEC_OK;
+  }
+
   FIXP_DMX_H* dmx_sorted = _p->fcParams->dmxMtx_sorted;
   INT* eqIndexVec_sorted = _p->fcParams->eqIndexVec_sorted;
   for (INT grp = 0; grp < (INT)pUsacConfig->bsNumSignalGroups; grp++) {
