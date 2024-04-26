@@ -823,7 +823,7 @@ void CJointStereo_ApplyMS(CAacDecoderChannelInfo* pAacDecoderChannelInfo[2],
                           SHORT* store_dmx_re_prev_e, const int mainband_flag) {
   int window, group, band;
   UCHAR groupMask;
-  CJointStereoData* pJointStereoData = &pAacDecoderChannelInfo[L]->pComData->jointStereoData;
+  CJointStereoData* pJointStereoData = pAacDecoderChannelInfo[L]->pComData->pJointStereoData;
   CCplxPredictionData* cplxPredictionData =
       pAacDecoderChannelInfo[L]->pComStaticData->cplxPredictionData;
 
@@ -1463,9 +1463,9 @@ void CJointStereo_ApplyMSIGFcore(CAacDecoderChannelInfo* pAacDecoderChannelInfo[
       GetWindowSequence(&pAacDecoderChannelInfo[L]->icsInfo) == BLOCK_SHORT);
 
   /* Set pointers to the already computed previous DMX and its exaponent */
-  FIXP_DBL* PreviousDMX = pAacDecoderChannelInfo[L]->pComData->jointStereoData.store_dmx_re_prev;
+  FIXP_DBL* PreviousDMX = pAacDecoderChannelInfo[L]->pComData->pJointStereoData->store_dmx_re_prev;
   SHORT* PreviousDMXexp =
-      &(pAacDecoderChannelInfo[L]->pComData->jointStereoData.store_dmx_re_prev_e);
+      &(pAacDecoderChannelInfo[L]->pComData->pJointStereoData->store_dmx_re_prev_e);
 
   /* Apply MS over tiles */
   for (int tileIdx = 0; tileIdx < NumberOfTiles; tileIdx++) {
@@ -1509,7 +1509,7 @@ void CJointStereo_ApplyMS_IGF(CAacDecoderStaticChannelInfo* pAacDecoderStaticCha
                               const UCHAR* pWindowGroupLength, const int windowGroups) {
   int window, group, band;
   UCHAR groupMask;
-  CJointStereoData* pJointStereoData = &pAacDecoderChannelInfo[L]->pComData->jointStereoData;
+  CJointStereoData* pJointStereoData = pAacDecoderChannelInfo[L]->pComData->pJointStereoData;
   CCplxPredictionData* cplxPredictionData =
       pAacDecoderChannelInfo[L]->pComStaticData->cplxPredictionData;
 

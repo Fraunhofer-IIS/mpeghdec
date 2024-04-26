@@ -1005,6 +1005,9 @@ static void CAacDecoder_DeInit(HANDLE_AACDECODER self, const int subStreamIndex)
 
   for (ch = aacChannelOffset; ch < aacChannelOffset + aacChannels; ch++) {
     if (self->pAacDecoderChannelInfo[ch] != NULL) {
+      if (self->pAacDecoderChannelInfo[ch]->pDynData != NULL) {
+        FDKfree(self->pAacDecoderChannelInfo[ch]->pDynData);
+      }
       if (self->pAacDecoderChannelInfo[ch]->pComStaticData != NULL) {
         if (self->pAacDecoderChannelInfo[ch]->pComStaticData->pWorkBufferCore1 != NULL) {
           if (ch == aacChannelOffset) {
@@ -1028,6 +1031,9 @@ static void CAacDecoder_DeInit(HANDLE_AACDECODER self, const int subStreamIndex)
         self->pAacDecoderChannelInfo[ch]->pComStaticData = NULL;
       }
       if (self->pAacDecoderChannelInfo[ch]->pComData != NULL) {
+        if (self->pAacDecoderChannelInfo[ch]->pComData->pJointStereoData != NULL) {
+          FDKfree(self->pAacDecoderChannelInfo[ch]->pComData->pJointStereoData);
+        }
         /* Avoid double free of linked pComData in case of CPE by settings pointer to NULL. */
         if (ch < (28) - 1) {
           if ((self->pAacDecoderChannelInfo[ch + 1] != NULL) &&
@@ -1583,6 +1589,12 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
         if (self->pAacDecoderChannelInfo[ch] == NULL) {
           goto bail;
         }
+        self->pAacDecoderChannelInfo[ch]->pDynData =
+            (CAacDecoderDynamicData*)FDKmalloc(sizeof(CAacDecoderDynamicData));
+        if (self->pAacDecoderChannelInfo[ch]->pDynData == NULL) {
+          goto bail;
+        }
+
         ch++;
       }
 
@@ -1642,8 +1654,16 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
                   (self->pAacDecoderChannelInfo[ch]->pComStaticData->pWorkBufferCore1 == NULL)) {
                 goto bail;
               }
-              self->pAacDecoderChannelInfo[ch]->pDynData =
-                  &(self->pAacDecoderChannelInfo[ch]->pComData->pAacDecoderDynamicData[0]);
+              if (el_channels == 2) {
+                self->pAacDecoderChannelInfo[ch]->pComData->pJointStereoData =
+                    (CJointStereoData*)FDKmalloc(sizeof(CJointStereoData));
+                if (self->pAacDecoderChannelInfo[ch]->pComData->pJointStereoData == NULL) {
+                  goto bail;
+                }
+              } else { /* memory required only for CPEs */
+                FDK_ASSERT(self->pAacDecoderChannelInfo[ch]->pComData->pJointStereoData == NULL);
+              }
+
               self->pAacDecoderChannelInfo[ch]->pSpectralCoefficient =
                   (SPECTRAL_PTR)&self->workBufferCore2[ch * 1024];
 
@@ -1660,8 +1680,6 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
                     self->pAacDecoderChannelInfo[ch]->pComStaticData;
                 self->pAacDecoderChannelInfo[ch + 1]->pComStaticData->pWorkBufferCore1 =
                     self->pAacDecoderChannelInfo[ch]->pComStaticData->pWorkBufferCore1;
-                self->pAacDecoderChannelInfo[ch + 1]->pDynData =
-                    &(self->pAacDecoderChannelInfo[ch]->pComData->pAacDecoderDynamicData[1]);
                 self->pAacDecoderChannelInfo[ch + 1]->pSpectralCoefficient =
                     (SPECTRAL_PTR)&self->workBufferCore2[(ch + 1) * 1024];
               }

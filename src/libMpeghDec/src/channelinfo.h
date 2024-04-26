@@ -236,15 +236,7 @@ CWorkBufferCore1;
 
 /* Common data referenced by all channels */
 typedef struct {
-  CAacDecoderDynamicData pAacDecoderDynamicData[2];
-
-  CJointStereoData jointStereoData; /* One for one element */
-
-  shouldBeUnion {
-    struct {
-    } aac;
-  }
-  overlay;
+  CJointStereoData* pJointStereoData; /* One for one element */
 
 } CAacDecoderCommonData;
 
