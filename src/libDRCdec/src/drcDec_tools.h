@@ -92,7 +92,7 @@ amm-info@iis.fraunhofer.de
 #define DRCDEC_TOOLS_H
 
 #include "drcDec_types.h"
-#include "drcDec_selectionProcess.h"
+#include "drcDecoder.h"
 
 int getDeltaTmin(const int sampleRate);
 

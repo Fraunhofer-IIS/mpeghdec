@@ -120,14 +120,10 @@ typedef enum { GAIN_DEC_DRC1, GAIN_DEC_DRC2_DRC3 } GAIN_DEC_LOCATION;
 typedef enum { GAIN_DEC_FRAME_SIZE, GAIN_DEC_SAMPLE_RATE } GAIN_DEC_PARAM;
 
 typedef struct {
-  FIXP_DBL gainLin; /* e = 7 */
-  SHORT time;
-} NODE_LIN;
-
-typedef struct {
   GAIN_INTERPOLATION_TYPE gainInterpolationType;
-  int nNodes[NUM_LNB_FRAMES]; /* number of nodes, saturated to 32 */
-  NODE_LIN linearNode[NUM_LNB_FRAMES][32];
+  int nNodes[NUM_LNB_FRAMES];                  /* number of nodes, saturated to 32 */
+  FIXP_DBL linearNodeGain[NUM_LNB_FRAMES][32]; /* e = 7 */
+  SHORT linearNodeTime[NUM_LNB_FRAMES][32];
 } LINEAR_NODE_BUFFER;
 
 typedef struct {

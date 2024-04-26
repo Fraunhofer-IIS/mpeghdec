@@ -208,10 +208,11 @@ static DRC_ERROR _interpolateDrcGain(const GAIN_INTERPOLATION_TYPE gainInterpola
 
 static DRC_ERROR _processNodeSegments(
     const int frameSize, const GAIN_INTERPOLATION_TYPE gainInterpolationType, const int nNodes,
-    const NODE_LIN* pNodeLin, const int offset, const SHORT stepsize,
-    const NODE_LIN nodePrevious,    /* the last node of the previous frame */
-    const FIXP_DBL channelGain,     /* e = 8 */
-    FIXP_DBL* pChannelGainPrevious, /* e = 8 */
+    const FIXP_DBL* pNodeLinGain, const SHORT* pNodeLinTime, const int offset, const SHORT stepsize,
+    const FIXP_DBL nodeLinGainPrevious, /* the last node gain of the previous frame */
+    const SHORT nodeLinTimePrevious,    /* the last node time of the previous frame */
+    const FIXP_DBL channelGain,         /* e = 8 */
+    FIXP_DBL* pChannelGainPrevious,     /* e = 8 */
     FIXP_DBL* buffer) {
   DRC_ERROR err = DE_OK;
   SHORT timePrev, duration, start, stop, time;
@@ -220,12 +221,12 @@ static DRC_ERROR _processNodeSegments(
   FIXP_DBL gainLinChan, gainLinChanPrev;                                  /* e = 7 */
   FIXP_DBL slopeLin = (FIXP_DBL)0, slopeLinPrev = (FIXP_DBL)0;            /* e = 7 */
 
-  timePrev = nodePrevious.time + offset;
-  gainLinPrev = nodePrevious.gainLin;
+  timePrev = nodeLinTimePrevious + offset;
+  gainLinPrev = nodeLinGainPrevious;
   for (n = 0; n < nNodes; n++) {
-    time = pNodeLin[n].time + offset;
+    time = pNodeLinTime[n] + offset;
     duration = time - timePrev;
-    gainLin = pNodeLin[n].gainLin;
+    gainLin = pNodeLinGain[n];
 
     /* skip over invalid sections with negative duration */
     if (duration < 0) continue;
@@ -308,7 +309,9 @@ processDrcTime(HANDLE_DRC_GAIN_DECODER hGainDec, const int activeDrcIndex,
     b = 0;
     {
       LINEAR_NODE_BUFFER *pLnb, *pLnbPrevious;
-      NODE_LIN nodePrevious;
+      FIXP_DBL nodeGainPrevious;
+      SHORT nodeTimePrevious;
+
       int lnbPointerDiff;
       /* get pointer to oldest linearNodes */
       lnbIx = lnbPointer + 1 - NUM_LNB_FRAMES;
@@ -323,8 +326,9 @@ processDrcTime(HANDLE_DRC_GAIN_DECODER hGainDec, const int activeDrcIndex,
           pLnbPrevious = &(pLinearNodeBuffer[pActiveDrc->lnbIndexForChannel[c][lnbIx] + b]);
         else
           pLnbPrevious = pDummyLnb;
-        nodePrevious = pLnbPrevious->linearNode[lnbIx][pLnbPrevious->nNodes[lnbIx] - 1];
-        nodePrevious.time -= hGainDec->frameSize;
+        nodeGainPrevious = pLnbPrevious->linearNodeGain[lnbIx][pLnbPrevious->nNodes[lnbIx] - 1];
+        nodeTimePrevious = pLnbPrevious->linearNodeTime[lnbIx][pLnbPrevious->nNodes[lnbIx] - 1];
+        nodeTimePrevious -= hGainDec->frameSize;
 
         /* Prepare current linearNodeBuffer instance */
         lnbIx++;
@@ -340,10 +344,11 @@ processDrcTime(HANDLE_DRC_GAIN_DECODER hGainDec, const int activeDrcIndex,
         /* number of frames of offset with respect to lnbPointer */
         lnbPointerDiff = i - (NUM_LNB_FRAMES - 2);
 
-        err = _processNodeSegments(hGainDec->frameSize, pLnb->gainInterpolationType,
-                                   pLnb->nNodes[lnbIx], pLnb->linearNode[lnbIx],
-                                   lnbPointerDiff * hGainDec->frameSize + delaySamples + offset, 1,
-                                   nodePrevious, channelGain, pChannelGainPrev, deinterleavedAudio);
+        err = _processNodeSegments(
+            hGainDec->frameSize, pLnb->gainInterpolationType, pLnb->nNodes[lnbIx],
+            pLnb->linearNodeGain[lnbIx], pLnb->linearNodeTime[lnbIx],
+            lnbPointerDiff * hGainDec->frameSize + delaySamples + offset, 1, nodeGainPrevious,
+            nodeTimePrevious, channelGain, pChannelGainPrev, deinterleavedAudio);
         if (err) return err;
       }
       deinterleavedAudio += timeDataChannelOffset; /* proceed to next channel */
@@ -428,7 +433,8 @@ processDrcSubband(HANDLE_DRC_GAIN_DECODER hGainDec, const int activeDrcIndex,
       for (b = 0; b < pActiveDrc->bandCountForChannelGroup[g]; b++) {
         LINEAR_NODE_BUFFER* pLnb =
             &(pLinearNodeBuffer[activeDrcOffset + pActiveDrc->gainElementForGroup[g] + b]);
-        NODE_LIN nodePrevious;
+        FIXP_DBL nodeGainPrevious;
+        SHORT nodeTimePrevious;
         int lnbPointerDiff;
 
         for (m = 0; m < frameSizeSb; m++) {
@@ -444,8 +450,9 @@ processDrcSubband(HANDLE_DRC_GAIN_DECODER hGainDec, const int activeDrcIndex,
            _processNodeSegments. */
         for (i = 0; i < NUM_LNB_FRAMES - 1; i++) {
           /* Prepare previous node */
-          nodePrevious = pLnb->linearNode[lnbIx][pLnb->nNodes[lnbIx] - 1];
-          nodePrevious.time -= hGainDec->frameSize;
+          nodeGainPrevious = pLnb->linearNodeGain[lnbIx][pLnb->nNodes[lnbIx] - 1];
+          nodeTimePrevious = pLnb->linearNodeTime[lnbIx][pLnb->nNodes[lnbIx] - 1];
+          nodeTimePrevious -= hGainDec->frameSize;
 
           lnbIx++;
           if (lnbIx >= NUM_LNB_FRAMES) lnbIx = 0;
@@ -455,9 +462,9 @@ processDrcSubband(HANDLE_DRC_GAIN_DECODER hGainDec, const int activeDrcIndex,
 
           err = _processNodeSegments(
               hGainDec->frameSize, pLnb->gainInterpolationType, pLnb->nNodes[lnbIx],
-              pLnb->linearNode[lnbIx],
+              pLnb->linearNodeGain[lnbIx], pLnb->linearNodeTime[lnbIx],
               lnbPointerDiff * hGainDec->frameSize + delaySamples + offset - (L - 1) / 2, L,
-              nodePrevious, gainOne, &gainOne,
+              nodeGainPrevious, nodeTimePrevious, gainOne, &gainOne,
               &(subbandGains[activeDrcOffset + g][b * frameSizeSb]));
           if (err) return err;
         }

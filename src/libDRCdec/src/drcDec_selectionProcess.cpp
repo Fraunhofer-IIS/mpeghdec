@@ -540,8 +540,7 @@ drcDec_SelectionProcess_SetParam(HANDLE_DRC_SELECTION_PROCESS hInstance,
       diff |= _compAssign(&pSelProcInput->targetLayoutRequested, requestValueInt);
       break;
     case SEL_PROC_TARGET_CHANNEL_COUNT:
-      if ((requestValueInt < 1) || (requestValueInt > 28))
-        return DRCDEC_SELECTION_PROCESS_PARAM_OUT_OF_RANGE;
+      if (requestValueInt < 1) return DRCDEC_SELECTION_PROCESS_PARAM_OUT_OF_RANGE;
       diff |= _compAssign(&pSelProcInput->targetConfigRequestType, TCRT_TARGET_CHANNEL_COUNT);
       diff |= _compAssign(&pSelProcInput->targetChannelCountRequested, requestValueInt);
       break;

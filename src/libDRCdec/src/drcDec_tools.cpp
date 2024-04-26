@@ -90,7 +90,6 @@ amm-info@iis.fraunhofer.de
 
 #include "drcDec_tools.h"
 #include "fixpoint_math.h"
-#include "drcDecoder.h"
 
 int getDeltaTmin(const int sampleRate) {
   /* half_ms = round (0.0005 * sampleRate); */
@@ -253,11 +252,6 @@ deriveDrcChannelGroups(const int drcSetEffect,                                  
         uniqueIndex[g] = duckingSequence;
       }
       duckingModificationForChannelGroup[g].duckingScaling = uniqueScaling[g];
-      if (uniqueScaling[g] != FL2FXCONST_SGL(1.0f / (float)(1 << 2))) {
-        duckingModificationForChannelGroup[g].duckingScalingPresent = 1;
-      } else {
-        duckingModificationForChannelGroup[g].duckingScalingPresent = 0;
-      }
     }
   }
 

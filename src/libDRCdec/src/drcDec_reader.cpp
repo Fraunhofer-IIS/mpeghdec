@@ -522,11 +522,11 @@ drcDec_readUniDrcGain(HANDLE_FDK_BITSTREAM hBs, DRC_COEFFICIENTS_UNI_DRC* pCoef,
 /****************/
 
 static void _decodeDuckingModification(HANDLE_FDK_BITSTREAM hBs, DUCKING_MODIFICATION* pDMod) {
-  int bsDuckingScaling, sigma, mu;
+  int duckingScalingPresent, bsDuckingScaling, sigma, mu;
 
-  pDMod->duckingScalingPresent = FDKreadBits(hBs, 1);
+  duckingScalingPresent = FDKreadBits(hBs, 1);
 
-  if (pDMod->duckingScalingPresent) {
+  if (duckingScalingPresent) {
     bsDuckingScaling = FDKreadBits(hBs, 4);
     sigma = bsDuckingScaling >> 3;
     mu = bsDuckingScaling & 0x7;
@@ -546,9 +546,10 @@ static void _decodeDuckingModification(HANDLE_FDK_BITSTREAM hBs, DUCKING_MODIFIC
 static void _decodeGainModification(HANDLE_FDK_BITSTREAM hBs, const int version, int bandCount,
                                     GAIN_MODIFICATION* pGMod) {
   int sign, bsGainOffset, bsAttenuationScaling, bsAmplificationScaling;
+  int gainScalingPresent, gainOffsetPresent;
 
   {
-    int b, gainScalingPresent, gainOffsetPresent;
+    int b;
     FIXP_SGL attenuationScaling = FL2FXCONST_SGL(1.0f / (float)(1 << 2)),
              amplificationScaling = FL2FXCONST_SGL(1.0f / (float)(1 << 2)),
              gainOffset = (FIXP_SGL)0;
@@ -574,12 +575,8 @@ static void _decodeGainModification(HANDLE_FDK_BITSTREAM hBs, const int version,
       }
     }
     for (b = 0; b < 4; b++) {
-      pGMod[b].targetCharacteristicLeftPresent = 0;
-      pGMod[b].targetCharacteristicRightPresent = 0;
-      pGMod[b].gainScalingPresent = gainScalingPresent;
       pGMod[b].attenuationScaling = attenuationScaling;
       pGMod[b].amplificationScaling = amplificationScaling;
-      pGMod[b].gainOffsetPresent = gainOffsetPresent;
       pGMod[b].gainOffset = gainOffset;
     }
   }
@@ -1366,8 +1363,8 @@ static DRC_ERROR _readLoudnessInfo(HANDLE_FDK_BITSTREAM hBs, const int version,
       loudnessInfo->truePeakLevel = FL2FXCONST_DBL(20.0f / (float)(1 << 7)) -
                                     (FIXP_DBL)(bsTruePeakLevel << (DFRACT_BITS - 1 - 5 - 7));
     }
-    loudnessInfo->truePeakLevelMeasurementSystem = FDKreadBits(hBs, 4);
-    loudnessInfo->truePeakLevelReliability = FDKreadBits(hBs, 2);
+    FDKpushFor(hBs, 4); /* truePeakLevelMeasurementSystem */
+    FDKpushFor(hBs, 2); /* truePeakLevelReliability */
   }
 
   measurementCount = FDKreadBits(hBs, 4);

@@ -167,20 +167,13 @@ typedef enum {
 } EQ_SUBBAND_GAIN_FORMAT;
 
 typedef struct {
-  UCHAR duckingScalingPresent;
   FIXP_SGL duckingScaling; /* e = 2 */
 } DUCKING_MODIFICATION;
 
 typedef struct {
-  UCHAR targetCharacteristicLeftPresent;
-  UCHAR targetCharacteristicLeftIndex;
-  UCHAR targetCharacteristicRightPresent;
-  UCHAR targetCharacteristicRightIndex;
-  UCHAR gainScalingPresent;
   FIXP_SGL attenuationScaling;   /* e = 2 */
   FIXP_SGL amplificationScaling; /* e = 2 */
-  UCHAR gainOffsetPresent;
-  FIXP_SGL gainOffset; /* e = 4 */
+  FIXP_SGL gainOffset;           /* e = 4 */
 } GAIN_MODIFICATION;
 
 typedef union {
@@ -348,8 +341,8 @@ typedef enum {
 typedef enum { R_UKNOWN = 0, R_UNVERIFIED = 1, R_CEILING = 2, R_ACCURATE = 3 } RELIABILITY;
 
 typedef struct {
-  UCHAR methodDefinition;
   FIXP_DBL methodValue; /* e = 7 for all methodDefinitions */
+  UCHAR methodDefinition;
   UCHAR measurementSystem;
   UCHAR reliability;
 } LOUDNESS_MEASUREMENT;
@@ -364,12 +357,10 @@ typedef struct {
   SCHAR drcSetId;
   UCHAR downmixId;
   UCHAR samplePeakLevelPresent;
-  FIXP_DBL samplePeakLevel; /* e = 7 */
   UCHAR truePeakLevelPresent;
-  FIXP_DBL truePeakLevel; /* e = 7 */
-  UCHAR truePeakLevelMeasurementSystem;
-  UCHAR truePeakLevelReliability;
-  UCHAR measurementCount; /* saturated to 16 */
+  UCHAR measurementCount;   /* saturated to 16 */
+  FIXP_DBL samplePeakLevel; /* e = 7 */
+  FIXP_DBL truePeakLevel;   /* e = 7 */
   LOUDNESS_MEASUREMENT loudnessMeasurement[16];
 } LOUDNESS_INFO;
 

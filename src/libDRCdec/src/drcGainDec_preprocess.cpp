@@ -130,7 +130,9 @@ static DRC_ERROR _toLinear(const NODE_MODIFICATION* nodeMod, const int drcBand,
     }
     gainRatio_e += 2;
   }
-  if ((pGMod != NULL) && (pGMod->gainScalingPresent == 1)) {
+  if ((pGMod != NULL) &&
+      ((pGMod->attenuationScaling != FL2FXCONST_SGL(1.0f / (float)(1 << 2))) ||
+       (pGMod->amplificationScaling != FL2FXCONST_SGL(1.0f / (float)(1 << 2))))) {
     if (gainDb < (FIXP_SGL)0) {
       gainRatio_m = fMultDiv2(gainRatio_m, pGMod->attenuationScaling);
     } else {
@@ -139,7 +141,7 @@ static DRC_ERROR _toLinear(const NODE_MODIFICATION* nodeMod, const int drcBand,
     gainRatio_e += 3;
   }
   if ((pDMod != NULL) && (nodeMod->drcSetEffect & (EB_DUCK_OTHER | EB_DUCK_SELF)) &&
-      (pDMod->duckingScalingPresent == 1)) {
+      (pDMod->duckingScaling != FL2FXCONST_SGL(1.0f / (float)(1 << 2)))) {
     gainRatio_m = fMultDiv2(gainRatio_m, pDMod->duckingScaling);
     gainRatio_e += 3;
   }
@@ -147,7 +149,7 @@ static DRC_ERROR _toLinear(const NODE_MODIFICATION* nodeMod, const int drcBand,
   gainDb_modified = fMultDiv2(gainDb, gainRatio_m); /* resulting e: 7 + gainRatio_e + 1*/
   gainDb_offset = (FIXP_DBL)0;
 
-  if ((pGMod != NULL) && (pGMod->gainOffsetPresent == 1)) {
+  if ((pGMod != NULL) && (pGMod->gainOffset != (FIXP_SGL)0)) {
     /* *gainLin *= (float)pow(2.0, (double)(pGMod->gainOffset/6.0f)); */
     gainDb_offset += FX_SGL2FX_DBL(pGMod->gainOffset) >> 4; /* resulting e: 8 */
   }
@@ -269,8 +271,8 @@ prepareDrcGain(HANDLE_DRC_GAIN_DECODER hGainDec, HANDLE_UNI_DRC_GAIN hUniDrcGain
           err = _toLinear(&nodeMod, b, hUniDrcGain->gainNode[seq][i].gainDb, (FIXP_SGL)0, &gainLin,
                           &slopeLin);
           if (err) return err;
-          pLnb->linearNode[lnbp][i].gainLin = gainLin;
-          pLnb->linearNode[lnbp][i].time = hUniDrcGain->gainNode[seq][i].time;
+          pLnb->linearNodeGain[lnbp][i] = gainLin;
+          pLnb->linearNodeTime[lnbp][i] = hUniDrcGain->gainNode[seq][i].time;
         }
         gainElementIndex++;
       }

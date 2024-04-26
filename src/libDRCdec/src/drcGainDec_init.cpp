@@ -209,13 +209,13 @@ void initDrcGainBuffers(const int frameSize, DRC_GAIN_BUFFERS* drcGainBuffers) {
   for (i = 0; i < 48; i++) {
     for (j = 0; j < NUM_LNB_FRAMES; j++) {
       drcGainBuffers->linearNodeBuffer[i].nNodes[j] = 1;
-      drcGainBuffers->linearNodeBuffer[i].linearNode[j][0].gainLin =
+      drcGainBuffers->linearNodeBuffer[i].linearNodeGain[j][0] =
           FL2FXCONST_DBL(1.0f / (float)(1 << 7));
       if (j == 0) {
-        drcGainBuffers->linearNodeBuffer[i].linearNode[j][0].time =
+        drcGainBuffers->linearNodeBuffer[i].linearNodeTime[j][0] =
             0; /* initialize last node with startup node */
       } else {
-        drcGainBuffers->linearNodeBuffer[i].linearNode[j][0].time = frameSize - 1;
+        drcGainBuffers->linearNodeBuffer[i].linearNodeTime[j][0] = frameSize - 1;
       }
     }
   }
@@ -225,8 +225,8 @@ void initDrcGainBuffers(const int frameSize, DRC_GAIN_BUFFERS* drcGainBuffers) {
   drcGainBuffers->dummyLnb.gainInterpolationType = GIT_LINEAR;
   for (i = 0; i < NUM_LNB_FRAMES; i++) {
     drcGainBuffers->dummyLnb.nNodes[i] = 1;
-    drcGainBuffers->dummyLnb.linearNode[i][0].gainLin = FL2FXCONST_DBL(1.0f / (float)(1 << 7));
-    drcGainBuffers->dummyLnb.linearNode[i][0].time = frameSize - 1;
+    drcGainBuffers->dummyLnb.linearNodeGain[i][0] = FL2FXCONST_DBL(1.0f / (float)(1 << 7));
+    drcGainBuffers->dummyLnb.linearNodeTime[i][0] = frameSize - 1;
   }
 
   drcGainBuffers->lnbPointer = 0;
