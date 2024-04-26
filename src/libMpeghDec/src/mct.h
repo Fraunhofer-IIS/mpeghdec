@@ -121,7 +121,6 @@ typedef struct CMct {
   UCHAR MCCSignalingType;
   UCHAR MCTSignalingTypePrev;
   UCHAR windowSequenceIsShortPrev[MAX_NUM_MCT_BOXES];
-  UCHAR channelMask[MAX_NUM_MCT_CHANNELS];
   UCHAR channelMap[MAX_NUM_MCT_CHANNELS];
   UCHAR numMctChannels;
   SHORT pairCoeffQSfbPrev[MAX_NUM_MCT_BOXES][MAX_NUM_MCT_BANDS];
@@ -131,7 +130,8 @@ typedef struct CMct {
   UCHAR Mct_group_parsed;
 } CMct, *CMctPtr;
 
-int CMct_Initialize(CMctPtr* pCMctPtr, const CSUsacExtElementConfig* extElementConfig,
+int CMct_Initialize(CMctPtr* pCMctPtr,
+                    const ULONG mctChanMask, /* msb aligned bit field: one bit for each channel */
                     int firstSigIdx, int signalsInGroup);
 
 void CMct_Destroy(CMctPtr self);

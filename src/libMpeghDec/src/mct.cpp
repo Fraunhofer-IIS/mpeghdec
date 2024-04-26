@@ -207,8 +207,8 @@ static inline WHITENING_LEVEL GetTileWhiteningLevel(IGF_PRIVATE_DATA_HANDLE hPri
   return hPrivateData->bitstreamData[0].igfWhiteningLevel[TileNum];
 }
 
-int CMct_Initialize(CMctPtr* pCMctPtr, const CSUsacExtElementConfig* extElementConfig,
-                    int firstSigIdx, int signalsInGroup) {
+int CMct_Initialize(CMctPtr* pCMctPtr, const ULONG mctChanMask, int firstSigIdx,
+                    int signalsInGroup) {
   int j;
   CMctPtr mct;
 
@@ -226,8 +226,8 @@ int CMct_Initialize(CMctPtr* pCMctPtr, const CSUsacExtElementConfig* extElementC
   /* get channelmap/mask for which channels the tool is active */
   mct->numMctChannels = 0;
   for (j = 0; j < signalsInGroup; j++) {
-    mct->channelMask[j] = extElementConfig->extConfig.mct.mctChanMask[j];
-    if (mct->channelMask[j] == 1) {
+    const int channelMask_j = mctChanMask & ((ULONG)1 << (31 - j));
+    if (channelMask_j) {
       mct->channelMap[mct->numMctChannels] = j + firstSigIdx;
       mct->numMctChannels++;
     }

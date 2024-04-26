@@ -1686,7 +1686,9 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
                 }
 
                 mctErr = CMct_Initialize(&self->pMCTdec[grp],
-                                         &self->pUsacConfig[streamIndex]->element[el].extElement,
+                                         self->pUsacConfig[streamIndex]
+                                             ->element[el]
+                                             .extElement.extConfig.mct.mctChanMask,
                                          firstSigIdx, signalsInGroup);
                 if (mctErr != 0) {
                   goto bail;
@@ -2391,7 +2393,8 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
                       INT hasObjectDistance =
                           self->pUsacConfig[streamIndex]
                               ->element[element_count - element_count_prev_streams]
-                              .extElement.extConfig.prodMetadata.hasObjectDistance[objGrp];
+                              .extElement.extConfig.prodMetadata.hasObjectDistance &
+                          ((ULONG)1 << (31 - objGrp));
                       INT err;
 
                       if (getOnOffFlag(self, self->pUsacConfig[streamIndex]

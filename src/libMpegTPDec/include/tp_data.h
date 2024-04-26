@@ -202,11 +202,8 @@ typedef enum {
 } TP_ASC_EXTENSION_ID;
 
 struct OAMCONFIG {
+  USHORT OAMframeLength;
   UCHAR lowDelayMetadataCoding;
-  UCHAR hasCoreLength;
-  UINT OAMframeLength;
-  UCHAR hasScreenRelativeObjects;
-  INT isScreenRelativeObject; /* use Bit 0-30 */
   UCHAR hasDynamicObjectPriority;
   UCHAR hasUniformSpread;
   UCHAR numObjectSignals;
@@ -220,14 +217,13 @@ typedef struct {
   union {
     struct OAMCONFIG oam;
     struct {
+      ULONG hasObjectDistance; /* msb aligned bit field: one bit for each object group */
       UCHAR hasReferenceDistance;
       UCHAR bsReferenceDistance;
-      UCHAR hasObjectDistance[32];
-      UCHAR directHeadphone[32];
     } prodMetadata;
 
     struct {
-      UCHAR mctChanMask[TP_MAX_CHANNELS_PER_SIGNAL_GROUP];
+      ULONG mctChanMask; /* msb aligned bit field: one bit for each channel */
     } mct;
   } extConfig;
 } CSUsacExtElementConfig;
@@ -307,8 +303,6 @@ typedef struct {
   UCHAR numAudioChannels;
   UCHAR m_usacConfigExtensionPresent;
   UCHAR elementLengthPresent;
-  UCHAR UsacConfig[TP_USAC_MAX_CONFIG_LEN];
-  USHORT UsacConfigBits;
 } CSUsacConfig;
 
 /**
