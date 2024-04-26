@@ -517,8 +517,6 @@ int objectMetadataFrame(HANDLE_GVBAPRENDERER hgVBAPRenderer, HANDLE_FDK_BITSTREA
 
   numOamFrames = hgVBAPRenderer->numOamFrames;
 
-  hgVBAPRenderer->flagOamFrameOk = 0;
-
   hgVBAPRenderer->hasUniformSpread = hasUniformSpread; /* store uniformSpread information */
 
   INT* pos = &(hgVBAPRenderer->OAM_parsed_data[0]);
@@ -706,6 +704,11 @@ int prodMetadataFrameGroup(HANDLE_GVBAPRENDERER hgVBAPRenderer, HANDLE_FDK_BITST
 static const int ringIndices30_1[] = {10, 11, 0, 1, 2, 9, 3};
 static const int ringIndices30_2[] = {8, 7, 6, 5, 4, 9, 3};
 
+/* ring containing VSO indices */
+static const UCHAR spread_indexRing[3 * GVBAP_SPREAD_NUM_VSO_AZI] = {
+    0, 1, 2, 3, 4,  5,  6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4,  5,
+    6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4,  5,  6, 7, 8, 9, 10, 11};
+
 static FIXP_DBL gVBAPRenderer_Spread_internal_spread_mappingToH(FIXP_DBL spreadAngle) {
   FIXP_DBL spreadAngleMapped = fMultDiv2(FL2FXCONST_DBL(1.25 / 2.0), spreadAngle);
   spreadAngleMapped += fMultDiv2(FL2FXCONST_DBL(0.0069 / 2 * 180), fMult(spreadAngle, spreadAngle));
@@ -753,8 +756,8 @@ static void gVBAPRenderer_Spread_internal_calculateLayerGains(HANDLE_GVBAPRENDER
   for (n = 0; n < loopLimit; n++) {
     idx1Arg = multiple + GVBAP_SPREAD_NUM_VSO_AZI - plumin * (n - 0);
     idx2Arg = multiple + GVBAP_SPREAD_NUM_VSO_AZI + plumin * (n + 1);
-    idx1 = phgVBAPRenderer->spread_indexRing[idx1Arg];
-    idx2 = phgVBAPRenderer->spread_indexRing[idx2Arg];
+    idx1 = spread_indexRing[idx1Arg];
+    idx2 = spread_indexRing[idx2Arg];
 
     tmp = (diffCLKDir + (FIXP_DBL)((int)GVBAP_SPREAD_OPEN_ANGLE_VSO * n));
     tmp = fMult(tmp, tmp);
@@ -950,7 +953,7 @@ static void gVBAPRenderer_Spread_internal_calculateGains(HANDLE_GVBAPRENDERER ph
                                                   parableEle);
 
   /* applying VSO spread gains to VSO loudspeaker gains (panning gains of VSO) */
-  for (gNo = 0; gNo < phgVBAPRenderer->spread_numInvolvedLS; gNo++) {
+  for (gNo = 0; gNo < phgVBAPRenderer->gainCacheLength; gNo++) {
     FIXP_DBL tmp = gainArray[gNo] >> 2; /* exp 5 */
 
     if (!muteVoGH || ((gNo != phgVBAPRenderer->ghostVoiceOfGodSpeakerIndex) &&
@@ -967,7 +970,7 @@ static void gVBAPRenderer_Spread_internal_calculateGains(HANDLE_GVBAPRENDERER ph
   }
 
   /* gain normalization */
-  gVBAPRenderer_Spread_internal_normalizeVector(gainArray, phgVBAPRenderer->spread_numInvolvedLS);
+  gVBAPRenderer_Spread_internal_normalizeVector(gainArray, phgVBAPRenderer->gainCacheLength);
 }
 
 static void gVBAPRenderer_Spread_renderSpread(HANDLE_GVBAPRENDERER phgVBAPRenderer,
@@ -1201,6 +1204,7 @@ int gVBAPRenderer_Open(HANDLE_GVBAPRENDERER* phgVBAPRenderer, int numObjects, in
   }
 
   numOamFrames = frameLength / oamFrameLength;
+  FDK_ASSERT((numOamFrames > 0) && (numOamFrames <= GVBAPRENDERER_MAX_OAM_FRAMES_PER_CORE_FRAME));
 
   *phgVBAPRenderer = tmp;
 
@@ -1358,10 +1362,12 @@ int gVBAPRenderer_Open(HANDLE_GVBAPRENDERER* phgVBAPRenderer, int numObjects, in
       (FIXP_DBL*)FDKmalloc((*phgVBAPRenderer)->numChannels * sizeof(FIXP_DBL));
   (*phgVBAPRenderer)->prevGainsMax =
       (FIXP_DBL*)FDKmalloc((*phgVBAPRenderer)->numChannels * sizeof(FIXP_DBL));
+  (*phgVBAPRenderer)->OAM_parsed_data =
+      (INT*)FDKcalloc((*phgVBAPRenderer)->numObjects * OAM_NUMBER_MAX_COMPONENTS, sizeof(INT));
   if (((*phgVBAPRenderer)->gainCache == NULL) || ((*phgVBAPRenderer)->startGains == NULL) ||
       ((*phgVBAPRenderer)->endGains == NULL) || ((*phgVBAPRenderer)->stepState == NULL) ||
       ((*phgVBAPRenderer)->scaleState == NULL) || ((*phgVBAPRenderer)->startGainsMax == NULL) ||
-      ((*phgVBAPRenderer)->prevGainsMax == NULL)) {
+      ((*phgVBAPRenderer)->prevGainsMax == NULL) || ((*phgVBAPRenderer)->OAM_parsed_data == NULL)) {
     return -2; /* could not allocate memory */
   }
 
@@ -1369,11 +1375,11 @@ int gVBAPRenderer_Open(HANDLE_GVBAPRENDERER* phgVBAPRenderer, int numObjects, in
 
   if (renderMode == GVBAP_ENHANCED) {
     /* initialization of spread rendering */
-    (*phgVBAPRenderer)->spread_numInvolvedLS = outChannels + numGhosts - numLFE;
+    int spread_numInvolvedLS = outChannels + numGhosts - numLFE;
 
     (*phgVBAPRenderer)->ghostVoiceOfGodSpeakerIndex = -1;
     (*phgVBAPRenderer)->ghostVoiceOfHellSpeakerIndex = -1;
-    for (i = 0; i < (*phgVBAPRenderer)->spread_numInvolvedLS; i++) {
+    for (i = 0; i < spread_numInvolvedLS; i++) {
       /* Assumption: A speaker is a ghost speaker if it is not downmixed to exactly one output
        * speaker */
       int nOutputTargets = 0;
@@ -1389,14 +1395,14 @@ int gVBAPRenderer_Open(HANDLE_GVBAPRENDERER* phgVBAPRenderer, int numObjects, in
     }
 
     (*phgVBAPRenderer)->spread_gainArray =
-        (FIXP_DBL*)FDKcalloc((*phgVBAPRenderer)->spread_numInvolvedLS, sizeof(FIXP_DBL));
+        (FIXP_DBL*)FDKcalloc(spread_numInvolvedLS, sizeof(FIXP_DBL));
     if ((*phgVBAPRenderer)->spread_gainArray == NULL) {
       return -2;
     }
 
     for (i = 0; i < GVBAP_SPREAD_NUM_VSO; i++) {
       (*phgVBAPRenderer)->spread_gainsVSO[i] =
-          (FIXP_DBL*)FDKcalloc((*phgVBAPRenderer)->spread_numInvolvedLS, sizeof(FIXP_DBL));
+          (FIXP_DBL*)FDKcalloc(spread_numInvolvedLS, sizeof(FIXP_DBL));
       if ((*phgVBAPRenderer)->spread_gainsVSO[i] == NULL) {
         return -2;
       }
@@ -1443,13 +1449,6 @@ int gVBAPRenderer_Open(HANDLE_GVBAPRENDERER* phgVBAPRenderer, int numObjects, in
       oam.cart = sphericalToCartesian(oam.sph);
       calculateVbap(*phgVBAPRenderer, oam, (*phgVBAPRenderer)->spread_gainsVSO[objNo], 1);
       objNo++;
-
-      /* further parameter definition */
-      for (i = 0; i < GVBAP_SPREAD_NUM_VSO_AZI; i++) {
-        (*phgVBAPRenderer)->spread_indexRing[i] = i;
-        (*phgVBAPRenderer)->spread_indexRing[GVBAP_SPREAD_NUM_VSO_AZI + i] = i;
-        (*phgVBAPRenderer)->spread_indexRing[2 * GVBAP_SPREAD_NUM_VSO_AZI + i] = i;
-      }
     }
   }
 
@@ -1482,8 +1481,6 @@ int gVBAPRenderer_Open(HANDLE_GVBAPRENDERER* phgVBAPRenderer, int numObjects, in
     (*phgVBAPRenderer)->oamSamples[numOamFrames - 1][i].spreadHeight = (FIXP_DBL)0;
   }
   (*phgVBAPRenderer)->metadataPresent[numOamFrames - 1] = 1;
-  FDKmemclear((*phgVBAPRenderer)->metadataPresent,
-              (numOamFrames - 1) * sizeof((*phgVBAPRenderer)->metadataPresent[0]));
 
   /* CONCEALMENT */
   if (((*phgVBAPRenderer)->oamSamplesValid =
@@ -1512,19 +1509,6 @@ int gVBAPRenderer_Open(HANDLE_GVBAPRENDERER* phgVBAPRenderer, int numObjects, in
     (*phgVBAPRenderer)->oamSamplesValid[numOamFrames - 1][i].spreadHeight = (FIXP_DBL)0;
   }
   (*phgVBAPRenderer)->metadataPresentValid[numOamFrames - 1] = 1;
-  FDKmemclear((*phgVBAPRenderer)->metadataPresentValid,
-              (numOamFrames - 1) * sizeof((*phgVBAPRenderer)->metadataPresentValid[0]));
-  (*phgVBAPRenderer)->flagOamFrameOk = 0;
-
-  /* clear fixed_val flags */
-  FDKmemclear((*phgVBAPRenderer)->fixed_val,
-              GVBAPRENDERER_MAX_OBJECTS * sizeof((*phgVBAPRenderer)->fixed_val[0]));
-
-  /* clear OAM parsed data */
-  FDKmemclear(
-      (*phgVBAPRenderer)->OAM_parsed_data,
-      GVBAPRENDERER_MAX_OBJECTS * (OAM_NUMBER_COMPONENTS + 1 + 2) *
-          sizeof((*phgVBAPRenderer)->OAM_parsed_data[0])); /* + 2 => spread high and depth */
 
   if (renderMode == GVBAP_ENHANCED) {
     (*phgVBAPRenderer)->hasUniformSpread = hasUniformSpread;
@@ -1869,6 +1853,9 @@ int gVBAPRenderer_Close(HANDLE_GVBAPRENDERER hgVBAPRenderer) {
 
   /* free maximum previous gain memory */
   FDKfree(hgVBAPRenderer->prevGainsMax);
+
+  /* free OAM parsed data */
+  FDKfree(hgVBAPRenderer->OAM_parsed_data);
 
   /* free gain cache */
   FDKfree(hgVBAPRenderer->gainCache);

@@ -237,18 +237,15 @@ typedef struct _GVBAPRENDERER {
 
   UCHAR metadataPresent[GVBAPRENDERER_MAX_OAM_FRAMES_PER_CORE_FRAME]; /* Dim: [OAM frames] */
 
-  int hasUniformSpread;
+  UCHAR hasUniformSpread;
 
   UCHAR oamDataValid;
   UCHAR metadataPresentValid[GVBAPRENDERER_MAX_OAM_FRAMES_PER_CORE_FRAME]; /* Dim: [OAM frames] Used
                                                                               for concealment */
   OAM_SAMPLE** oamSamplesValid; /* Dim: [OAM frames][objects] Used for concealment */
 
-  UCHAR flagOamFrameOk; /* 0: if no complete Frame was read; 1: if complete oam Data was read */
-
   UCHAR fixed_val[OAM_NUMBER_MAX_COMPONENTS];
-  INT OAM_parsed_data[GVBAPRENDERER_MAX_OBJECTS *
-                      OAM_NUMBER_MAX_COMPONENTS]; /* 32 bit signed integer */
+  INT* OAM_parsed_data; /* 32 bit signed integer */
 
   FIXP_DBL* startGainsMax;
   FIXP_DBL* prevGainsMax;
@@ -265,29 +262,25 @@ typedef struct _GVBAPRENDERER {
                                speaker] */
   int downmixMatrixNumRows, downmixMatrixNumCols;
 
-  FIXP_DBL* outputCache; /* Dim: [frame length] */
+  SCHAR numChannels;
+  SCHAR numLFE;
+  SCHAR numGhosts;
+  SCHAR numObjects;
+  SHORT frameLength;
+  SHORT oamFrameLength;
+  SCHAR numOamFrames;
+  SCHAR gainCacheLength;
 
-  int numChannels;
-  int numLFE;
-  int numGhosts;
-  int numObjects;
-  int frameLength;
-  int oamFrameLength;
-  int numOamFrames;
-  int gainCacheLength;
+  UCHAR startGainsFilled;
 
-  int startGainsFilled;
-
-  UCHAR spread_indexRing[3 * GVBAP_SPREAD_NUM_VSO_AZI]; /**< ring containing VSO indices */
   FIXP_DBL*
       spread_gainsVSO[GVBAP_SPREAD_NUM_VSO]; /**< vbap-panned gains of virtual spread objects */
   FIXP_DBL spread_gainsSpread[GVBAP_SPREAD_NUM_VSO]; /**< spread gains for virtual spread objects */
-  int spread_numInvolvedLS;         /**< number of loudspeakers used for spread effect */
-  int ghostVoiceOfGodSpeakerIndex;  /**< index of ghost voice of god speaker */
-  int ghostVoiceOfHellSpeakerIndex; /**< index of ghost voice of hell speaker */
-  FIXP_DBL* spread_gainArray;       /**< spread gain array */
-  int renderMode; /**< 0: original rendering (MPEG standardized), 1: alternative (proprietary)
-                     rendering (new spread rendering, new imaginary speaker initialization) */
+  FIXP_DBL* spread_gainArray;                        /**< spread gain array */
+  SCHAR ghostVoiceOfGodSpeakerIndex;                 /**< index of ghost voice of god speaker */
+  SCHAR ghostVoiceOfHellSpeakerIndex;                /**< index of ghost voice of hell speaker */
+  UCHAR renderMode; /**< 0: original rendering (MPEG standardized), 1: alternative (proprietary)
+                       rendering (new spread rendering, new imaginary speaker initialization) */
 } GVBAPRENDERER;
 
 /*
