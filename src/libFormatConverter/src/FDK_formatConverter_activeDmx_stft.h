@@ -134,29 +134,20 @@ typedef struct {
 
   UINT numInChans;             /* number input channels */
   UINT numOutChans;            /* number output channels */
-  UINT numStftBands;           /* number of fft bands */
-  UINT numErbBands;            /* number of ERB bands */
-  const UINT* erbFreqIdx;      /* frequency band stop indices corresponding to ERB bands */
   FIXP_DBL** inputBufferStft;  /* STFT input data with interleaved real and imaginary parts */
   FIXP_DBL** outputBufferStft; /* STFT output data with interleaved real and imaginary parts */
   FIXP_DBL**
       prevInputBufferStft; /* previous STFT input data with interleaved real and imaginary parts */
-  UINT frameSize;          /* frame size*/
-  UINT fftLength;          /* fft transform length*/
-  FIXP_DBL eqLimitMax;     /* format: Q3.29 */
-  FIXP_DBL eqLimitMin;     /* format: Q3.29 */
   FIXP_DBL fixpAES;        /* format: Q3.29 */
   INT* targetEnePrevExp;
-  INT inBufStftHeadroomPrev;
-  INT realizedSigHeadroomPrev;
+  SCHAR inBufStftHeadroomPrev[STFT_ERB_BANDS];
+  SCHAR realizedSigHeadroomPrev[STFT_ERB_BANDS];
 } activeDownmixer;
 
 void activeDmxProcess_STFT(void* handle);
 
 INT activeDmxStftInit(void** handle, UINT numInChans, UINT numOutChans, FIXP_DBL** inputBufferStft,
-                      FIXP_DBL** prevInputBufferStft, FIXP_DBL** outputBufferStft, UINT frameSize,
-                      UINT fftLength, FIXP_DBL eqLimitMax, FIXP_DBL eqLimitMin, UINT numStftBands,
-                      UINT numErbBands, const UINT* stftErbFreqIdx, INT aes);
+                      FIXP_DBL** prevInputBufferStft, FIXP_DBL** outputBufferStft, INT aes);
 
 void activeDmxSetAES(INT AES, void* handle);
 void activeDmxClose_STFT(void* handle);

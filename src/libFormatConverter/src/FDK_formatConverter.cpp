@@ -526,9 +526,6 @@ INT formatConverterSetDmxMtx(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt) {
   /* DMX matrix is valid now */
   fcInt->fcParams->dmxMtxIsSet = 1;
 
-  /* internal EQs are switched off for external DMX matrix */
-  fcInt->fcParams->applyEqFilters = 0;
-
   return 0;
 }
 

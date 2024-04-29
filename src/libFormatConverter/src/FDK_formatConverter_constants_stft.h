@@ -93,6 +93,8 @@ amm-info@iis.fraunhofer.de
 
 #include "common_fix.h"
 
+#define STFT_FRAME_SIZE 256
+#define STFT_LENGTH (2 * STFT_FRAME_SIZE)
 #define STFT_ERB_BANDS 58
 #define IIS_FORMATCONVERTER_MAX_OUT_CH FDK_FORMAT_CONVERTER_MAX_OUTPUT_CHANNELS
 

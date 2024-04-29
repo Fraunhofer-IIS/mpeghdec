@@ -348,15 +348,6 @@ typedef struct T_FORMAT_CONVERTER_PARAMS {
   /** center frequencies */
   const FIXP_DBL* centerFrequenciesNormalized;
 
-  /** eqLimitMax */
-  FIXP_DBL eqLimitMax; /* value could be nearly 16 at most -> exponent = 4 */
-
-  /** eqLimitMin */
-  FIXP_DBL eqLimitMin; /* value could be -16 at least -> exponent = 4 */
-
-  /** applyEqFilters */
-  INT applyEqFilters;
-
 } FORMAT_CONVERTER_PARAMS;
 
 /**********************************************************************************************************************************/
@@ -395,7 +386,6 @@ typedef struct {
   FDK_FORMAT_CONVERTER_INPUT_FORMAT fcInputFormat;
   FDK_FORMAT_CONVERTER_OUTPUT_FORMAT fcOutputFormat;
   INT aes;
-  INT pas;
   UINT numOutputChannels;
   CICP2GEOMETRY_CHANNEL_GEOMETRY outChannelGeo[FDK_FORMAT_CONVERTER_MAX_OUTPUT_CHANNELS];
   INT cicpLayoutIndex;
@@ -419,8 +409,6 @@ typedef struct {
   UINT stftFrameSize;
   UINT stftLength;
   UINT stftNumErbBands;
-  const UINT* stftErbFreqIdx;
-
   AFC_FORMAT_CONVERTER_CHANNEL_ID format_in_listOfChannels[FDK_FORMAT_CONVERTER_MAX_INPUT_CHANNELS];
   int format_in_listOfChannels_nchan;
   AFC_FORMAT_CONVERTER_CHANNEL_ID

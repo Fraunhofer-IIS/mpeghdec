@@ -136,8 +136,6 @@ int setFormatConverterParams(const FIXP_DBL* centerFrequenciesNormalized,
 
   /* freq domain params */
   if (fcInt->mode != IIS_FORMATCONVERTER_MODE_PASSIVE_TIME_DOMAIN) {
-    /* apply equalization filters */
-    params->applyEqFilters = 1;
     FDK_ASSERT(centerFrequenciesNormalized != NULL);
 
     if (fcInt->mode == IIS_FORMATCONVERTER_MODE_ACTIVE_FREQ_DOMAIN_STFT ||
@@ -146,26 +144,6 @@ int setFormatConverterParams(const FIXP_DBL* centerFrequenciesNormalized,
     } else {
       params->centerFrequenciesNormalized = NULL;
     }
-
-    /* aeq limits */
-    params->eqLimitMax = (FIXP_DBL)0x50615FA7; /* FL2FXCONST_DBL(2.511886432f/4.0f);
-                                                  pow(10.f, 8.f/20.f) in format Q3.29*/
-    params->eqLimitMin = (FIXP_DBL)0x50F44D89; /* 0x0A1E89B1; FL2FXCONST_DBL(0.316227766f/4.0f);
-                                                  pow(10.f, -10.f/20.f) in format Q0.32 */
-
-    /* time domain params */
-  } else {
-    /* Do not apply equalization filters */
-    params->applyEqFilters = 0;
-
-    /* aeq limits */
-    params->eqLimitMax = (FIXP_DBL)0;
-    params->eqLimitMin = (FIXP_DBL)0;
-  }
-
-  /* switch off equalizer filters in case of generic setups with external DmxMtx */
-  if (params->genericIOFmt) {
-    params->applyEqFilters = 0;
   }
 
   /* init DMX matrix */
@@ -312,7 +290,7 @@ int allocateFormatConverterEQs(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt) {
   /* eqGains */
   if (fcInt->eqGains[0] == NULL) {
     for (INT i = 0; i < (INT)numInputChannels; i++) {
-      fcInt->eqGains[i] = (FIXP_EQ_H*)FDKcalloc(fcInt->stftNumErbBands, sizeof *fcInt->eqGains[i]);
+      fcInt->eqGains[i] = (FIXP_EQ_H*)FDKcalloc(STFT_ERB_BANDS, sizeof *fcInt->eqGains[i]);
       if (fcInt->eqGains[i] == NULL) {
         return -1;
       }
@@ -436,12 +414,10 @@ int setFormatConverterState(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt) {
   /* IIS_FORMATCONVERTER_MODE_PASSIVE_FREQ_DOMAIN_STFT: This only depends on the aes parameter, 7
      for active and 0 for passive. */
   {
-    errorFlag2 = activeDmxStftInit(
-        &fcInt->fcState->handleActiveDmxStft, fcInt->numTotalInputChannels,
-        fcInt->numOutputChannels, fcInt->inputBufferStft, fcInt->prevInputBufferStft,
-        fcInt->outputBufferStft, fcInt->stftFrameSize, fcInt->stftLength,
-        fcInt->fcParams->eqLimitMax, fcInt->fcParams->eqLimitMin, fcInt->fcNumFreqBands,
-        fcInt->stftNumErbBands, fcInt->stftErbFreqIdx, fcInt->aes);
+    errorFlag2 =
+        activeDmxStftInit(&fcInt->fcState->handleActiveDmxStft, fcInt->numTotalInputChannels,
+                          fcInt->numOutputChannels, fcInt->inputBufferStft,
+                          fcInt->prevInputBufferStft, fcInt->outputBufferStft, fcInt->aes);
   }
 
   if (errorFlag1 != 0 || errorFlag2 != 0)

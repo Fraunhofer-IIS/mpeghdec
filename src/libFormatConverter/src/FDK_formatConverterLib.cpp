@@ -161,11 +161,10 @@ INT IIS_FormatConverter_Create(IIS_FORMATCONVERTER_HANDLE* self, IIS_FORMATCONVE
   if (mode == IIS_FORMATCONVERTER_MODE_ACTIVE_FREQ_DOMAIN_STFT ||
       mode == IIS_FORMATCONVERTER_MODE_CUSTOM_FREQ_DOMAIN_STFT) {
     _p->stftNumErbBands = STFT_ERB_BANDS;
-    _p->stftFrameSize = 256;
-    _p->stftLength = _p->stftFrameSize * 2;
+    _p->stftFrameSize = STFT_FRAME_SIZE;
+    _p->stftLength = STFT_LENGTH;
     _p->fcNumFreqBands = _p->stftLength / 2 + 1;
     _p->fcCenterFrequencies = f_bands_nrm_stft_256_erb_58;
-    _p->stftErbFreqIdx = erb_freq_idx_256_58;
   }
   FDKmemcpy(_p->GVH, GVH, 13 * 6 * sizeof(FIXP_DBL));
   FDKmemcpy(_p->GVL, GVL, 13 * 6 * sizeof(FIXP_DBL));
@@ -318,7 +317,6 @@ int IIS_FormatConverter_Open(IIS_FORMATCONVERTER_HANDLE self, INT* p_buffer, UIN
     return -1;
 
   _p->aes = self->aes;
-  _p->pas = self->pas;
 
   /* match known channels in channel config */
   err = formatConverterMatchChConfig2Channels(_p->inputChannelGeo, 0, _p->numTotalInputChannels,
