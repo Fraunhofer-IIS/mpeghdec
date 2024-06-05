@@ -369,6 +369,7 @@ typedef struct {
 
 #define ASI_MAX_LIMIT 28
 #define ASI_MAX_GROUP_PRESETS 16
+#define ASI_MAX_DESCRIPTION_LANGUAGES 8
 
 #define ASI_MAX_GROUPS ASI_MAX_LIMIT
 #define ASI_MAX_SWITCH_GROUPS (ASI_MAX_LIMIT / 2)
@@ -379,7 +380,8 @@ typedef struct {
 #define ASI_MAX_COMPOSITE_PAIRS ASI_MAX_LIMIT
 #define ASI_MAX_PREF_DESCR_LANGUAGES 10
 #define ASI_MAX_DESCRIPTION_BLOCKS (ASI_MAX_GROUPS + ASI_MAX_SWITCH_GROUPS + ASI_MAX_GROUP_PRESETS)
-#define ASI_MAX_DESCRIPTION_LEN 257 /* max(mae_bsDescriptionDataLength) + 1 */
+#define ASI_MAX_DESCRIPTION_LEN 256 /* max(mae_bsDescriptionDataLength) + 1 */
+#define ASI_MAX_STORED_DESCRIPTION_LEN 64
 
 #define ASI_DIFF_DESCRIPTION 1
 #define ASI_DIFF_CONTENT 2
@@ -394,8 +396,15 @@ typedef struct {
 
 typedef struct {
   UCHAR present;
+#ifdef ASI_MAX_DESCRIPTION_LANGUAGES
+  SHORT numLanguages;
+  SHORT prefLangIdx;
+  char language[ASI_MAX_DESCRIPTION_LANGUAGES][3];
+  char data[ASI_MAX_DESCRIPTION_LANGUAGES][ASI_MAX_STORED_DESCRIPTION_LEN + 1];
+#else
   char language[3];
-  char data[ASI_MAX_DESCRIPTION_LEN];
+  char data[ASI_MAX_DESCRIPTION_LEN + 1];
+#endif
 } ASI_DESCRIPTION;
 
 typedef struct {
@@ -452,9 +461,6 @@ typedef struct {
   /* extension */
   UCHAR extPresent;
 
-  /* description */
-  ASI_DESCRIPTION description;
-
   /* content data */
   UCHAR contPresent;
   ASI_CONTENT_DATA contentData;
@@ -473,8 +479,6 @@ typedef struct {
 
   UCHAR defaultGroupID;
 
-  /* description */
-  ASI_DESCRIPTION description;
 } ASI_SWITCH_GROUP;
 
 typedef struct {
@@ -517,8 +521,6 @@ typedef struct {
   /* production screen size */
   ASI_PRODUCTION_SCREEN_SIZE_DATA productionScreenSize;
 
-  /* description */
-  ASI_DESCRIPTION description;
 } ASI_GROUP_PRESET;
 
 typedef struct {
@@ -547,6 +549,12 @@ typedef struct {
 } ASI_DRC_UI_INFO;
 
 typedef struct {
+  ASI_DESCRIPTION groups[ASI_MAX_GROUPS];
+  ASI_DESCRIPTION switchGroups[ASI_MAX_SWITCH_GROUPS];
+  ASI_DESCRIPTION groupPresets[ASI_MAX_GROUP_PRESETS];
+} ASI_DESCRIPTIONS;
+
+typedef struct {
   UCHAR isMainStream[16];
   UCHAR audioSceneInfoID;
 
@@ -558,6 +566,8 @@ typedef struct {
 
   UCHAR numGroupPresets;
   ASI_GROUP_PRESET groupPresets[ASI_MAX_GROUP_PRESETS];
+
+  ASI_DESCRIPTIONS* pDescriptions;
 
   UCHAR metaDataElementIDoffset[16];
   SHORT metaDataElementIDmaxAvail[16]; /* the maximum available metaDataElementID in a Main Stream

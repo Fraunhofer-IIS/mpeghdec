@@ -183,12 +183,16 @@ void asiReset(AUDIO_SCENE_INFO* asi) {
   int i;
   char prefDescrLanguages_old[ASI_MAX_PREF_DESCR_LANGUAGES][3];
   UCHAR activeDmxId_old = asi->activeDmxId;
+  ASI_DESCRIPTIONS* pDescriptions_old = asi->pDescriptions;
 
   for (i = 0; i < ASI_MAX_PREF_DESCR_LANGUAGES; i++) {
     FDKstrncpy(prefDescrLanguages_old[i], asi->prefDescrLanguages[i], 3);
   }
 
   FDKmemclear(asi, sizeof(AUDIO_SCENE_INFO));
+
+  if (pDescriptions_old) FDKmemclear(pDescriptions_old, sizeof(ASI_DESCRIPTIONS));
+  asi->pDescriptions = pDescriptions_old;
 
   asi->activeDmxId = activeDmxId_old;
   for (i = 0; i < ASI_MAX_PREF_DESCR_LANGUAGES; i++) {
@@ -208,6 +212,7 @@ static TRANSPORTDEC_ERROR mae_GroupDefinition(AUDIO_SCENE_INFO* asi, HANDLE_FDK_
 
   for (grp = 0; grp < asi->numGroups; grp++) {
     ASI_GROUP* group = &(asi->groups[grp]);
+    ASI_DESCRIPTION* description = asi->pDescriptions ? &(asi->pDescriptions->groups[grp]) : NULL;
 
     if (compAssign(&group->groupID, FDKreadBits(bs, 7))) asi->diffFlags |= ASI_DIFF_NEEDS_RESET;
     if (compAssign(&group->allowOnOff, FDKreadBit(bs))) asi->diffFlags |= ASI_DIFF_NEEDS_RESET;
@@ -276,7 +281,7 @@ static TRANSPORTDEC_ERROR mae_GroupDefinition(AUDIO_SCENE_INFO* asi, HANDLE_FDK_
     group->extPresent = 0;
     group->contPresent = 0;
 
-    if (asi->diffFlags & ASI_DIFF_NEEDS_RESET) group->description.present = 0;
+    if (description && (asi->diffFlags & ASI_DIFF_NEEDS_RESET)) description->present = 0;
 
     group->switchGroupID = INVALID_ID;
     /*Presume that no groups are available initially.*/
@@ -352,6 +357,8 @@ static TRANSPORTDEC_ERROR mae_SwitchGroupDefinition(AUDIO_SCENE_INFO* asi,
 
   for (swgrp = 0; swgrp < asi->numSwitchGroups; swgrp++) {
     ASI_SWITCH_GROUP* switchGroup = &(asi->switchGroups[swgrp]);
+    ASI_DESCRIPTION* description =
+        asi->pDescriptions ? &(asi->pDescriptions->switchGroups[swgrp]) : NULL;
 
     if (compAssign(&switchGroup->switchGroupID, FDKreadBits(bs, 5)))
       asi->diffFlags |= ASI_DIFF_NEEDS_RESET;
@@ -382,7 +389,7 @@ static TRANSPORTDEC_ERROR mae_SwitchGroupDefinition(AUDIO_SCENE_INFO* asi,
     if (compAssign(&switchGroup->defaultGroupID, FDKreadBits(bs, 7)))
       asi->diffFlags |= ASI_DIFF_SWITCHGRP;
 
-    if (asi->diffFlags & ASI_DIFF_NEEDS_RESET) switchGroup->description.present = 0;
+    if (description && (asi->diffFlags & ASI_DIFF_NEEDS_RESET)) description->present = 0;
   }
 
   return TRANSPORTDEC_OK;
@@ -394,6 +401,8 @@ static TRANSPORTDEC_ERROR mae_GroupPresetDefinition(AUDIO_SCENE_INFO* asi,
 
   for (gp = 0; gp < asi->numGroupPresets; gp++) {
     ASI_GROUP_PRESET* groupPreset = &(asi->groupPresets[gp]);
+    ASI_DESCRIPTION* description =
+        asi->pDescriptions ? &(asi->pDescriptions->groupPresets[gp]) : NULL;
 
     if (compAssign(&groupPreset->groupPresetID, FDKreadBits(bs, 5)))
       asi->diffFlags |= ASI_DIFF_NEEDS_RESET;
@@ -436,7 +445,7 @@ static TRANSPORTDEC_ERROR mae_GroupPresetDefinition(AUDIO_SCENE_INFO* asi,
 
     groupPreset->extPresent = 0;
 
-    if (asi->diffFlags & ASI_DIFF_NEEDS_RESET) groupPreset->description.present = 0;
+    if (description && (asi->diffFlags & ASI_DIFF_NEEDS_RESET)) description->present = 0;
 
     groupPreset->productionScreenSize.hasNonStandardScreenSize = 0;
   }
@@ -632,32 +641,42 @@ static TRANSPORTDEC_ERROR mae_Description(int type, AUDIO_SCENE_INFO* asi,
 
       i = asiGroupID2idx(asi, groupID);
       if (i < 0) return TRANSPORTDEC_PARSE_ERROR;
-      descr = &(asi->groups[i].description);
+      if (asi->pDescriptions) descr = &(asi->pDescriptions->groups[i]);
     } else if (type == ID_MAE_SWITCHGROUP_DESCRIPTION) {
       int switchGroupID = FDKreadBits(bs, 5);
 
       i = asiSwitchGroupID2idx(asi, switchGroupID);
       if (i < 0) return TRANSPORTDEC_PARSE_ERROR;
-      descr = &(asi->switchGroups[i].description);
+      if (asi->pDescriptions) descr = &(asi->pDescriptions->switchGroups[i]);
     } else if (type == ID_MAE_GROUPPRESET_DESCRIPTION) {
       int groupPresetID = FDKreadBits(bs, 5);
 
       i = asiGroupPresetID2idx(asi, groupPresetID);
       if (i < 0) return TRANSPORTDEC_PARSE_ERROR;
-      descr = &(asi->groupPresets[i].description);
+      if (asi->pDescriptions) descr = &(asi->pDescriptions->groupPresets[i]);
     }
 
     /* get priority of current language */
     if (descr && descr->present) {
       for (currPrio = 0; currPrio < ASI_MAX_PREF_DESCR_LANGUAGES; currPrio++) {
+#ifndef ASI_MAX_DESCRIPTION_LANGUAGES
         if (descr->language[0] &&
             (FDKstrncmp(descr->language, asi->prefDescrLanguages[currPrio], 3) == 0)) {
+#else
+        if (descr->language[descr->prefLangIdx][0] &&
+            (FDKstrncmp(descr->language[descr->prefLangIdx], asi->prefDescrLanguages[currPrio],
+                        3) == 0)) {
+#endif
           break;
         }
       }
     }
 
     numDescLanguages = FDKreadBits(bs, 4) + 1;
+#ifdef ASI_MAX_DESCRIPTION_LANGUAGES
+    if (numDescLanguages > ASI_MAX_DESCRIPTION_LANGUAGES) return TRANSPORTDEC_PARSE_ERROR;
+    if (descr) descr->numLanguages = numDescLanguages;
+#endif
     for (i = 0; i < numDescLanguages; i++) {
       char language[3];
       int dataLength;
@@ -671,19 +690,27 @@ static TRANSPORTDEC_ERROR mae_Description(int type, AUDIO_SCENE_INFO* asi,
       dataLength = FDKreadBits(bs, 8) + 1;
 
       /* get priority of language */
-      for (prio = 0; prio < ASI_MAX_PREF_DESCR_LANGUAGES; prio++) {
-        if (language[0] && (FDKstrncmp(language, asi->prefDescrLanguages[prio], 3) == 0)) {
-          break;
+      if (descr) {
+        for (prio = 0; prio < ASI_MAX_PREF_DESCR_LANGUAGES; prio++) {
+          if (language[0] && (FDKstrncmp(language, asi->prefDescrLanguages[prio], 3) == 0)) {
+            break;
+          }
         }
-      }
-      if (prio == ASI_MAX_PREF_DESCR_LANGUAGES)
-        prio += i; /* if not in preferred list select first transmitted */
-      if (prio == ASI_MAX_PREF_DESCR_LANGUAGES) {
-        if (descr && descr->present && (FDKstrncmp(language, descr->language, 3) != 0)) {
-          prio++;
+        if (prio == ASI_MAX_PREF_DESCR_LANGUAGES)
+          prio += i; /* if not in preferred list select first transmitted */
+        if (prio == ASI_MAX_PREF_DESCR_LANGUAGES) {
+#ifndef ASI_MAX_DESCRIPTION_LANGUAGES
+          if (descr && descr->present && (FDKstrncmp(language, descr->language, 3) != 0)) {
+#else
+          if (descr && descr->present &&
+              (FDKstrncmp(language, descr->language[descr->prefLangIdx], 3) != 0)) {
+#endif
+            prio++;
+          }
         }
       }
 
+#ifndef ASI_MAX_DESCRIPTION_LANGUAGES
       /* select language with highest priority */
       if (descr && (prio <= currPrio)) {
         int c;
@@ -702,7 +729,43 @@ static TRANSPORTDEC_ERROR mae_Description(int type, AUDIO_SCENE_INFO* asi,
           asi->diffFlags |= ASI_DIFF_DESCRIPTION; /* terminate string */
 
         currPrio = prio;
-      } else {
+      }
+#else
+      if (descr) {
+        int j;
+
+        if (prio <= currPrio) descr->prefLangIdx = i;
+
+        descr->present = 1;
+
+        if (compAssign(&descr->language[i][0], language[0])) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+        if (compAssign(&descr->language[i][1], language[1])) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+        if (compAssign(&descr->language[i][2], language[2])) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+
+        for (j = 0; j < dataLength; j++) {
+          char c;
+
+          if (j >= ASI_MAX_STORED_DESCRIPTION_LEN) break;
+
+          c = FDKreadBits(bs, 8);
+
+          /* prevent truncation within UTF-8 character */
+          if (((j == ASI_MAX_STORED_DESCRIPTION_LEN - 1) && ((c & 0xC0) == 0xC0)) ||
+              ((j == ASI_MAX_STORED_DESCRIPTION_LEN - 2) && ((c & 0xE0) == 0xE0)) ||
+              ((j == ASI_MAX_STORED_DESCRIPTION_LEN - 3) && ((c & 0xF0) == 0xF0))) {
+            c = 0;
+          }
+
+          if (compAssign(&descr->data[i][j], c)) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+        }
+        if (compAssign(&descr->data[i][j], 0))
+          asi->diffFlags |= ASI_DIFF_DESCRIPTION; /* terminate string */
+        FDKpushFor(bs, 8 * (dataLength - j));
+
+        currPrio = prio;
+      }
+#endif
+      else {
         /* skip string */
         FDKpushFor(bs, 8 * dataLength);
       }
@@ -746,6 +809,10 @@ static TRANSPORTDEC_ERROR mae_ContentData(AUDIO_SCENE_INFO* asi, HANDLE_FDK_BITS
         asi->diffFlags |= ASI_DIFF_CONTENT;
       if (compAssign(&contentData->contentLanguage[2], language[2]))
         asi->diffFlags |= ASI_DIFF_CONTENT;
+    } else {
+      if (compAssign(&contentData->contentLanguage[0], 0)) asi->diffFlags |= ASI_DIFF_CONTENT;
+      if (compAssign(&contentData->contentLanguage[1], 0)) asi->diffFlags |= ASI_DIFF_CONTENT;
+      if (compAssign(&contentData->contentLanguage[2], 0)) asi->diffFlags |= ASI_DIFF_CONTENT;
     }
   }
 
@@ -959,14 +1026,25 @@ static TRANSPORTDEC_ERROR mae_Data(AUDIO_SCENE_INFO* asi, HANDLE_FDK_BITSTREAM b
 
   /* clear data of elements not present */
   for (int grp = 0; grp < asi->numGroups; grp++) {
+    ASI_DESCRIPTION* description = NULL;
+    if (asi->pDescriptions) description = &(asi->pDescriptions->groups[grp]);
+
     if (!asi->drcUiInfoPresent) {
       asi->drcUiInfo.numTargetLoudnessConditions = 0;
     }
-    if (!asi->groups[grp].description.present) {
-      if (compAssign(&asi->groups[grp].description.language[0], 0))
-        asi->diffFlags |= ASI_DIFF_DESCRIPTION;
-      if (compAssign(&asi->groups[grp].description.data[0], 0))
-        asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+
+    if (description && !description->present) {
+#ifndef ASI_MAX_DESCRIPTION_LANGUAGES
+      if (compAssign(&description->language[0], 0)) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+      if (compAssign(&description->data[0], 0)) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+#else
+      if (compAssign(&description->numLanguages, 0)) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+      for (int i = 0; i < ASI_MAX_DESCRIPTION_LANGUAGES; i++) {
+        if (compAssign(&description->language[i][0], 0)) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+        if (compAssign(&description->data[i][0], 0)) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+      }
+      description->prefLangIdx = 0;
+#endif
     }
 
     if (!asi->groups[grp].contPresent) {
@@ -978,15 +1056,28 @@ static TRANSPORTDEC_ERROR mae_Data(AUDIO_SCENE_INFO* asi, HANDLE_FDK_BITSTREAM b
   }
 
   for (int swgrp = 0; swgrp < asi->numSwitchGroups; swgrp++) {
-    if (!asi->switchGroups[swgrp].description.present) {
-      if (compAssign(&asi->switchGroups[swgrp].description.language[0], 0))
-        asi->diffFlags |= ASI_DIFF_DESCRIPTION;
-      if (compAssign(&asi->switchGroups[swgrp].description.data[0], 0))
-        asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+    ASI_DESCRIPTION* description = NULL;
+    if (asi->pDescriptions) description = &(asi->pDescriptions->switchGroups[swgrp]);
+
+    if (description && !description->present) {
+#ifndef ASI_MAX_DESCRIPTION_LANGUAGES
+      if (compAssign(&description->language[0], 0)) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+      if (compAssign(&description->data[0], 0)) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+#else
+      if (compAssign(&description->numLanguages, 0)) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+      for (int i = 0; i < ASI_MAX_DESCRIPTION_LANGUAGES; i++) {
+        if (compAssign(&description->language[i][0], 0)) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+        if (compAssign(&description->data[i][0], 0)) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+      }
+      description->prefLangIdx = 0;
+#endif
     }
   }
 
   for (int gp = 0; gp < asi->numGroupPresets; gp++) {
+    ASI_DESCRIPTION* description = NULL;
+    if (asi->pDescriptions) description = &(asi->pDescriptions->groupPresets[gp]);
+
     if (!asi->groupPresets[gp].extPresent) {
       if (compAssign(&asi->groupPresets[gp].hasDownmixIdExtension, 0))
         asi->diffFlags |= ASI_DIFF_NEEDS_RESET;
@@ -997,11 +1088,18 @@ static TRANSPORTDEC_ERROR mae_Data(AUDIO_SCENE_INFO* asi, HANDLE_FDK_BITSTREAM b
       }
     }
 
-    if (!asi->groupPresets[gp].description.present) {
-      if (compAssign(&asi->groupPresets[gp].description.language[0], 0))
-        asi->diffFlags |= ASI_DIFF_DESCRIPTION;
-      if (compAssign(&asi->groupPresets[gp].description.data[0], 0))
-        asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+    if (description && !description->present) {
+#ifndef ASI_MAX_DESCRIPTION_LANGUAGES
+      if (compAssign(&description->language[0], 0)) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+      if (compAssign(&description->data[0], 0)) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+#else
+      if (compAssign(&description->numLanguages, 0)) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+      for (int i = 0; i < ASI_MAX_DESCRIPTION_LANGUAGES; i++) {
+        if (compAssign(&description->language[i][0], 0)) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+        if (compAssign(&description->data[i][0], 0)) asi->diffFlags |= ASI_DIFF_DESCRIPTION;
+      }
+      description->prefLangIdx = 0;
+#endif
     }
   }
 

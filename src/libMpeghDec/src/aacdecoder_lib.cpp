@@ -1020,7 +1020,7 @@ LINKSPEC_CPP HANDLE_AACDECODER aacDecoder_Open(TRANSPORT_TYPE transportFmt, UINT
   transportDec_RegisterEarconConfigCallBack(pIn, aacDecoder_EarconSetConfigCallback, (void*)aacDec);
   transportDec_RegisterEarconInfoCallBack(pIn, aacDecoder_EarconSetInfoCallback, (void*)aacDec);
 
-  if (UI_Manager_Create(&aacDec->hUiManager) != UI_MANAGER_OK) {
+  if (UI_Manager_Create(&aacDec->hUiManager, 0) != UI_MANAGER_OK) {
     err = -1;
     goto bail;
   }

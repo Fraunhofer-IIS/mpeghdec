@@ -153,7 +153,7 @@ typedef struct {
 struct UI_MANAGER;
 typedef struct UI_MANAGER* HANDLE_UI_MANAGER;
 
-INT UI_Manager_Create(HANDLE_UI_MANAGER* phUiManager);
+INT UI_Manager_Create(HANDLE_UI_MANAGER* phUiManager, INT storeAsiDescriptions);
 
 AUDIO_SCENE_INFO* UI_Manager_GetAsiPointer(HANDLE_UI_MANAGER hUiManager);
 

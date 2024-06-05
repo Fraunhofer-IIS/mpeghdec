@@ -219,7 +219,7 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_ApplyXmlAction(HANDLE_MPEGH_UI_MANAGER self, 
  * @brief  Feed MHAS input into UI manager
  *
  * @param[in] self        UI manager handle.
- * @param[in] mhasBuffer  Buffer containing all MHAS packets for exactly one audio frame.
+ * @param[in] mhasBuffer  Input buffer containing all MHAS packets for exactly one audio frame.
  * @param[in] mhasLength  Size of MHAS packets in bytes.
  * @return                Error code.
  */
@@ -227,17 +227,18 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_FeedMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR*
                                             UINT mhasLength);
 
 /**
- * @brief  Get updated MHAS output from UI manager
+ * @brief  Update MHAS buffer, inserting UI and DRC packets from UI manager.
+ *         A previous call of mpegh_UI_FeedMHAS() is required.
  *
  * @param[in]     self              UI manager handle.
- * @param[in,out] mhasBuffer        Buffer receiving updated MHAS packets (including UI and DRC
- *                                  packets).
- * @param[in]     mhasBufferLength  Size of buffer in bytes. This buffer must be large enough to
- *                                  also include UI MHAS packets. If the buffer is not large
- *                                  enough, pending UI packets will be delayed until the next RAP
- *                                  frame.
- * @param[out]    mhasLength        Pointer to variable receiving size of updated MHAS packets in
- *                                  bytes.
+ * @param[in,out] mhasBuffer        Input/output buffer, modified in-place. As input has to contain
+ *                                  exactly the same data as passed to previous call of
+ *                                  mpegh_UI_FeedMHAS(). Upon return the buffer is updated with
+ *                                  UI and DRC packets inserted.
+ * @param[in]     mhasBufferLength  Size of buffer in bytes. This should be at least the size of the
+ *                                  input MHAS data plus 256 bytes.
+ * @param[in,out] mhasLength        Pointer to variable receiving total size of updated MHAS packet
+ *                                  buffer in bytes.
  * @return                          Error code.
  */
 LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_UpdateMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR* mhasBuffer,

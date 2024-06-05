@@ -94,10 +94,11 @@ amm-info@iis.fraunhofer.de
 #include "uiXml.h"
 #include "uiPersistence.h"
 
-static void reset(HANDLE_UI_MANAGER hUiManager, int keepSwitchGroups);
+static void reset(HANDLE_UI_MANAGER hUiManager, int keepSwitchGroups, UI_STATE* pUiState = NULL);
 static UI_MANAGER_ERROR selectSwitchGroup(HANDLE_UI_MANAGER hUiManager, int switchGrpIdx,
-                                          UCHAR groupID);
-static UI_MANAGER_ERROR applyPreset(HANDLE_UI_MANAGER hUiManager, UCHAR presetID);
+                                          UCHAR groupID, UI_STATE* pUiState = NULL);
+static UI_MANAGER_ERROR applyPreset(HANDLE_UI_MANAGER hUiManager, UCHAR presetID,
+                                    UI_STATE* pUiState = NULL);
 static void persistenceRestore(HANDLE_UI_MANAGER hUiManager);
 
 /* set group on/off */
@@ -347,8 +348,10 @@ static UI_MANAGER_ERROR setSwitchGroupElOffset(HANDLE_UI_MANAGER hUiManager, UCH
 }
 
 /* select audio language */
-static void selectAudioLang(HANDLE_UI_MANAGER hUiManager) {
+static void selectAudioLang(HANDLE_UI_MANAGER hUiManager, UI_STATE* pUiState = NULL) {
   int swgrpIdx, grpId, grpIdx, memberIdx;
+
+  if (pUiState == NULL) pUiState = &hUiManager->uiState;
 
   for (swgrpIdx = 0; swgrpIdx < hUiManager->asi.numSwitchGroups; swgrpIdx++) {
     ASI_SWITCH_GROUP* pSwitchGroup = &(hUiManager->asi.switchGroups[swgrpIdx]);
@@ -356,7 +359,7 @@ static void selectAudioLang(HANDLE_UI_MANAGER hUiManager) {
     int prio, currPrio = NUM_PREF_LANGUAGES, selGrpId = pSwitchGroup->defaultGroupID;
     int hasLang = 0;
 
-    grpId = pSwitchGroup->memberID[hUiManager->uiState.switchGroups[swgrpIdx].activeMemberIndex];
+    grpId = pSwitchGroup->memberID[pUiState->switchGroups[swgrpIdx].activeMemberIndex];
     grpIdx = asiGroupID2idx(&hUiManager->asi, grpId);
     if (grpIdx < 0) continue;
     pGroup = &(hUiManager->asi.groups[grpIdx]);
@@ -373,7 +376,7 @@ static void selectAudioLang(HANDLE_UI_MANAGER hUiManager) {
         /* get language priority of member */
         for (prio = 0; prio < NUM_PREF_LANGUAGES; prio++) {
           if (FDKstrncmp(pGroup->contentData.contentLanguage,
-                         &hUiManager->uiState.prefAudioLanguages[prio][0], 3) == 0)
+                         &pUiState->prefAudioLanguages[prio][0], 3) == 0)
             break;
         }
 
@@ -386,8 +389,11 @@ static void selectAudioLang(HANDLE_UI_MANAGER hUiManager) {
     }
 
     if (hasLang && (selGrpId != INVALID_ID)) {
-      selectSwitchGroup(hUiManager, swgrpIdx, selGrpId);
-      hUiManager->xmlStateChanged = 1;
+      selectSwitchGroup(hUiManager, swgrpIdx, selGrpId, pUiState);
+
+      if (pUiState == &hUiManager->uiState) {
+        hUiManager->xmlStateChanged = 1;
+      }
     }
   }
 }
@@ -513,15 +519,17 @@ static void resetAvailability(HANDLE_UI_MANAGER hUiManager) {
 }
 
 /* reset state to default */
-static void reset(HANDLE_UI_MANAGER hUiManager, int keepSwitchGroups) {
+static void reset(HANDLE_UI_MANAGER hUiManager, int keepSwitchGroups, UI_STATE* pUiState) {
   const AUDIO_SCENE_INFO* pASI = &hUiManager->asi;
   int i, memberIdx;
+
+  if (pUiState == NULL) pUiState = &hUiManager->uiState;
 
   FDK_ASSERT(hUiManager->asi.numGroups <= ASI_MAX_GROUPS);
 
   /* groups */
   for (i = 0; i < hUiManager->asi.numGroups; i++) {
-    UI_STATE_GROUP* pGroupState = &(hUiManager->uiState.groups[i]);
+    UI_STATE_GROUP* pGroupState = &(pUiState->groups[i]);
 
     /* on/off*/
     pGroupState->onOff = hUiManager->asi.groups[i].defaultOnOff;
@@ -546,18 +554,18 @@ static void reset(HANDLE_UI_MANAGER hUiManager, int keepSwitchGroups) {
 
   /* switch groups */
   for (i = 0; i < hUiManager->asi.numSwitchGroups; i++) {
-    UI_STATE_SWITCH_GROUP* pSwitchGroupState = &(hUiManager->uiState.switchGroups[i]);
+    UI_STATE_SWITCH_GROUP* pSwitchGroupState = &(pUiState->switchGroups[i]);
 
     pSwitchGroupState->onOff = hUiManager->asi.switchGroups[i].defaultOnOff;
     pSwitchGroupState->allowSwitch = 1;
 
     if (!keepSwitchGroups) {
       pSwitchGroupState->activeMemberIndex = 0;
-      selectSwitchGroup(hUiManager, i, hUiManager->asi.switchGroups[i].defaultGroupID);
+      selectSwitchGroup(hUiManager, i, hUiManager->asi.switchGroups[i].defaultGroupID, pUiState);
     } else {
       selectSwitchGroup(
           hUiManager, i,
-          hUiManager->asi.switchGroups[i].memberID[pSwitchGroupState->activeMemberIndex]);
+          hUiManager->asi.switchGroups[i].memberID[pSwitchGroupState->activeMemberIndex], pUiState);
     }
 
     pSwitchGroupState->isAvailable = 1;
@@ -567,7 +575,7 @@ static void reset(HANDLE_UI_MANAGER hUiManager, int keepSwitchGroups) {
       int grpIdx = asiGroupID2idx(&hUiManager->asi, grpId);
       if (grpIdx < 0) continue;
 
-      hUiManager->uiState.groups[grpIdx].allowOnOff = hUiManager->asi.switchGroups[i].allowOnOff;
+      pUiState->groups[grpIdx].allowOnOff = hUiManager->asi.switchGroups[i].allowOnOff;
 
       /* Check if all members are available. */
       if (hUiManager->asi.groups[grpIdx].isAvailable == 0) {
@@ -578,7 +586,7 @@ static void reset(HANDLE_UI_MANAGER hUiManager, int keepSwitchGroups) {
 
   /* presets */
   for (int p = 0; p < hUiManager->asi.numGroupPresets; p++) {
-    hUiManager->uiState.groupPresets[p].isAvailable = 1;
+    pUiState->groupPresets[p].isAvailable = 1;
 
     for (memberIdx = 0; memberIdx < hUiManager->asi.groupPresets[p].numConditions; memberIdx++) {
       int numConditions;
@@ -597,30 +605,32 @@ static void reset(HANDLE_UI_MANAGER hUiManager, int keepSwitchGroups) {
           int grpIdx = asiGroupID2idx(pASI, conditions[i].referenceID);
           if (grpIdx < 0) continue;
 
-          if (hUiManager->uiState.groups[grpIdx].isAvailable == 0) {
-            hUiManager->uiState.groupPresets[p].isAvailable = 0;
+          if (pUiState->groups[grpIdx].isAvailable == 0) {
+            pUiState->groupPresets[p].isAvailable = 0;
           }
         } else { /* switch group condition */
           int swGrpIdx = asiSwitchGroupID2idx(pASI, conditions[i].referenceID);
           if (swGrpIdx < 0) continue;
 
-          if (hUiManager->uiState.switchGroups[swGrpIdx].isAvailable == 0) {
-            hUiManager->uiState.groupPresets[p].isAvailable = 0;
+          if (pUiState->switchGroups[swGrpIdx].isAvailable == 0) {
+            pUiState->groupPresets[p].isAvailable = 0;
           }
         }
       }
     }
   }
 
-  hUiManager->uiState.activePresetIndex = INVALID_IDX;
+  pUiState->activePresetIndex = INVALID_IDX;
 
   if (!keepSwitchGroups) {
     /* select audio language */
-    selectAudioLang(hUiManager);
+    selectAudioLang(hUiManager, pUiState);
   }
 
-  hUiManager->xmlStateChanged = 1;
-  hUiManager->uiStateChanged = 1;
+  if (pUiState == &hUiManager->uiState) {
+    hUiManager->xmlStateChanged = 1;
+    hUiManager->uiStateChanged = 1;
+  }
 }
 
 /* compare asi group properties: 0 = no diff, 1 = different */
@@ -654,20 +664,22 @@ static int cmpGroupProperties(AUDIO_SCENE_INFO* asi, int groupIndex1, int groupI
 
 /* select active switch group member */
 static UI_MANAGER_ERROR selectSwitchGroup(HANDLE_UI_MANAGER hUiManager, int switchGrpIdx,
-                                          UCHAR groupID) {
+                                          UCHAR groupID, UI_STATE* pUiState) {
   /* get switch group pointer */
   ASI_SWITCH_GROUP* switchGroup = &(hUiManager->asi.switchGroups[switchGrpIdx]);
   int i, found = 0;
   int grpIdx = 0;
   int prevGrpIdx = 0;
 
+  if (pUiState == NULL) pUiState = &hUiManager->uiState;
+
   /* check if allowed */
-  if (!hUiManager->uiState.switchGroups[switchGrpIdx].allowSwitch) return UI_MANAGER_NOT_ALLOWED;
+  if (!pUiState->switchGroups[switchGrpIdx].allowSwitch) return UI_MANAGER_NOT_ALLOWED;
 
   /* get currently active group id */
-  prevGrpIdx = asiGroupID2idx(
-      &hUiManager->asi,
-      switchGroup->memberID[hUiManager->uiState.switchGroups[switchGrpIdx].activeMemberIndex]);
+  prevGrpIdx =
+      asiGroupID2idx(&hUiManager->asi,
+                     switchGroup->memberID[pUiState->switchGroups[switchGrpIdx].activeMemberIndex]);
   if (prevGrpIdx < 0) return UI_MANAGER_INVALID_STATE;
 
   /* find member to be activated */
@@ -678,12 +690,11 @@ static UI_MANAGER_ERROR selectSwitchGroup(HANDLE_UI_MANAGER hUiManager, int swit
 
     /* turn selected member on, all others off */
     if (switchGroup->memberID[i] == groupID) {
-      hUiManager->uiState.switchGroups[switchGrpIdx].activeMemberIndex = i;
-      hUiManager->uiState.groups[grpIdx].onOff =
-          hUiManager->uiState.switchGroups[switchGrpIdx].onOff;
+      pUiState->switchGroups[switchGrpIdx].activeMemberIndex = i;
+      pUiState->groups[grpIdx].onOff = pUiState->switchGroups[switchGrpIdx].onOff;
       found = 1;
     } else {
-      hUiManager->uiState.groups[grpIdx].onOff = 0;
+      pUiState->groups[grpIdx].onOff = 0;
     }
   }
 
@@ -691,27 +702,28 @@ static UI_MANAGER_ERROR selectSwitchGroup(HANDLE_UI_MANAGER hUiManager, int swit
   if (!found) {
     if (switchGroup->allowOnOff) {
       /* switch group turned off */
-      hUiManager->uiState.switchGroups[switchGrpIdx].onOff = 0;
+      pUiState->switchGroups[switchGrpIdx].onOff = 0;
     } else {
       /* turn previous active member back on */
-      int grpId =
-          switchGroup->memberID[hUiManager->uiState.switchGroups[switchGrpIdx].activeMemberIndex];
+      int grpId = switchGroup->memberID[pUiState->switchGroups[switchGrpIdx].activeMemberIndex];
       grpIdx = asiGroupID2idx(&hUiManager->asi, grpId);
-      hUiManager->uiState.groups[grpIdx].onOff = 1;
+      pUiState->groups[grpIdx].onOff = 1;
     }
   }
 
   /* get active group id */
-  grpIdx = asiGroupID2idx(
-      &hUiManager->asi,
-      switchGroup->memberID[hUiManager->uiState.switchGroups[switchGrpIdx].activeMemberIndex]);
+  grpIdx =
+      asiGroupID2idx(&hUiManager->asi,
+                     switchGroup->memberID[pUiState->switchGroups[switchGrpIdx].activeMemberIndex]);
   if (grpIdx < 0) return UI_MANAGER_INVALID_STATE;
 
-  if (cmpGroupProperties(&hUiManager->asi, prevGrpIdx, grpIdx)) {
-    hUiManager->xmlStateChanged = 1;
-  }
+  if (pUiState == &hUiManager->uiState) {
+    if (cmpGroupProperties(&hUiManager->asi, prevGrpIdx, grpIdx)) {
+      hUiManager->xmlStateChanged = 1;
+    }
 
-  hUiManager->uiStateChanged = 1;
+    hUiManager->uiStateChanged = 1;
+  }
 
   if (!found) return UI_MANAGER_INVALID_PARAM;
 
@@ -720,50 +732,56 @@ static UI_MANAGER_ERROR selectSwitchGroup(HANDLE_UI_MANAGER hUiManager, int swit
 
 /* apply preset condition to group */
 static void applyConditionToGroup(HANDLE_UI_MANAGER hUiManager,
-                                  ASI_GROUP_PRESET_CONDITION* pCondition, int grpIdx) {
+                                  ASI_GROUP_PRESET_CONDITION* pCondition, int grpIdx,
+                                  UI_STATE* pUiState = NULL) {
+  if (pUiState == NULL) pUiState = &hUiManager->uiState;
+
   /* on/off (do not set for switch group members)  */
   if (hUiManager->asi.groups[grpIdx].switchGroupID == INVALID_ID) {
-    hUiManager->uiState.groups[grpIdx].onOff = pCondition->conditionOnOff;
+    pUiState->groups[grpIdx].onOff = pCondition->conditionOnOff;
   }
 
   /* disable on/off */
-  hUiManager->uiState.groups[grpIdx].allowOnOff = 0;
+  pUiState->groups[grpIdx].allowOnOff = 0;
 
   if (pCondition->conditionOnOff) {
     /* gain interactivity */
     if (pCondition->disableGainInteractivity) {
-      hUiManager->uiState.groups[grpIdx].allowGainInteractivity = 0;
+      pUiState->groups[grpIdx].allowGainInteractivity = 0;
     }
 
     /* default gain */
     if (pCondition->gainFlag) {
-      hUiManager->uiState.groups[grpIdx].gain = hUiManager->uiState.groups[grpIdx].defaultGain =
+      pUiState->groups[grpIdx].gain = pUiState->groups[grpIdx].defaultGain =
           ((SHORT)pCondition->gain - 255) + 64;
     }
 
     /* position interactivity */
     if (pCondition->disablePositionInteractivity) {
-      hUiManager->uiState.groups[grpIdx].allowPositionInteractivity = 0;
+      pUiState->groups[grpIdx].allowPositionInteractivity = 0;
     }
 
     /* default position */
     if (pCondition->positionFlag) {
-      hUiManager->uiState.groups[grpIdx].azOffset =
-          hUiManager->uiState.groups[grpIdx].defaultAzOffset = pCondition->azOffset;
-      hUiManager->uiState.groups[grpIdx].elOffset =
-          hUiManager->uiState.groups[grpIdx].defaultElOffset = pCondition->elOffset;
-      hUiManager->uiState.groups[grpIdx].distFactor =
-          hUiManager->uiState.groups[grpIdx].defaultDistFactor = pCondition->distFactor;
+      pUiState->groups[grpIdx].azOffset = pUiState->groups[grpIdx].defaultAzOffset =
+          pCondition->azOffset;
+      pUiState->groups[grpIdx].elOffset = pUiState->groups[grpIdx].defaultElOffset =
+          pCondition->elOffset;
+      pUiState->groups[grpIdx].distFactor = pUiState->groups[grpIdx].defaultDistFactor =
+          pCondition->distFactor;
     }
   }
 }
 
 /* apply preset */
-static UI_MANAGER_ERROR applyPreset(HANDLE_UI_MANAGER hUiManager, UCHAR presetID) {
+static UI_MANAGER_ERROR applyPreset(HANDLE_UI_MANAGER hUiManager, UCHAR presetID,
+                                    UI_STATE* pUiState) {
   ASI_GROUP_PRESET* preset;
   ASI_GROUP_PRESET_CONDITION* conditions;
 
   int i, numConditions;
+
+  if (pUiState == NULL) pUiState = &hUiManager->uiState;
 
   if (presetID == PRESET_ID_AUTO) {
     /* find appropriate preset (default preset is returned for accessibility preference 0) */
@@ -777,7 +795,7 @@ static UI_MANAGER_ERROR applyPreset(HANDLE_UI_MANAGER hUiManager, UCHAR presetID
   preset = &hUiManager->asi.groupPresets[presetIdx];
 
   /* set active preset index */
-  hUiManager->uiState.activePresetIndex = presetIdx;
+  pUiState->activePresetIndex = presetIdx;
 
   /* replace conditions if downmixIdGroupPresetExtension applies */
   if (preset->hasDownmixIdExtension) {
@@ -797,7 +815,7 @@ static UI_MANAGER_ERROR applyPreset(HANDLE_UI_MANAGER hUiManager, UCHAR presetID
 
       /* check if group is member of a switch group */
       if (hUiManager->asi.groups[grpIdx].switchGroupID == INVALID_ID) {
-        applyConditionToGroup(hUiManager, &(conditions[i]), grpIdx);
+        applyConditionToGroup(hUiManager, &(conditions[i]), grpIdx, pUiState);
       } else {
         int swgrpIdx;
         ASI_SWITCH_GROUP* switchGroup;
@@ -812,10 +830,10 @@ static UI_MANAGER_ERROR applyPreset(HANDLE_UI_MANAGER hUiManager, UCHAR presetID
         /* apply condition to switch group */
         if (conditions[i].conditionOnOff) {
           /* on/off */
-          hUiManager->uiState.switchGroups[swgrpIdx].onOff = 1;
+          pUiState->switchGroups[swgrpIdx].onOff = 1;
 
           /* disable switch */
-          hUiManager->uiState.switchGroups[swgrpIdx].allowSwitch = 0;
+          pUiState->switchGroups[swgrpIdx].allowSwitch = 0;
 
           /* apply condition to all switch group members */
           for (memberIdx = 0; memberIdx < switchGroup->numMembers; memberIdx++) {
@@ -827,13 +845,13 @@ static UI_MANAGER_ERROR applyPreset(HANDLE_UI_MANAGER hUiManager, UCHAR presetID
 
             /* on/off */
             if (grpId == conditions[i].referenceID) {
-              hUiManager->uiState.groups[grpIdx].onOff = 1;
-              hUiManager->uiState.switchGroups[swgrpIdx].activeMemberIndex = memberIdx;
+              pUiState->groups[grpIdx].onOff = 1;
+              pUiState->switchGroups[swgrpIdx].activeMemberIndex = memberIdx;
             } else {
-              hUiManager->uiState.groups[grpIdx].onOff = 0;
+              pUiState->groups[grpIdx].onOff = 0;
             }
 
-            applyConditionToGroup(hUiManager, &(conditions[i]), grpIdx);
+            applyConditionToGroup(hUiManager, &(conditions[i]), grpIdx, pUiState);
           }
         }
       }
@@ -848,13 +866,13 @@ static UI_MANAGER_ERROR applyPreset(HANDLE_UI_MANAGER hUiManager, UCHAR presetID
       switchGroup = &(hUiManager->asi.switchGroups[swgrpIdx]);
 
       /* on/off */
-      hUiManager->uiState.switchGroups[swgrpIdx].onOff = conditions[i].conditionOnOff;
+      pUiState->switchGroups[swgrpIdx].onOff = conditions[i].conditionOnOff;
 
       /* set active member on/off */
-      grpId = switchGroup->memberID[hUiManager->uiState.switchGroups[swgrpIdx].activeMemberIndex];
+      grpId = switchGroup->memberID[pUiState->switchGroups[swgrpIdx].activeMemberIndex];
       grpIdx = asiGroupID2idx(&hUiManager->asi, grpId);
       if (grpIdx < 0) continue;
-      hUiManager->uiState.groups[grpIdx].onOff = conditions[i].conditionOnOff;
+      pUiState->groups[grpIdx].onOff = conditions[i].conditionOnOff;
 
       /* apply condition to members */
       for (memberIdx = 0; memberIdx < switchGroup->numMembers; memberIdx++) {
@@ -862,15 +880,25 @@ static UI_MANAGER_ERROR applyPreset(HANDLE_UI_MANAGER hUiManager, UCHAR presetID
         grpIdx = asiGroupID2idx(&hUiManager->asi, switchGroup->memberID[memberIdx]);
         if (grpIdx < 0) continue;
 
-        applyConditionToGroup(hUiManager, &(conditions[i]), grpIdx);
+        applyConditionToGroup(hUiManager, &(conditions[i]), grpIdx, pUiState);
       }
     }
   }
 
-  hUiManager->xmlStateChanged = 1;
-  hUiManager->uiStateChanged = 1;
+  if (pUiState == &hUiManager->uiState) {
+    hUiManager->xmlStateChanged = 1;
+    hUiManager->uiStateChanged = 1;
+  }
 
   return UI_MANAGER_OK;
+}
+
+/* simulate preset */
+void simulatePreset(HANDLE_UI_MANAGER hUiManager, UCHAR presetID, UI_STATE* pUiState) {
+  FDK_ASSERT(pUiState != &hUiManager->uiState);
+
+  reset(hUiManager, 0, pUiState);
+  applyPreset(hUiManager, presetID, pUiState);
 }
 
 /* check/update state */
@@ -1314,10 +1342,13 @@ static void persistenceRestore(HANDLE_UI_MANAGER hUiManager) {
 }
 
 /* create instance */
-INT UI_Manager_Create(HANDLE_UI_MANAGER* phUiManager) {
+INT UI_Manager_Create(HANDLE_UI_MANAGER* phUiManager, INT storeAsiDescriptions) {
   *phUiManager = (HANDLE_UI_MANAGER)FDKcalloc(1, sizeof(UI_MANAGER));
   if (*phUiManager == NULL) return UI_MANAGER_OUT_OF_MEMORY;
 
+  if (storeAsiDescriptions) {
+    (*phUiManager)->asi.pDescriptions = (ASI_DESCRIPTIONS*)FDKcalloc(1, sizeof(ASI_DESCRIPTIONS));
+  }
   (*phUiManager)->asi.activeDmxId = INVALID_ID;
   (*phUiManager)->uiState.targetLoudness = UI_MANAGER_USE_DEFAULT_TARGET_LOUDNESS;
   (*phUiManager)->uiState.drcSelected = UI_MANAGER_USE_DEFAULT_DRC_SELECTED;
@@ -1597,6 +1628,7 @@ INT UI_Manager_Delete(HANDLE_UI_MANAGER* phUiManager) {
   if (*phUiManager && (*phUiManager)->hPersistence)
     persistenceManagerDelete((*phUiManager)->hPersistence);
 
+  if (*phUiManager && (*phUiManager)->asi.pDescriptions) FDKfree((*phUiManager)->asi.pDescriptions);
   FDKfree(*phUiManager);
   *phUiManager = NULL;
 

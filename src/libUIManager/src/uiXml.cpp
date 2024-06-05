@@ -92,9 +92,10 @@ amm-info@iis.fraunhofer.de
 
 #include "uiManagerInternal.h"
 
-#define SMART_XML_OUTPUT
-
-#ifdef SMART_XML_OUTPUT
+static void writeSwitchGroup(HANDLE_UI_MANAGER hUiManager, int switchGroupIdx,
+                             UI_STATE* pUiState = NULL, int nonInteract = 0);
+static void writeGroup(HANDLE_UI_MANAGER hUiManager, int groupIdx, UI_STATE* pUiState = NULL,
+                       int nonInteract = 0);
 
 /* sort */
 static void sort(USHORT* data, UINT n) {
@@ -135,12 +136,10 @@ static void appendIDtoStr(char* str, UCHAR id) {
   *str = 0;
 }
 
-#endif
-
 /* reset XML writer state */
 static void resetXmlWriter(UI_MANAGER_XML_WRITER* pWriter) {
   pWriter->nextPresetIdx = XML_START_INDEX;
-  pWriter->nextGroupIdx = 0;
+  pWriter->nextGroupIdx = XML_START_INDEX;
   pWriter->nextSwitchGroupMemberIdx = XML_START_INDEX;
 }
 
@@ -351,7 +350,7 @@ static void writeDescription(UI_MANAGER_XML_WRITER* pWriter, const ASI_DESCRIPTI
     writeString(pWriter, "/>\n");
   }
 
-  if (!pDescr->present) return;
+  if ((!pContent || !pContent->contentLanguage[0]) && (!pDescr || !pDescr->present)) return;
 
   writeString(pWriter, "<customKind");
 
@@ -365,19 +364,39 @@ static void writeDescription(UI_MANAGER_XML_WRITER* pWriter, const ASI_DESCRIPTI
 
   writeString(pWriter, ">\n");
 
-  writeString(pWriter, "<description");
-  if (pDescr->language[0]) {
-    writeString(pWriter, " langCode=\"");
-    writeChar(pWriter, pDescr->language[0]);
-    writeChar(pWriter, pDescr->language[1]);
-    writeChar(pWriter, pDescr->language[2]);
-    writeChar(pWriter, '"');
+  if (pDescr && pDescr->present) {
+#if defined(ASI_MAX_DESCRIPTION_LANGUAGES)
+    for (int i = 0; i < pDescr->numLanguages; i++)
+#endif
+    {
+      writeString(pWriter, "<description");
+      if (pDescr->language[0]) {
+        writeString(pWriter, " langCode=\"");
+#if !defined(ASI_MAX_DESCRIPTION_LANGUAGES)
+        writeChar(pWriter, pDescr->language[0]);
+        writeChar(pWriter, pDescr->language[1]);
+        writeChar(pWriter, pDescr->language[2]);
+        writeChar(pWriter, '"');
+#else
+        writeChar(pWriter, pDescr->language[i][0]);
+        writeChar(pWriter, pDescr->language[i][1]);
+        writeChar(pWriter, pDescr->language[i][2]);
+        writeChar(pWriter, '"');
+
+        if (i == pDescr->prefLangIdx) writeString(pWriter, " isPreferred=\"true\"");
+#endif
+      }
+      writeString(pWriter, ">");
+
+#if !defined(ASI_MAX_DESCRIPTION_LANGUAGES)
+      writeEscapedString(pWriter, pDescr->data);
+#else
+      writeEscapedString(pWriter, pDescr->data[i]);
+#endif
+
+      writeString(pWriter, "</description>\n");
+    }
   }
-  writeString(pWriter, ">");
-
-  writeEscapedString(pWriter, pDescr->data);
-
-  writeString(pWriter, "</description>\n");
 
   writeString(pWriter, "</customKind>\n");
 }
@@ -385,11 +404,7 @@ static void writeDescription(UI_MANAGER_XML_WRITER* pWriter, const ASI_DESCRIPTI
 /* write interaction params */
 static void writeInteractParams(UI_MANAGER_XML_WRITER* pWriter, const ASI_GROUP* pGroup,
                                 const UI_STATE_GROUP* pGroupState) {
-#ifdef SMART_XML_OUTPUT
   if (pGroupState->allowGainInteractivity) {
-#else
-  if (pGroup->allowGainInteractivity) {
-#endif
     writeString(pWriter, "<prominenceLevelProp min=");
     writeValue(pWriter, (pGroup->interactivityMinGain - 63) << 1);
 
@@ -408,11 +423,7 @@ static void writeInteractParams(UI_MANAGER_XML_WRITER* pWriter, const ASI_GROUP*
     writeString(pWriter, "/>\n");
   }
 
-#ifdef SMART_XML_OUTPUT
   if (pGroupState->allowOnOff) {
-#else
-  if (pGroup->allowOnOff) {
-#endif
     writeString(pWriter, "<mutingProp def=");
     writeBool(pWriter, !pGroup->defaultOnOff);
 
@@ -425,11 +436,7 @@ static void writeInteractParams(UI_MANAGER_XML_WRITER* pWriter, const ASI_GROUP*
     writeString(pWriter, "/>\n");
   }
 
-#ifdef SMART_XML_OUTPUT
   if (pGroupState->allowPositionInteractivity) {
-#else
-  if (pGroup->allowPositionInteractivity) {
-#endif
     if ((INT)pGroup->interactivityMaxAzOffset > -(INT)pGroup->interactivityMinAzOffset) {
       writeString(pWriter, "<azimuthProp min=");
       writeValue(pWriter, -3 * pGroup->interactivityMinAzOffset);
@@ -473,47 +480,174 @@ static void writeInteractParams(UI_MANAGER_XML_WRITER* pWriter, const ASI_GROUP*
 }
 
 /* write preset */
-static void writePreset(HANDLE_UI_MANAGER hUiManager, int presetIdx) {
+static void writePreset(HANDLE_UI_MANAGER hUiManager, int presetIdx, USHORT* sortedGrpIDs,
+                        int nSortedGrpIDs) {
   UI_MANAGER_XML_WRITER* pWriter = &(hUiManager->xmlWriter);
-  const ASI_GROUP_PRESET* preset = &(hUiManager->asi.groupPresets[presetIdx]);
+  const ASI_GROUP_PRESET* pPreset = NULL;
+  const ASI_DESCRIPTION* pDescription = NULL;
 
-  writeString(pWriter, "<preset id=");
-  writeID(pWriter, preset->groupPresetID);
+  if (presetIdx >= 0) pPreset = &(hUiManager->asi.groupPresets[presetIdx]);
 
-  writeString(pWriter, " isActive=");
-  writeBool(pWriter, hUiManager->uiState.activePresetIndex == presetIdx);
+  if (hUiManager->asi.pDescriptions && presetIdx >= 0)
+    pDescription = &(hUiManager->asi.pDescriptions->groupPresets[presetIdx]);
 
-  writeString(pWriter, " isDefault=");
-  writeBool(pWriter, preset->groupPresetID == getMinPresetID(hUiManager));
+  if (pWriter->nextGroupIdx == XML_START_INDEX) {
+    writeString(pWriter, "<preset id=");
+    writeID(pWriter, pPreset ? pPreset->groupPresetID : 0);
 
-  writeString(pWriter, " isAvailable=");
-  writeBool(pWriter, hUiManager->uiState.groupPresets[presetIdx].isAvailable);
+    writeString(pWriter, " isActive=");
+    writeBool(pWriter, pPreset ? (hUiManager->uiState.activePresetIndex == presetIdx) : 1);
 
-  writeString(pWriter, ">\n");
+    writeString(pWriter, " isDefault=");
+    writeBool(pWriter, pPreset ? (pPreset->groupPresetID == getMinPresetID(hUiManager)) : 1);
 
-#ifdef SMART_XML_OUTPUT
-  if (preset->description.present) {
+    writeString(pWriter, " isAvailable=");
+    writeBool(pWriter, pPreset ? (hUiManager->uiState.groupPresets[presetIdx].isAvailable) : 1);
+
+    writeString(pWriter, ">\n");
+
+    if (pDescription && pDescription->present) {
+      writeDescription(pWriter, pDescription, NULL, &pPreset->kind);
+    } else if (pPreset) {
+#ifndef ASI_MAX_DESCRIPTION_LANGUAGES
+      ASI_DESCRIPTION descr = {1, {'e', 'n', 'g'}, "Preset "};
+      appendIDtoStr(descr.data, pPreset->groupPresetID);
+#else
+      ASI_DESCRIPTION descr = {1, 1, 0, {{'e', 'n', 'g'}}, {"Preset "}};
+      appendIDtoStr(descr.data[0], pPreset->groupPresetID);
 #endif
-    writeDescription(pWriter, &preset->description, NULL, &preset->kind);
-#ifdef SMART_XML_OUTPUT
-  } else {
-    ASI_DESCRIPTION descr = {1, {'e', 'n', 'g'}, "Preset "};
-    appendIDtoStr(descr.data, preset->groupPresetID);
 
-    writeDescription(pWriter, &descr, NULL, &preset->kind);
+      writeDescription(pWriter, &descr, NULL, &pPreset->kind);
+    } else {
+#ifndef ASI_MAX_DESCRIPTION_LANGUAGES
+      ASI_DESCRIPTION descr = {1, {'e', 'n', 'g'}, "Default"};
+#else
+      ASI_DESCRIPTION descr = {1, 1, 0, {{'e', 'n', 'g'}}, {"Default"}};
+#endif
+
+      writeDescription(pWriter, &descr, NULL, NULL);
+    }
+    if (pWriter->nLeft) {
+      pWriter->pLastValidPos = pWriter->pOut;
+      pWriter->nextGroupIdx = 0;
+    } else {
+      return;
+    }
   }
-#endif
+
+  {
+    UI_STATE tmpUiState, *pUiState;
+
+    if (hUiManager->uiState.activePresetIndex == presetIdx || presetIdx < 0) {
+      pUiState = &hUiManager->uiState;
+    } else {
+      tmpUiState = hUiManager->uiState;
+      pUiState = &tmpUiState;
+
+      simulatePreset(hUiManager, pPreset->groupPresetID, pUiState);
+    }
+
+    /* write groups and switch groups */
+    for (int i = pWriter->nextGroupIdx; i < nSortedGrpIDs; i++) {
+      if (sortedGrpIDs[i] & 0x100) {
+        const UI_STATE_SWITCH_GROUP* pSwitchGroupState =
+            &(pUiState->switchGroups[sortedGrpIDs[i] & 0xFF]);
+        int grpIdx =
+            asiGroupID2idx(&hUiManager->asi, hUiManager->asi.switchGroups[sortedGrpIDs[i] & 0xFF]
+                                                 .memberID[pSwitchGroupState->activeMemberIndex]);
+        const UI_STATE_GROUP* pGroupState;
+        int allowSwitch = pSwitchGroupState->allowSwitch &&
+                          (hUiManager->asi.switchGroups[sortedGrpIDs[i] & 0xFF].numMembers > 1);
+        int allowAnyAction, show;
+
+        if (grpIdx < 0) continue;
+        pGroupState = &(pUiState->groups[grpIdx]);
+
+        /* show switch group only if any interaction allowed */
+        allowAnyAction =
+            (allowSwitch || pGroupState->allowOnOff || pGroupState->allowGainInteractivity ||
+             pGroupState->allowPositionInteractivity);
+        if (!pGroupState->onOff && !pGroupState->allowOnOff) allowAnyAction = 0;
+
+        show = allowAnyAction;
+        /* show switch group if it is always on and has content info or description */
+        if (!show && pGroupState->onOff) {
+          if (hUiManager->asi.groups[grpIdx].contPresent) {
+            if (hUiManager->asi.groups[grpIdx].contentData.contentKind != 0) show = 1;
+            if (hUiManager->asi.groups[grpIdx].contentData.contentLanguage[0]) show = 1;
+          }
+          if (hUiManager->asi.pDescriptions->switchGroups[sortedGrpIDs[i] & 0xFF].present) show = 1;
+        }
+
+        if (show) {
+          /* write switch group */
+          writeSwitchGroup(hUiManager, sortedGrpIDs[i] & 0xFF, pUiState, !allowAnyAction);
+        }
+      } else {
+        const UI_STATE_GROUP* pGroupState = &(pUiState->groups[sortedGrpIDs[i] & 0xFF]);
+        int allowAnyAction, show;
+
+        /* show group only if any interaction allowed */
+        allowAnyAction = (pGroupState->allowOnOff || pGroupState->allowGainInteractivity ||
+                          pGroupState->allowPositionInteractivity);
+        if (!pGroupState->onOff && !pGroupState->allowOnOff) allowAnyAction = 0;
+
+        show = allowAnyAction;
+        /* show group if it is always on and has content info or description */
+        if (!show && pGroupState->onOff) {
+          if (hUiManager->asi.groups[sortedGrpIDs[i] & 0xFF].contPresent) {
+            if (hUiManager->asi.groups[sortedGrpIDs[i] & 0xFF].contentData.contentKind != 0)
+              show = 1;
+            if (hUiManager->asi.groups[sortedGrpIDs[i] & 0xFF].contentData.contentLanguage[0])
+              show = 1;
+          }
+          if (hUiManager->asi.pDescriptions->groups[sortedGrpIDs[i] & 0xFF].present) show = 1;
+        }
+
+        if (show) {
+          /* write group */
+          writeGroup(hUiManager, sortedGrpIDs[i] & 0xFF, pUiState, !allowAnyAction);
+        }
+      }
+
+      if (pWriter->nLeft) {
+        pWriter->pLastValidPos = pWriter->pOut;
+        pWriter->nextGroupIdx = i + 1;
+      } else {
+        return;
+      }
+    }
+  }
 
   writeString(pWriter, "</preset>\n");
+
+  if (pWriter->nLeft) {
+    pWriter->pLastValidPos = pWriter->pOut;
+    pWriter->nextGroupIdx = XML_START_INDEX;
+    pWriter->nextSwitchGroupMemberIdx = XML_START_INDEX;
+  }
 }
 
 /* write group */
-static void writeGroup(HANDLE_UI_MANAGER hUiManager, int groupIdx) {
+static void writeGroup(HANDLE_UI_MANAGER hUiManager, int groupIdx, UI_STATE* pUiState,
+                       int nonInteract) {
   UI_MANAGER_XML_WRITER* pWriter = &(hUiManager->xmlWriter);
   const ASI_GROUP* pGroup = &(hUiManager->asi.groups[groupIdx]);
-  const UI_STATE_GROUP* pGroupState = &(hUiManager->uiState.groups[groupIdx]);
+  const UI_STATE_GROUP* pGroupState;
+  const ASI_DESCRIPTION* pDescription =
+      hUiManager->asi.pDescriptions ? &(hUiManager->asi.pDescriptions->groups[groupIdx]) : NULL;
 
-  writeString(pWriter, "<audioElement id=");
+  if (pUiState == NULL) pUiState = &hUiManager->uiState;
+
+  pGroupState = &(pUiState->groups[groupIdx]);
+
+  if (nonInteract == 1) {
+    writeString(pWriter, "<nonInteractiveAudioElement");
+  } else {
+    writeString(pWriter, "<audioElement");
+  }
+
+  writeString(pWriter, " id=");
   writeID(pWriter, pGroup->groupID);
 
   writeString(pWriter, " isAvailable=");
@@ -521,39 +655,56 @@ static void writeGroup(HANDLE_UI_MANAGER hUiManager, int groupIdx) {
 
   writeString(pWriter, ">\n");
 
-  writeInteractParams(pWriter, pGroup, pGroupState);
+  if (!nonInteract) {
+    writeInteractParams(pWriter, pGroup, pGroupState);
+  }
 
-  writeDescription(pWriter, &pGroup->description, pGroup->contPresent ? &pGroup->contentData : NULL,
-                   NULL);
+  writeDescription(pWriter, pDescription, pGroup->contPresent ? &pGroup->contentData : NULL, NULL);
 
-  writeString(pWriter, "</audioElement>\n");
+  if (nonInteract == 1) {
+    writeString(pWriter, "</nonInteractiveAudioElement>\n");
+  } else {
+    writeString(pWriter, "</audioElement>\n");
+  }
 }
 
 /* write switch group */
-static void writeSwitchGroup(HANDLE_UI_MANAGER hUiManager, int switchGroupIdx) {
+static void writeSwitchGroup(HANDLE_UI_MANAGER hUiManager, int switchGroupIdx, UI_STATE* pUiState,
+                             int nonInteract) {
   UI_MANAGER_XML_WRITER* pWriter = &(hUiManager->xmlWriter);
   const ASI_SWITCH_GROUP* pSwitchGroup = &(hUiManager->asi.switchGroups[switchGroupIdx]);
-  const UI_STATE_SWITCH_GROUP* pSwitchGroupState =
-      &(hUiManager->uiState.switchGroups[switchGroupIdx]);
-  int grpIdx, i;
+  const ASI_DESCRIPTION* pSwitchGroupDescription =
+      hUiManager->asi.pDescriptions ? &(hUiManager->asi.pDescriptions->switchGroups[switchGroupIdx])
+                                    : NULL;
+  const UI_STATE_SWITCH_GROUP* pSwitchGroupState;
+  int grpIdx = 0, i;
   const ASI_GROUP* pGroup;
+  const ASI_DESCRIPTION* pGroupDescription;
   ASI_GROUP tmpGroup;
   const UI_STATE_GROUP* pGroupState;
   USHORT sortedIDs[ASI_MAX_SWITCH_GROUP_MEMBERS];
 
+  if (pUiState == NULL) pUiState = &hUiManager->uiState;
+
+  pSwitchGroupState = &(pUiState->switchGroups[switchGroupIdx]);
+
   if (pWriter->nextSwitchGroupMemberIdx == XML_START_INDEX) {
-    writeString(pWriter, "<audioElementSwitch id=");
+    if (nonInteract) {
+      writeString(pWriter, "<nonInteractiveAudioElementSwitch");
+    } else {
+      writeString(pWriter, "<audioElementSwitch");
+    }
+
+    writeString(pWriter, " id=");
     writeID(pWriter, pSwitchGroup->switchGroupID);
 
     writeString(pWriter, " isAvailable=");
     writeBool(pWriter, pSwitchGroupState->isAvailable);
 
-    writeString(pWriter, " isActionAllowed=");
-#ifdef SMART_XML_OUTPUT
-    writeBool(pWriter, pSwitchGroupState->allowSwitch && (pSwitchGroup->numMembers > 1));
-#else
-    writeBool(pWriter, pSwitchGroupState->allowSwitch);
-#endif
+    if (!nonInteract) {
+      writeString(pWriter, " isActionAllowed=");
+      writeBool(pWriter, pSwitchGroupState->allowSwitch && (pSwitchGroup->numMembers > 1));
+    }
 
     writeString(pWriter, ">\n");
 
@@ -563,99 +714,102 @@ static void writeSwitchGroup(HANDLE_UI_MANAGER hUiManager, int switchGroupIdx) {
     if (grpIdx < 0) return;
 
     pGroup = &(hUiManager->asi.groups[grpIdx]);
-    pGroupState = &(hUiManager->uiState.groups[grpIdx]);
+    pGroupState = &(pUiState->groups[grpIdx]);
 
-    tmpGroup = *pGroup;
-    tmpGroup.allowOnOff = pSwitchGroup->allowOnOff;
-    tmpGroup.defaultOnOff = pSwitchGroup->defaultOnOff;
-    writeInteractParams(pWriter, &tmpGroup, pGroupState);
+    if (!nonInteract) {
+      tmpGroup = *pGroup;
+      tmpGroup.allowOnOff = pSwitchGroup->allowOnOff;
+      tmpGroup.defaultOnOff = pSwitchGroup->defaultOnOff;
+      writeInteractParams(pWriter, &tmpGroup, pGroupState);
 
-    writeString(pWriter, "<audioElements>\n");
+      writeString(pWriter, "<audioElements>\n");
 
-    if (pWriter->nLeft) {
-      pWriter->pLastValidPos = pWriter->pOut;
-      pWriter->nextSwitchGroupMemberIdx = 0;
-    } else {
-      return;
+      if (pWriter->nLeft) {
+        pWriter->pLastValidPos = pWriter->pOut;
+        pWriter->nextSwitchGroupMemberIdx = 0;
+      } else {
+        return;
+      }
     }
   }
 
-  /* sort switch group members by ID */
-  for (i = 0; i < pSwitchGroup->numMembers; i++) {
-    sortedIDs[i] = (pSwitchGroup->memberID[i] << 8) | i;
-  }
-#ifdef SMART_XML_OUTPUT
-  sort(sortedIDs, pSwitchGroup->numMembers);
-#endif
+  if (nonInteract) {
+    writeGroup(hUiManager, grpIdx, pUiState, 2);
+  } else {
+    /* sort switch group members by ID */
+    for (i = 0; i < pSwitchGroup->numMembers; i++) {
+      sortedIDs[i] = (pSwitchGroup->memberID[i] << 8) | i;
+    }
+    sort(sortedIDs, pSwitchGroup->numMembers);
 
-  for (i = pWriter->nextSwitchGroupMemberIdx; i < pSwitchGroup->numMembers; i++) {
-#ifdef SMART_XML_OUTPUT
-    int isDefault;
-#endif
+    for (i = pWriter->nextSwitchGroupMemberIdx; i < pSwitchGroup->numMembers; i++) {
+      int isDefault;
 
-    grpIdx = asiGroupID2idx(&hUiManager->asi, sortedIDs[i] >> 8);
+      grpIdx = asiGroupID2idx(&hUiManager->asi, sortedIDs[i] >> 8);
 
-    if (grpIdx < 0) continue;
+      if (grpIdx < 0) continue;
 
-    pGroup = &(hUiManager->asi.groups[grpIdx]);
-    pGroupState = &(hUiManager->uiState.groups[grpIdx]);
+      pGroup = &(hUiManager->asi.groups[grpIdx]);
+      pGroupState = &(pUiState->groups[grpIdx]);
+      pGroupDescription =
+          hUiManager->asi.pDescriptions ? &(hUiManager->asi.pDescriptions->groups[grpIdx]) : NULL;
 
-#ifdef SMART_XML_OUTPUT
-    if (!pSwitchGroupState->allowSwitch &&
-        (pSwitchGroupState->activeMemberIndex != (sortedIDs[i] & 0xFF)))
-      continue;
-#endif
+      if (!pSwitchGroupState->allowSwitch &&
+          (pSwitchGroupState->activeMemberIndex != (sortedIDs[i] & 0xFF)))
+        continue;
 
-    writeString(pWriter, "<audioElement id=");
-    writeID(pWriter, pGroup->groupID);
+      writeString(pWriter, "<audioElement id=");
+      writeID(pWriter, pGroup->groupID);
 
-    writeString(pWriter, " isActive=");
-    writeBool(pWriter, pSwitchGroupState->activeMemberIndex == (sortedIDs[i] & 0xFF));
+      writeString(pWriter, " isActive=");
+      writeBool(pWriter, pSwitchGroupState->activeMemberIndex == (sortedIDs[i] & 0xFF));
 
-    writeString(pWriter, " isDefault=");
-#ifdef SMART_XML_OUTPUT
-    isDefault = pSwitchGroupState->allowSwitch
-                    ? (pSwitchGroup->defaultGroupID == pGroup->groupID)
-                    : (pSwitchGroupState->activeMemberIndex == (sortedIDs[i] & 0xFF));
-    writeBool(pWriter, isDefault);
+      writeString(pWriter, " isDefault=");
+      isDefault = pSwitchGroupState->allowSwitch
+                      ? (pSwitchGroup->defaultGroupID == pGroup->groupID)
+                      : (pSwitchGroupState->activeMemberIndex == (sortedIDs[i] & 0xFF));
+      writeBool(pWriter, isDefault);
+
+      writeString(pWriter, " isAvailable=");
+      writeBool(pWriter, pGroupState->isAvailable);
+
+      writeString(pWriter, ">\n");
+
+      if (pGroupDescription && pGroupDescription->present) {
+        writeDescription(pWriter, pGroupDescription,
+                         pGroup->contPresent ? &pGroup->contentData : NULL, NULL);
+      } else {
+#ifndef ASI_MAX_DESCRIPTION_LANGUAGES
+        ASI_DESCRIPTION descr = {1, {'e', 'n', 'g'}, ""};
+        appendIDtoStr(descr.data, pGroup->groupID);
 #else
-    writeBool(pWriter, pSwitchGroup->defaultGroupID == pGroup->groupID);
+        ASI_DESCRIPTION descr = {1, 1, 0, {{'e', 'n', 'g'}}, {""}};
+        appendIDtoStr(descr.data[0], pGroup->groupID);
 #endif
 
-    writeString(pWriter, " isAvailable=");
-    writeBool(pWriter, pGroupState->isAvailable);
+        writeDescription(pWriter, &descr, pGroup->contPresent ? &pGroup->contentData : NULL, NULL);
+      }
 
-    writeString(pWriter, ">\n");
+      writeString(pWriter, "</audioElement>\n");
 
-#ifdef SMART_XML_OUTPUT
-    if (pGroup->description.present) {
-#endif
-      writeDescription(pWriter, &pGroup->description,
-                       pGroup->contPresent ? &pGroup->contentData : NULL, NULL);
-#ifdef SMART_XML_OUTPUT
-    } else {
-      ASI_DESCRIPTION descr = {1, {'e', 'n', 'g'}, ""};
-      appendIDtoStr(descr.data, pGroup->groupID);
-
-      writeDescription(pWriter, &descr, pGroup->contPresent ? &pGroup->contentData : NULL, NULL);
+      if (pWriter->nLeft) {
+        pWriter->pLastValidPos = pWriter->pOut;
+        pWriter->nextSwitchGroupMemberIdx = i + 1;
+      } else {
+        return;
+      }
     }
-#endif
 
-    writeString(pWriter, "</audioElement>\n");
-
-    if (pWriter->nLeft) {
-      pWriter->pLastValidPos = pWriter->pOut;
-      pWriter->nextSwitchGroupMemberIdx = i + 1;
-    } else {
-      return;
-    }
+    writeString(pWriter, "</audioElements>\n");
   }
 
-  writeString(pWriter, "</audioElements>\n");
+  writeDescription(pWriter, pSwitchGroupDescription, NULL, NULL);
 
-  writeDescription(pWriter, &pSwitchGroup->description, NULL, NULL);
-
-  writeString(pWriter, "</audioElementSwitch>\n");
+  if (nonInteract) {
+    writeString(pWriter, "</nonInteractiveAudioElementSwitch>\n");
+  } else {
+    writeString(pWriter, "</audioElementSwitch>\n");
+  }
 
   if (pWriter->nLeft) {
     pWriter->pLastValidPos = pWriter->pOut;
@@ -711,8 +865,9 @@ static void writeDrcInfo(HANDLE_UI_MANAGER hUiManager) {
 /* write scene */
 static void writeScene(HANDLE_UI_MANAGER hUiManager, UCHAR shortInfo) {
   UI_MANAGER_XML_WRITER* pWriter = &(hUiManager->xmlWriter);
-  USHORT sortedIDs[ASI_MAX_GROUPS + ASI_MAX_SWITCH_GROUPS], mainDlg = 0xFFFF;
-  int i, n;
+  USHORT sortedPresetIDs[ASI_MAX_GROUP_PRESETS],
+      sortedGrpIDs[ASI_MAX_GROUPS + ASI_MAX_SWITCH_GROUPS], mainDlg = 0xFFFF;
+  int i, nSortedGrpIDs;
 
   if (pWriter->nextPresetIdx == XML_START_INDEX) {
     /* start XML */
@@ -725,7 +880,7 @@ static void writeScene(HANDLE_UI_MANAGER hUiManager, UCHAR shortInfo) {
       writeString(pWriter, "<AudioSceneConfig uuid=");
       writeUUID(pWriter, hUiManager->uiState.uuid);
     }
-    writeString(pWriter, " version=\"9.0\"");
+    writeString(pWriter, " version=\"11.0\"");
     writeString(pWriter, " configChanged=");
     if (shortInfo == 2) { /* 2 indicates no UI available */
       writeBool(pWriter, 0);
@@ -754,61 +909,14 @@ static void writeScene(HANDLE_UI_MANAGER hUiManager, UCHAR shortInfo) {
     }
   }
 
-#ifdef SMART_XML_OUTPUT
-  if (hUiManager->asi.numGroupPresets == 0) {
-    /* if no preset present show default preset */
-    if (pWriter->nextPresetIdx == 0) {
-      writeString(pWriter,
-                  "<preset id=\"0\" isActive=\"true\" isDefault=\"true\" isAvailable=\"true\">\n");
-      writeString(pWriter, "<customKind>\n");
-      writeString(pWriter, "<description langCode=\"eng\">Default</description>\n");
-      writeString(pWriter, "</customKind>\n");
-      writeString(pWriter, "</preset>\n");
-
-      if (pWriter->nLeft) {
-        pWriter->pLastValidPos = pWriter->pOut;
-        pWriter->nextPresetIdx = 1;
-      } else {
-        return;
-      }
-    }
-  } else
-#endif
-  {
-    /* sort presets by ID */
-    for (i = 0; i < hUiManager->asi.numGroupPresets; i++) {
-      sortedIDs[i] = (hUiManager->asi.groupPresets[i].groupPresetID << 8) | i;
-    }
-#ifdef SMART_XML_OUTPUT
-    sort(sortedIDs, hUiManager->asi.numGroupPresets);
-#endif
-
-    /* write presets */
-    for (i = pWriter->nextPresetIdx; i < hUiManager->asi.numGroupPresets; i++) {
-      writePreset(hUiManager, sortedIDs[i] & 0xFF);
-
-      if (pWriter->nLeft) {
-        pWriter->pLastValidPos = pWriter->pOut;
-        pWriter->nextPresetIdx = i + 1;
-      } else {
-        return;
-      }
-    }
+  /* sort presets by ID */
+  for (i = 0; i < hUiManager->asi.numGroupPresets; i++) {
+    sortedPresetIDs[i] = (hUiManager->asi.groupPresets[i].groupPresetID << 8) | i;
   }
-
-  /* end presets */
-  if (pWriter->nextPresetIdx != XML_END_INDEX) {
-    writeString(pWriter, "</presets>\n");
-    if (pWriter->nLeft) {
-      pWriter->pLastValidPos = pWriter->pOut;
-      pWriter->nextPresetIdx = XML_END_INDEX;
-    } else {
-      return;
-    }
-  }
+  sort(sortedPresetIDs, hUiManager->asi.numGroupPresets);
 
   /* sort groups and switch groups by ID, but main dialog element first */
-  n = 0;
+  nSortedGrpIDs = 0;
   for (i = 0; i < hUiManager->asi.numGroups; i++) {
     USHORT tmp = (hUiManager->asi.groups[i].groupID << 9) | i;
 
@@ -821,17 +929,16 @@ static void writeScene(HANDLE_UI_MANAGER hUiManager, UCHAR shortInfo) {
     /* check if group is switch group member*/
     if (hUiManager->asi.groups[i].switchGroupID != INVALID_ID) continue;
 
-    sortedIDs[n] = tmp;
-    n++;
+    sortedGrpIDs[nSortedGrpIDs] = tmp;
+    nSortedGrpIDs++;
   }
 
   for (i = 0; i < hUiManager->asi.numSwitchGroups; i++) {
-    sortedIDs[n] = (hUiManager->asi.switchGroups[i].switchGroupID << 9) | 0x100 | i;
-    n++;
+    sortedGrpIDs[nSortedGrpIDs] = (hUiManager->asi.switchGroups[i].switchGroupID << 9) | 0x100 | i;
+    nSortedGrpIDs++;
   }
 
-#ifdef SMART_XML_OUTPUT
-  sort(sortedIDs, n);
+  sort(sortedGrpIDs, nSortedGrpIDs);
 
   if (mainDlg != 0xFFFF) {
     UCHAR swGrpID = hUiManager->asi.groups[mainDlg & 0xFF].switchGroupID;
@@ -841,66 +948,43 @@ static void writeScene(HANDLE_UI_MANAGER hUiManager, UCHAR shortInfo) {
       if (swGrpIdx >= 0) mainDlg = (swGrpID << 9) | 0x100 | swGrpIdx;
     }
 
-    for (i = 1; i < n; i++) {
-      if (sortedIDs[i] == mainDlg) {
-        FDKmemmove(sortedIDs + 1, sortedIDs, i * sizeof(USHORT));
-        sortedIDs[0] = mainDlg;
+    for (i = 1; i < nSortedGrpIDs; i++) {
+      if (sortedGrpIDs[i] == mainDlg) {
+        FDKmemmove(sortedGrpIDs + 1, sortedGrpIDs, i * sizeof(USHORT));
+        sortedGrpIDs[0] = mainDlg;
         break;
       }
     }
   }
-#endif
 
-  /* write groups and switch groups */
-  for (i = pWriter->nextGroupIdx; i < n; i++) {
-    if (sortedIDs[i] & 0x100) {
-#ifdef SMART_XML_OUTPUT
-      const UI_STATE_SWITCH_GROUP* pSwitchGroupState =
-          &(hUiManager->uiState.switchGroups[sortedIDs[i] & 0xFF]);
-      int grpIdx =
-          asiGroupID2idx(&hUiManager->asi, hUiManager->asi.switchGroups[sortedIDs[i] & 0xFF]
-                                               .memberID[pSwitchGroupState->activeMemberIndex]);
-      const UI_STATE_GROUP* pGroupState;
-      int allowSwitch = pSwitchGroupState->allowSwitch &&
-                        (hUiManager->asi.switchGroups[sortedIDs[i] & 0xFF].numMembers > 1);
-      int allowAnyAction;
-
-      if (grpIdx < 0) continue;
-      pGroupState = &(hUiManager->uiState.groups[grpIdx]);
-
-      /* show switch group only if any interaction allowed */
-      allowAnyAction =
-          (allowSwitch || pGroupState->allowOnOff || pGroupState->allowGainInteractivity ||
-           pGroupState->allowPositionInteractivity);
-      if (!pGroupState->onOff && !pGroupState->allowOnOff) allowAnyAction = 0;
-
-      if (allowAnyAction)
-#endif
-      {
-        /* write switch group */
-        writeSwitchGroup(hUiManager, sortedIDs[i] & 0xFF);
-      }
-    } else {
-#ifdef SMART_XML_OUTPUT
-      const UI_STATE_GROUP* pGroupState = &(hUiManager->uiState.groups[sortedIDs[i] & 0xFF]);
-      int allowAnyAction;
-
-      /* show group only if any interaction allowed */
-      allowAnyAction = (pGroupState->allowOnOff || pGroupState->allowGainInteractivity ||
-                        pGroupState->allowPositionInteractivity);
-      if (!pGroupState->onOff && !pGroupState->allowOnOff) allowAnyAction = 0;
-
-      if (allowAnyAction)
-#endif
-      {
-        /* write group */
-        writeGroup(hUiManager, sortedIDs[i] & 0xFF);
-      }
-    }
+  /* write presets */
+  if (hUiManager->asi.numGroupPresets == 0 && pWriter->nextPresetIdx == 0) {
+    writePreset(hUiManager, -1, sortedGrpIDs, nSortedGrpIDs);
 
     if (pWriter->nLeft) {
       pWriter->pLastValidPos = pWriter->pOut;
-      pWriter->nextGroupIdx = i + 1;
+      pWriter->nextPresetIdx = i + 1;
+    } else {
+      return;
+    }
+  }
+  for (i = pWriter->nextPresetIdx; i < hUiManager->asi.numGroupPresets; i++) {
+    writePreset(hUiManager, sortedPresetIDs[i] & 0xFF, sortedGrpIDs, nSortedGrpIDs);
+
+    if (pWriter->nLeft) {
+      pWriter->pLastValidPos = pWriter->pOut;
+      pWriter->nextPresetIdx = i + 1;
+    } else {
+      return;
+    }
+  }
+
+  /* end presets */
+  if (pWriter->nextPresetIdx != XML_END_INDEX) {
+    writeString(pWriter, "</presets>\n");
+    if (pWriter->nLeft) {
+      pWriter->pLastValidPos = pWriter->pOut;
+      pWriter->nextPresetIdx = XML_END_INDEX;
     } else {
       return;
     }
@@ -1171,7 +1255,10 @@ UINT uiManagerParseXmlAction(const char* xmlIn, UINT xmlInSize, UI_MANAGER_ACTIO
   /* parse version attribute */
   pAttrib = findAttrib("version", p, l);
   if (!pAttrib) return 0;
-  if (readFloat(pAttrib) != (FIXP_DBL)0x90000) return 0;
+  {
+    FIXP_DBL version = readFloat(pAttrib);
+    if (version < (FIXP_DBL)0x90000 || version > (FIXP_DBL)0xB0000) return 0;
+  }
 
   /* parse actionType attribute */
   pAttrib = findAttrib("actionType", p, l);

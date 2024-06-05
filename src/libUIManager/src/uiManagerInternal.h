@@ -231,5 +231,6 @@ typedef struct {
 } UI_MANAGER_ACTION;
 
 int getMinPresetID(UI_MANAGER* hUiManager);
+void simulatePreset(UI_MANAGER* hUiManager, UCHAR presetID, UI_STATE* pUiState);
 
 #endif

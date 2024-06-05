@@ -121,7 +121,7 @@ LINKSPEC_H HANDLE_MPEGH_UI_MANAGER mpegh_UI_Manager_Open(void) {
   self = (HANDLE_MPEGH_UI_MANAGER)FDKcalloc(1, sizeof(MPEGH_UI_MANAGER));
 
   if (self) {
-    if (UI_Manager_Create(&self->hUiManager) != UI_MANAGER_OK) {
+    if (UI_Manager_Create(&self->hUiManager, 1) != UI_MANAGER_OK) {
       mpegh_UI_Manager_Close(self);
       return NULL;
     }
