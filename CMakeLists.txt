@@ -25,6 +25,15 @@ FetchContent_Declare(
 
 get_directory_property(parentDir PARENT_DIRECTORY)
 
+# Set either of the two variables to OFF in case not both functionalities are required:
+set(mpeghdec_BUILD_DECODER   ON  CACHE BOOL   "Build MPEG-H decoder functionality")
+set(mpeghdec_BUILD_UIMANAGER ON  CACHE BOOL   "Build MPEG-H UI manager functionality")
+mark_as_advanced(mpeghdec_BUILD_DECODER mpeghdec_BUILD_UIMANAGER)
+if(NOT mpeghdec_BUILD_DECODER AND NOT mpeghdec_BUILD_UIMANAGER)
+  message(SEND_ERROR "At least one of \"mpeghdec_BUILD_DECODER\" or \"mpeghdec_BUILD_UIMANAGER\" needs to be enabled!")
+endif()
+
+
 # Only enable building binaries by default if project is top-level
 if(parentDir)
   set(mpeghdec_BUILD_BINARIES OFF CACHE BOOL   "Build demo binaries")
@@ -34,7 +43,6 @@ endif()
 set(mpeghdec_BUILD_DOC OFF CACHE BOOL "Build mpeghdec documentation")
 
 # Add libraries
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 add_subdirectory(src)
 
 # Add binaries
