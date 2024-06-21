@@ -1,6 +1,6 @@
 # MPEG-H decoder software
 
-The Fraunhofer MPEG-H decoder (**mpeghdec**) is a C/C++ implementation of the MPEG-H Audio standard as defined in [ISO/IEC 23008-3:2022](https://www.iso.org/standard/83525.html). MPEG-H Audio is the Next Generation Audio (NGA) codec for personalized and immersive sound. Please visit [www.mpegh.com](https://mpegh.com) to learn more about the MPEG-H Audio.
+The Fraunhofer MPEG-H decoder (**mpeghdec**) is a C/C++ implementation of the MPEG-H Audio standard as defined in [ISO/IEC 23008-3:2022](https://www.iso.org/standard/83525.html). MPEG-H Audio is the Next Generation Audio (NGA) codec for personalized and immersive sound. Please visit [www.mpegh.com](https://mpegh.com) to learn more about MPEG-H Audio.
 
 For documentation and usage, please have a look at the [Wiki](https://github.com/Fraunhofer-IIS/mpeghdec/wiki/home).
 
@@ -105,13 +105,17 @@ The following project-specific CMake parameters are available:
 </tr>
 <tr>
 <td><code>mpeghdec_BUILD_DOC</code></td>
-<td>Enable / Disable documentation generation (requires a working [Doxygen](https://www.doxygen.nl/) installation).</td>
+<td>
+
+Enable / Disable documentation generation (requires a working [Doxygen](https://www.doxygen.nl/) installation).
+
+</td>
 </tr>
 </table>
 
 ### How to build using CMake
 
-Find below the basic instructions to build the project or visit the ["Wiki Build"](https://github.com/Fraunhofer-IIS/mpeghdec/wiki/Build) page(s) to get further information (additional build parameters and platform specific build instructions).
+Find below the basic instructions to build the project or visit the ["Wiki Build"](https://github.com/Fraunhofer-IIS/mpeghdec/wiki/Build-instructions) page(s) to get further information (additional build parameters and platform specific build instructions).
 
 1. Clone the project and make a build folder.
    ```
@@ -120,28 +124,28 @@ Find below the basic instructions to build the project or visit the ["Wiki Build
    ```
 2. Configure the project using CMake.
    ```
-   $ cmake -S mpeghdec -B build
+   $ cmake -S mpeghdec -B build -DCMAKE_BUILD_TYPE=Release
    ```
 3. Build the project.
    ```
-   $ cmake --build build
+   $ cmake --build build --config Release
    ```
 
 ## Command-line example programs
 
 The **mpeghdec** provides following command-line based example programs:
 
-- [MPEG-H decoder](https://github.com/Fraunhofer-IIS/mpeghdec/wiki/mpeghDecoder)
-- [MPEG-H UI manager](https://github.com/Fraunhofer-IIS/mpeghdec/wiki/mpeghUiManager)
+- [MPEG-H decoder](https://github.com/Fraunhofer-IIS/mpeghdec/wiki/MPEG-H-decoder-example)
+- [MPEG-H UI manager](https://github.com/Fraunhofer-IIS/mpeghdec/wiki/MPEG-H-UI-manager-example)
 
 ## Contributing
 
 Contributions may be done through a pull request to the upstream repository.
 
-- Create a fork based on the latest master branch
-- Apply changes to the fork
-- Add the author names to [AUTHORS.md](./AUTHORS.md)
-- Create a pull request to the upstream repository. The request must contain a detailed description of its purpose
+- Create a fork based on the latest master branch.
+- Apply changes to the fork.
+- Add the author names to [AUTHORS.md](./AUTHORS.md).
+- Create a pull request to the upstream repository. The request must contain a detailed description of its purpose.
 
 ## Links
 
