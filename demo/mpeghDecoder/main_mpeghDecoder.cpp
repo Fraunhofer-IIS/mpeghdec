@@ -81,6 +81,7 @@ amm-info@iis.fraunhofer.de
 -----------------------------------------------------------------------------*/
 
 // system includes
+#include <functional>
 #include <iomanip>
 
 // external includes
@@ -96,6 +97,10 @@ amm-info@iis.fraunhofer.de
 #include "mpeghdecoder.h"
 #include "sys/cmdl_parser.h"
 #include "sys/wav_file.h"
+
+#ifdef BUILD_UIMANAGER
+#include "mpeghUiManagerProcessor.h"
+#endif
 
 using namespace mmt::isobmff;
 
@@ -184,7 +189,7 @@ class CProcessor {
   }
 
   void process(int32_t startSample, int32_t stopSample, int32_t seekFromSample,
-               int32_t seekToSample) {
+               int32_t seekToSample, std::function<void(CSample&, uint64_t)>&& processUiManager) {
     uint32_t frameSize = 0;       // Current audio frame size
     uint32_t sampleRate = 0;      // Current samplerate
     int32_t numChannels = -1;     // Current amount of output channels
@@ -256,6 +261,13 @@ class CProcessor {
         if (err != MPEGH_DEC_OK) {
           throw std::runtime_error("Error: Unable to set mpeghDecoder MHA configuration");
         }
+
+        if (processUiManager) {
+          std::cout
+              << "Warning: UI manager is not supported for MHA, ignoring interactivity script!"
+              << std::endl;
+          processUiManager = nullptr;
+        }
       }
 
       std::cout << std::endl;
@@ -301,6 +313,10 @@ class CProcessor {
       timestamp =
           calcTimestampNs(sampleInfo.timestamp.ptsValue(), sampleInfo.timestamp.timescale());
       while (!sample.empty() && sampleCounter <= static_cast<uint32_t>(stopSample)) {
+        if (processUiManager) {
+          processUiManager(sample, sampleCounter);
+        }
+
         MPEGH_DECODER_ERROR err = MPEGH_DEC_OK;
         // Feed the sample data to the decoder.
         err = mpeghdecoder_process(m_decoder, sample.rawData.data(), sample.rawData.size(),
@@ -409,7 +425,7 @@ class CProcessor {
       }
 
       mpeghTrackAlreadyProcessed = true;
-      std::cout << std::endl << "Written MPEG-H audio frames: " << frameCounter << std::endl;
+      std::cout << std::endl << "Decoded MPEG-H audio frames: " << frameCounter << std::endl;
     }
   }
 };
@@ -427,6 +443,11 @@ int main(int argc, char* argv[]) {
   int32_t cicpSetup = defaultCicpSetup;
   char inputFilename[CMDL_MAX_STRLEN] = {0};  /*!< Name of input bitstream file */
   char outputFilename[CMDL_MAX_STRLEN] = {0}; /*!< Name of audio output file */
+#ifdef BUILD_UIMANAGER
+  char scriptFilename[CMDL_MAX_STRLEN] = "";
+  char xmlSceneStateFilename[CMDL_MAX_STRLEN] = "";
+  char persistFilename[CMDL_MAX_STRLEN] = "";
+#endif
 
   // Check if helpMode was set.
   IIS_ScanCmdl(argc, argv, "(-h %1)", &helpMode);
@@ -444,6 +465,11 @@ int main(int argc, char* argv[]) {
   // Parse optional command line parameters,
   IIS_ScanCmdl(argc, argv, "(-tl %d) (-y %d) (-z %d) (-sf %d) (-st %d)", &cicpSetup, &startSample,
                &stopSample, &seekFromSample, &seekToSample);
+#ifdef BUILD_UIMANAGER
+  IIS_ScanCmdl(argc, argv, "(-script %s)", scriptFilename);
+  IIS_ScanCmdl(argc, argv, "(-xmlSceneState %s)", xmlSceneStateFilename);
+  IIS_ScanCmdl(argc, argv, "(-persistFile %s)", persistFilename);
+#endif
 
   // Check if from and to sample for seeking are defined
   if ((seekFromSample != -1 && seekToSample == -1) ||
@@ -457,12 +483,23 @@ int main(int argc, char* argv[]) {
 
   // Initialize, configure and process.
   try {
+    std::function<void(CSample&, uint64_t)> processUiManager = nullptr;
+#ifdef BUILD_UIMANAGER
+    CUIManagerProcessor uiManagerProcessor(scriptFilename, persistFilename, xmlSceneStateFilename);
+    if (scriptFilename[0] != '\0' || xmlSceneStateFilename[0] != '\0' ||
+        persistFilename[0] != '\0') {
+      processUiManager = [&uiManagerProcessor](CSample& sample, uint64_t sampleCounter) {
+        uiManagerProcessor.processSingleSample(sample, sampleCounter);
+      };
+    }
+#endif
     // initialize
     CProcessor processor(inputFilename, outputFilename, cicpSetup);
     // configure decoder
     processor.configureDecoder(argc, argv);
     // process
-    processor.process(startSample, stopSample, seekFromSample, seekToSample);
+    processor.process(startSample, stopSample, seekFromSample, seekToSample,
+                      std::move(processUiManager));
   } catch (const std::exception& e) {
     std::cout << std::endl << "Error: " << e.what() << std::endl << std::endl;
     return FDK_EXITCODE_SOFTWARE;
@@ -507,6 +544,22 @@ static void cmdlHelp(const char* progname) {
          "         \t  Afterwards it will seek to the nearest ISOBMFF/MP4 sync sample around\n"
          "         \t  ISOBMFF/MP4 sample 100 and resume decoding until the end of the input file\n"
          "         \t  is reached.\n"
+#ifdef BUILD_UIMANAGER
+      << "       -script XML user interactivity script input file\n"
+         "         \t  This file contains a list of XML ActionEvent tags with support for an "
+         "additional\n"
+         "         \t  '<Sleep Frame=\"<frame count>\" />' tag allowing to delay the successive "
+         "ActionEvents\n"
+         "         \t  by the given <frame count> of frames.\n"
+         "       -xmlSceneState UI scene state output file.\n"
+         "         \t  This file will contain a list of entries for every audio scene change, in "
+         "the format\n"
+         "         \t  '[<frame number>] <Audio Scene XML>' where <frame number> is the frame "
+         "number at\n"
+         "         \t  which the <Audio Scene XML> is first applied.\n"
+         "       -persistFile Binary file to read/write UI persistency data from/to.\n"
+         "         \t  NOTE: The contents of this file influence the UI manager behavior.\n"
+#endif
          "       -h\tShow this help"
       << std::endl;
 }

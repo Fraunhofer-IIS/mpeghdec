@@ -80,77 +80,46 @@ www.iis.fraunhofer.de/amm
 amm-info@iis.fraunhofer.de
 -----------------------------------------------------------------------------*/
 
+#ifndef MPEGHUIMANAGERDEMO_H
+#define MPEGHUIMANAGERDEMO_H
+
 // system includes
-#include <iostream>
+#include <fstream>
+#include <memory>
+#include <string>
+#include <vector>
 
 // external includes
-#include "ilo/memory.h"
-#include "mmtisobmff/logging.h"
+#include "mmtisobmff/reader/reader.h"
+#include "mmtisobmff/writer/writer.h"
 
 // project includes
-#include "mpeghUiManagerProcessor.h"
 #include "mpeghUIManager.h"
-#include "sys/cmdl_parser.h"
-#include "sys/genericStds.h"
+#include "interactivityScriptParser.h"
 
-/*************************** function declarations ***************************/
-static void cmdlHelp(const char* progname);
+class CUIManagerProcessor {
+ private:
+  std::string m_persistenceFilename;
+  std::unique_ptr<mmt::isobmff::CIsobmffReader> m_reader;
+  HANDLE_MPEGH_UI_MANAGER m_uiManager;
+  std::vector<uint16_t> m_persistenceMemory;
+  std::shared_ptr<mmt::isobmff::CIsobmffFileWriter> m_writer;
+  std::ofstream m_sceneStateFile;
+  CInteractivityScriptParser m_parser;
+  bool m_readOnlyMode = false;
 
-int main(int argc, char** argv) {
-  // Configure mmtisobmff logging to your liking (logging to file, system, console or disable)
-  mmt::isobmff::disableLogging();
+ public:
+  CUIManagerProcessor(const std::string& inputFilename, const std::string& outputFilename,
+                      const std::string& scriptFilename, const std::string& persistFilename,
+                      const std::string& xmlSceneStateFilename);
+  CUIManagerProcessor(const std::string& scriptFilename, const std::string& persistFilename,
+                      const std::string& xmlSceneStateFilename);
 
-  char inputFilename[CMDL_MAX_STRLEN] = "";
-  char outputFilename[CMDL_MAX_STRLEN] = "";
-  char scriptFilename[CMDL_MAX_STRLEN] = "";
-  char xmlSceneStateFilename[CMDL_MAX_STRLEN] = "";
-  char persistFilename[CMDL_MAX_STRLEN] = "";
-  uint32_t helpMode = 0;
+  ~CUIManagerProcessor();
 
-  // Check if helpMode was set.
-  IIS_ScanCmdl(argc, argv, "(-h %1)", &helpMode);
-  if (helpMode) {
-    cmdlHelp(argv[0]);
-    return FDK_EXITCODE_OK;
-  }
+  void process();
 
-  // Check if we got the mandatory input and output parameters.
-  if (IIS_ScanCmdl(argc, argv, "-if %s -of %s", inputFilename, outputFilename) < 2) {
-    cmdlHelp(argv[0]);
-    return FDK_EXITCODE_USAGE;
-  }
+  void processSingleSample(mmt::isobmff::CSample& sample, uint64_t sampleCounter);
+};
 
-  // Parse optional command line parameters.
-  IIS_ScanCmdl(argc, argv, "(-script %s)", scriptFilename);
-  IIS_ScanCmdl(argc, argv, "(-xmlSceneState %s)", xmlSceneStateFilename);
-  IIS_ScanCmdl(argc, argv, "(-persistFile %s)", persistFilename);
-
-  std::cout << "Input file:  " << inputFilename << std::endl;
-  std::cout << "Output file: " << outputFilename << std::endl;
-
-  // Initialize and process.
-  try {
-    // initialize
-    CUIManagerProcessor processor(inputFilename, outputFilename, scriptFilename, persistFilename,
-                                  xmlSceneStateFilename);
-    // process
-    processor.process();
-  } catch (const std::exception& e) {
-    std::cout << std::endl << "Error: " << e.what() << std::endl << std::endl;
-    return FDK_EXITCODE_SOFTWARE;
-  } catch (...) {
-    std::cout << std::endl
-              << "Error: An unknown error happened. The program will exit now." << std::endl
-              << std::endl;
-    return FDK_EXITCODE_UNAVAILABLE;
-  }
-  return FDK_EXITCODE_OK;
-}
-
-static void cmdlHelp(const char* progname) {
-  std::cout << std::endl
-            << "Usage: " << progname
-            << " -if <input file> -of <output file> [-script <interactivity "
-               "script>][-xmlSceneState <XML output>][-persistFile <filename>]"
-            << std::endl;
-}
+#endif /* MPEGHUIMANAGERDEMO_H */
