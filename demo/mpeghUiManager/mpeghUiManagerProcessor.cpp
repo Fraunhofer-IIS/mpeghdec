@@ -306,6 +306,10 @@ void CUIManagerProcessor::process() {
     mpeghTrackReader->nextSample(sample);
 
     while (!sample.empty()) {
+      // Since the output is a non-fragmented file, reset the read fragment number from
+      // the input file in case it is fragmented
+      sample.fragmentNumber = 0;
+
       processSingleSample(sample, sampleCounter);
       // Write the sample to the track
       mpeghTrackWriter->addSample(sample);
