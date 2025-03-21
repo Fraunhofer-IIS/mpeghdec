@@ -115,9 +115,6 @@ typedef struct {
 
 /*************************** function declarations ***************************/
 static void cmdlHelp(const char* progname);
-static uint64_t calcTimestampNs(uint32_t pts, uint32_t timescale) {
-  return (uint64_t)((double)pts * (double)1e9 / (double)timescale + 0.5);
-}
 
 // I/O buffers
 #define IN_BUF_SIZE (65536) /*!< Size of decoder input buffer in bytes. */
@@ -312,9 +309,6 @@ class CProcessor {
       sampleInfo = mpeghTrackReader->sampleByTimestamp(seekConfig, sample);
 
       bool seekPerformed = false;
-      // Calculate the timestamp in nano seconds
-      timestamp =
-          calcTimestampNs(sampleInfo.timestamp.ptsValue(), sampleInfo.timestamp.timescale());
       while (!sample.empty() && sampleCounter <= static_cast<uint32_t>(stopSample)) {
         if (processUiManager) {
           processUiManager(sample, sampleCounter, trackInfo, mpeghTrackReader->sampleRate());
@@ -322,8 +316,9 @@ class CProcessor {
 
         MPEGH_DECODER_ERROR err = MPEGH_DEC_OK;
         // Feed the sample data to the decoder.
-        err = mpeghdecoder_process(m_decoder, sample.rawData.data(), sample.rawData.size(),
-                                   timestamp);
+        err = mpeghdecoder_processTimescale(m_decoder, sample.rawData.data(), sample.rawData.size(),
+                                            sampleInfo.timestamp.ptsValue(),
+                                            sampleInfo.timestamp.timescale());
         if (err != MPEGH_DEC_OK) {
           throw std::runtime_error("[" + std::to_string(sampleCounter) +
                                    "] Error: Unable to process data");
@@ -354,9 +349,7 @@ class CProcessor {
 
         // Check if EOF or the provided stop sample is reached.
         if (!sample.empty() && sampleCounter <= static_cast<uint32_t>(stopSample)) {
-          // Stop sample is not reached; get the sample's timestamp in nano seconds
-          timestamp =
-              calcTimestampNs(sampleInfo.timestamp.ptsValue(), sampleInfo.timestamp.timescale());
+          // Stop sample is not reached.
         } else {
           // Stop sample is reached. -> Flush the remaining output frames from the decoder.
           std::cout << std::endl;

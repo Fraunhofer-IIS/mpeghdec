@@ -172,6 +172,8 @@ typedef struct MPEGH_DECODER_OUTPUT_INFO {
                                  signal. */
   int numChannels;          /*!< The number of audio channels of the decoded PCM audio signal. */
   int sampleRate;           /*!< The sample rate in Hz of the decoded PCM audio signal. */
+  uint64_t ticks;           /*!< The presentation timestamp in ticks of the sample rate of the
+                                 decoded PCM audio signal */
   uint64_t pts;             /*!< The presentation timestamp in nano seconds of the decoded
                                  PCM audio signal. */
   int loudness;             /*!< Audio output loudness in steps of -0.25 LU.
@@ -227,6 +229,25 @@ void mpeghdecoder_destroy(HANDLE_MPEGH_DECODER_CONTEXT hCtx);
  */
 MPEGH_DECODER_ERROR mpeghdecoder_process(HANDLE_MPEGH_DECODER_CONTEXT hCtx, const uint8_t* inData,
                                          uint32_t inLength, uint64_t timestamp);
+
+/**
+ * @brief  Fill MPEG-H decoder's internal input buffer with bitstream data from the external input
+ *         buffer and adds the corresponding timestamp to a timestamp queue. Furthermore, it
+ *         decodes as many frames as possible and pushes the decoded samples into a samples queue.
+ *         The decoded PCM samples can then be obtained by calling the mpeghdecoder_getSamples()
+ *         function.
+ *
+ * @param[in] hCtx         MPEG-H decoder handle.
+ * @param[in] inData       Pointer to external input buffer.
+ * @param[in] inLength     Size of external input buffer.
+ * @param[in] timestamp    Presentation timestamp of the external input buffer (in ticks of
+ *                         timescale).
+ * @param[in] timescale    Timescale of the presentation timestamp.
+ * @return                 Error code.
+ */
+MPEGH_DECODER_ERROR mpeghdecoder_processTimescale(HANDLE_MPEGH_DECODER_CONTEXT hCtx,
+                                                  const uint8_t* inData, uint32_t inLength,
+                                                  uint64_t timestamp, uint32_t timescale);
 
 /**
  * @brief  Get a decoded audio frame

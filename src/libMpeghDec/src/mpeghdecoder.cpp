@@ -522,6 +522,13 @@ MPEGH_DECODER_ERROR mpeghdecoder_process(HANDLE_MPEGH_DECODER_CONTEXT hCtx, cons
   return MPEGH_DEC_OK;
 }
 
+MPEGH_DECODER_ERROR mpeghdecoder_processTimescale(HANDLE_MPEGH_DECODER_CONTEXT hCtx,
+                                                  const uint8_t* inData, uint32_t inLength,
+                                                  uint64_t timestamp, uint32_t timescale) {
+  uint64_t timestampNs = (uint64_t)((double)timestamp * 1e9 / timescale + 0.5);
+  return mpeghdecoder_process(hCtx, inData, inLength, timestampNs);
+}
+
 MPEGH_DECODER_ERROR
 mpeghdecoder_getSamples(HANDLE_MPEGH_DECODER_CONTEXT hCtx, int32_t* outData, uint32_t outLength,
                         MPEGH_DECODER_OUTPUT_INFO* outInfo) {
@@ -552,7 +559,7 @@ mpeghdecoder_getSamples(HANDLE_MPEGH_DECODER_CONTEXT hCtx, int32_t* outData, uin
   uint64_t b = *(uint64_t*)deque_at(&hCtx->timestampInQueue, 1);
   uint64_t a = *(uint64_t*)deque_at(&hCtx->timestampInQueue, 0);
   duration = b - a;
-  durationSamples = (int)(((double)duration * hCtx->sampleRate / 1000000000.0) + 0.5);
+  durationSamples = (int)(((double)duration * hCtx->sampleRate / 1e9) + 0.5);
 
   int fadelen = NUM_FADE_SAMPLES_PER_CHANNEL * hCtx->numberOfChannels;
 
@@ -700,7 +707,7 @@ mpeghdecoder_getSamples(HANDLE_MPEGH_DECODER_CONTEXT hCtx, int32_t* outData, uin
       info->size -= outNumSamples;
       uint64_t* tmpPts = (uint64_t*)deque_front(&hCtx->timestampOutQueue);
       pts = *tmpPts;
-      *tmpPts += (uint64_t)((double)newFrameSize * 1000000000.0 / hCtx->sampleRate + 0.5);
+      *tmpPts += (uint64_t)((double)newFrameSize * 1e9 / hCtx->sampleRate + 0.5);
     } else {
       // all samples fit into output buffer
       pts = *(uint64_t*)deque_pop_front(&hCtx->timestampOutQueue);
@@ -732,6 +739,7 @@ mpeghdecoder_getSamples(HANDLE_MPEGH_DECODER_CONTEXT hCtx, int32_t* outData, uin
 
     outInfo->numSamplesPerChannel = outNumSamples / outInfo->numChannels;
     outInfo->pts = pts;
+    outInfo->ticks = (uint64_t)((double)pts * outInfo->sampleRate / 1e9 + 0.5);
     outInfo->loudness = info->outputLoudness;
     outInfo->isConcealed = info->concealed;
 
@@ -786,7 +794,7 @@ mpeghdecoder_flushAndGet(HANDLE_MPEGH_DECODER_CONTEXT hCtx) {
         AUInfo* auInfo = (AUInfo*)deque_back(&hCtx->auInfoQueue);
         last_frame_size = auInfo->auSize;
       }
-      pts += (uint64_t)((double)last_frame_size * 1000000000.0 / p_si->sampleRate + 0.5);
+      pts += (uint64_t)((double)last_frame_size * 1e9 / p_si->sampleRate + 0.5);
       deque_push_back(&hCtx->timestampInQueue, &pts);
     }
   }
