@@ -92,6 +92,7 @@ amm-info@iis.fraunhofer.de
 #include "mmtisobmff/reader/reader.h"
 #include "mmtisobmff/helper/printhelpertools.h"
 #include "mmtisobmff/reader/trackreader.h"
+#include "mmtisobmff/writer/trackwriter.h"
 
 // project includes
 #include "mpeghdecoder.h"
@@ -142,6 +143,8 @@ static PARAMETER_ASSIGNMENT_TAB paramList[] = {
 
 static constexpr int32_t defaultCicpSetup = 6;
 
+using UiManagerCallback = std::function<void(CSample&, uint64_t, const CTrackInfo&, uint32_t)>;
+
 class CProcessor {
  private:
   std::string m_wavFilename;
@@ -189,7 +192,7 @@ class CProcessor {
   }
 
   void process(int32_t startSample, int32_t stopSample, int32_t seekFromSample,
-               int32_t seekToSample, std::function<void(CSample&, uint64_t)>&& processUiManager) {
+               int32_t seekToSample, UiManagerCallback&& processUiManager) {
     uint32_t frameSize = 0;       // Current audio frame size
     uint32_t sampleRate = 0;      // Current samplerate
     int32_t numChannels = -1;     // Current amount of output channels
@@ -314,7 +317,7 @@ class CProcessor {
           calcTimestampNs(sampleInfo.timestamp.ptsValue(), sampleInfo.timestamp.timescale());
       while (!sample.empty() && sampleCounter <= static_cast<uint32_t>(stopSample)) {
         if (processUiManager) {
-          processUiManager(sample, sampleCounter);
+          processUiManager(sample, sampleCounter, trackInfo, mpeghTrackReader->sampleRate());
         }
 
         MPEGH_DECODER_ERROR err = MPEGH_DEC_OK;
@@ -430,6 +433,32 @@ class CProcessor {
   }
 };
 
+static std::unique_ptr<CIsobmffFileWriter> openMp4Writer(const std::string& bitstreamFilename) {
+  if (bitstreamFilename.empty()) {
+    return nullptr;
+  }
+  CIsobmffFileWriter::SOutputConfig outputConfig;
+  outputConfig.outputUri = bitstreamFilename;
+
+  SMovieConfig movieConfig;
+  movieConfig.majorBrand = ilo::toFcc("mp42");
+
+  return ilo::make_unique<CIsobmffFileWriter>(outputConfig, movieConfig);
+}
+
+static void openTrackWriter(std::shared_ptr<CMpeghTrackWriter>& trackWriter,
+                            CIsobmffFileWriter& writer, const CTrackInfo& trackInfo,
+                            uint32_t sampleRate) {
+  if (!trackWriter) {
+    SMpeghMhm1TrackConfig mpeghConfig;
+    mpeghConfig.mediaTimescale = trackInfo.timescale;
+    mpeghConfig.sampleRate = sampleRate;
+
+    // Create MPEG-H track writer
+    trackWriter = writer.trackWriter<CMpeghTrackWriter>(mpeghConfig);
+  }
+}
+
 int main(int argc, char* argv[]) {
   // Configure mmtisobmff logging to your liking (logging to file, system, console or disable)
   disableLogging();
@@ -447,6 +476,7 @@ int main(int argc, char* argv[]) {
   char scriptFilename[CMDL_MAX_STRLEN] = "";
   char xmlSceneStateFilename[CMDL_MAX_STRLEN] = "";
   char persistFilename[CMDL_MAX_STRLEN] = "";
+  char bitstreamFilename[CMDL_MAX_STRLEN] = "";
 #endif
 
   // Check if helpMode was set.
@@ -456,8 +486,13 @@ int main(int argc, char* argv[]) {
     return FDK_EXITCODE_OK;
   }
 
-  // Check if we got the mandatory input and output parameters.
+// Check if we got the mandatory input and output parameters.
+#ifdef BUILD_UIMANAGER
+  if (IIS_ScanCmdl(argc, argv, "-if %s (-of %s) (-bsof %s)", inputFilename, outputFilename,
+                   bitstreamFilename) < 2) {
+#else
   if (IIS_ScanCmdl(argc, argv, "-if %s -of %s", inputFilename, outputFilename) < 2) {
+#endif
     cmdlHelp(argv[0]);
     return FDK_EXITCODE_USAGE;
   }
@@ -483,13 +518,22 @@ int main(int argc, char* argv[]) {
 
   // Initialize, configure and process.
   try {
-    std::function<void(CSample&, uint64_t)> processUiManager = nullptr;
+    UiManagerCallback processUiManager = nullptr;
 #ifdef BUILD_UIMANAGER
     CUIManagerProcessor uiManagerProcessor(scriptFilename, persistFilename, xmlSceneStateFilename);
+    auto mp4Writer = openMp4Writer(bitstreamFilename);
+    std::shared_ptr<CMpeghTrackWriter> trackWriter{};
     if (scriptFilename[0] != '\0' || xmlSceneStateFilename[0] != '\0' ||
-        persistFilename[0] != '\0') {
-      processUiManager = [&uiManagerProcessor](CSample& sample, uint64_t sampleCounter) {
+        persistFilename[0] != '\0' || bitstreamFilename[0] != '\0') {
+      processUiManager = [&uiManagerProcessor, &mp4Writer, trackWriter](
+                             CSample& sample, uint64_t sampleCounter, const CTrackInfo& trackInfo,
+                             uint32_t sampleRate) mutable {
         uiManagerProcessor.processSingleSample(sample, sampleCounter);
+        if (mp4Writer) {
+          // Write the UI-manager processed sample to the MP4 output
+          openTrackWriter(trackWriter, *mp4Writer, trackInfo, sampleRate);
+          trackWriter->addSample(sample);
+        }
       };
     }
 #endif
@@ -515,9 +559,12 @@ int main(int argc, char* argv[]) {
 static void cmdlHelp(const char* progname) {
   std::cout << std::endl
             << "Usage: " << progname
+#ifdef BUILD_UIMANAGER
+            << " [options] -if infile [-of outfile] [-bsof outfile]\n"
+#else
             << " [options] -if infile -of outfile\n"
-               "       options are:"
-            << std::endl;
+#endif
+            << "       options are:" << std::endl;
   std::cout << "       -tl\tCICP index of the desired target layout (default: 6)" << std::endl;
   for (uint32_t i = 0; i < (uint32_t)(sizeof(paramList) / sizeof(PARAMETER_ASSIGNMENT_TAB)); i++) {
     std::cout << "       " << paramList[i].swText << "\t" << paramList[i].desc << std::endl;
@@ -559,6 +606,8 @@ static void cmdlHelp(const char* progname) {
          "         \t  which the <Audio Scene XML> is first applied.\n"
          "       -persistFile Binary file to read/write UI persistency data from/to.\n"
          "         \t  NOTE: The contents of this file influence the UI manager behavior.\n"
+         "       -bsof \tOutput file for encoded bitstream processed by the MPEG-H UI Manager.\n"
+         "         \t  The output file will be written in the ISOBMFF/MP4 format.\n"
 #endif
          "       -h\tShow this help"
       << std::endl;
