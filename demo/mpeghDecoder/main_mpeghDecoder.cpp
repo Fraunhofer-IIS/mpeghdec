@@ -197,7 +197,6 @@ class CProcessor {
 
     uint32_t sampleCounter = 0;  // mp4 sample counter
     uint32_t frameCounter = 0;   // output frame counter
-    uint64_t timestamp = 0;      // current sample timestamp in nanoseconds
 
     int32_t outData[MAX_RENDERED_CHANNELS * MAX_RENDERED_FRAME_SIZE] = {0};
 

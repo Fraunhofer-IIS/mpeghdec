@@ -91,6 +91,8 @@ amm-info@iis.fraunhofer.de
  * @brief  MPEG-H 3DA decoder library interface header file.
  */
 
+#include "mpeghexport.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -191,7 +193,7 @@ typedef struct MPEGH_DECODER_OUTPUT_INFO {
  * @param[in] cicpSetup The CICP index of the desired target layout.
  * @return              MPEG-H decoder handle.
  */
-HANDLE_MPEGH_DECODER_CONTEXT mpeghdecoder_init(int32_t cicpSetup);
+MPEGHDEC_EXPORT HANDLE_MPEGH_DECODER_CONTEXT mpeghdecoder_init(int32_t cicpSetup);
 
 /**
  * @brief  Explicitly configure the decoder by passing the MHA config contained in a binary buffer.
@@ -203,8 +205,9 @@ HANDLE_MPEGH_DECODER_CONTEXT mpeghdecoder_init(int32_t cicpSetup);
  * @param[in] configSize  Length of the configuration buffer in bytes.
  * @return                Error code.
  */
-MPEGH_DECODER_ERROR mpeghdecoder_setMhaConfig(HANDLE_MPEGH_DECODER_CONTEXT hCtx,
-                                              const uint8_t* config, uint32_t configSize);
+MPEGHDEC_EXPORT MPEGH_DECODER_ERROR mpeghdecoder_setMhaConfig(HANDLE_MPEGH_DECODER_CONTEXT hCtx,
+                                                              const uint8_t* config,
+                                                              uint32_t configSize);
 
 /**
  * @brief  De-allocate all resources of an MPEG-H decoder instance.
@@ -212,7 +215,7 @@ MPEGH_DECODER_ERROR mpeghdecoder_setMhaConfig(HANDLE_MPEGH_DECODER_CONTEXT hCtx,
  * @param[in] hCtx  MPEG-H decoder handle.
  * @return          void.
  */
-void mpeghdecoder_destroy(HANDLE_MPEGH_DECODER_CONTEXT hCtx);
+MPEGHDEC_EXPORT void mpeghdecoder_destroy(HANDLE_MPEGH_DECODER_CONTEXT hCtx);
 
 /**
  * @brief  Fill MPEG-H decoder's internal input buffer with bitstream data from the external input
@@ -227,8 +230,9 @@ void mpeghdecoder_destroy(HANDLE_MPEGH_DECODER_CONTEXT hCtx);
  * @param[in] timestamp  Presentation timestamp of the external input buffer (in nano seconds).
  * @return               Error code.
  */
-MPEGH_DECODER_ERROR mpeghdecoder_process(HANDLE_MPEGH_DECODER_CONTEXT hCtx, const uint8_t* inData,
-                                         uint32_t inLength, uint64_t timestamp);
+MPEGHDEC_EXPORT MPEGH_DECODER_ERROR mpeghdecoder_process(HANDLE_MPEGH_DECODER_CONTEXT hCtx,
+                                                         const uint8_t* inData, uint32_t inLength,
+                                                         uint64_t timestamp);
 
 /**
  * @brief  Fill MPEG-H decoder's internal input buffer with bitstream data from the external input
@@ -245,9 +249,11 @@ MPEGH_DECODER_ERROR mpeghdecoder_process(HANDLE_MPEGH_DECODER_CONTEXT hCtx, cons
  * @param[in] timescale    Timescale of the presentation timestamp.
  * @return                 Error code.
  */
-MPEGH_DECODER_ERROR mpeghdecoder_processTimescale(HANDLE_MPEGH_DECODER_CONTEXT hCtx,
-                                                  const uint8_t* inData, uint32_t inLength,
-                                                  uint64_t timestamp, uint32_t timescale);
+MPEGHDEC_EXPORT MPEGH_DECODER_ERROR mpeghdecoder_processTimescale(HANDLE_MPEGH_DECODER_CONTEXT hCtx,
+                                                                  const uint8_t* inData,
+                                                                  uint32_t inLength,
+                                                                  uint64_t timestamp,
+                                                                  uint32_t timescale);
 
 /**
  * @brief  Get a decoded audio frame
@@ -263,8 +269,9 @@ MPEGH_DECODER_ERROR mpeghdecoder_processTimescale(HANDLE_MPEGH_DECODER_CONTEXT h
  *                        output frame.
  * @return                Error code.
  */
-MPEGH_DECODER_ERROR mpeghdecoder_getSamples(HANDLE_MPEGH_DECODER_CONTEXT hCtx, int32_t* outData,
-                                            uint32_t outLength, MPEGH_DECODER_OUTPUT_INFO* outInfo);
+MPEGHDEC_EXPORT MPEGH_DECODER_ERROR mpeghdecoder_getSamples(HANDLE_MPEGH_DECODER_CONTEXT hCtx,
+                                                            int32_t* outData, uint32_t outLength,
+                                                            MPEGH_DECODER_OUTPUT_INFO* outInfo);
 
 /**
  * @brief  Flush the decoder and push the flushed PCM samples into a samples queue. The decoded PCM
@@ -275,7 +282,7 @@ MPEGH_DECODER_ERROR mpeghdecoder_getSamples(HANDLE_MPEGH_DECODER_CONTEXT hCtx, i
  * @param[in] hCtx  MPEG-H decoder handle.
  * @return          Error code.
  */
-MPEGH_DECODER_ERROR mpeghdecoder_flushAndGet(HANDLE_MPEGH_DECODER_CONTEXT hCtx);
+MPEGHDEC_EXPORT MPEGH_DECODER_ERROR mpeghdecoder_flushAndGet(HANDLE_MPEGH_DECODER_CONTEXT hCtx);
 
 /**
  * @brief  Flush the decoder and discard all pending samples in the samples queue. This function
@@ -284,7 +291,7 @@ MPEGH_DECODER_ERROR mpeghdecoder_flushAndGet(HANDLE_MPEGH_DECODER_CONTEXT hCtx);
  * @param[in] hCtx  MPEG-H decoder handle.
  * @return          Error code.
  */
-MPEGH_DECODER_ERROR mpeghdecoder_flush(HANDLE_MPEGH_DECODER_CONTEXT hCtx);
+MPEGHDEC_EXPORT MPEGH_DECODER_ERROR mpeghdecoder_flush(HANDLE_MPEGH_DECODER_CONTEXT hCtx);
 
 /**
  * @brief  Set decoder parameter.
@@ -294,8 +301,8 @@ MPEGH_DECODER_ERROR mpeghdecoder_flush(HANDLE_MPEGH_DECODER_CONTEXT hCtx);
  * @param[in] value  Parameter value.
  * @return           Error code.
  */
-MPEGH_DECODER_ERROR mpeghdecoder_setParam(HANDLE_MPEGH_DECODER_CONTEXT hCtx,
-                                          MPEGH_DECODER_PARAMETER param, int value);
+MPEGHDEC_EXPORT MPEGH_DECODER_ERROR mpeghdecoder_setParam(HANDLE_MPEGH_DECODER_CONTEXT hCtx,
+                                                          MPEGH_DECODER_PARAMETER param, int value);
 
 #ifdef __cplusplus
 }

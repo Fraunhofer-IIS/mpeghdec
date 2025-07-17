@@ -145,6 +145,10 @@ LINKSPEC_H void mpegh_UI_Manager_Close(HANDLE_MPEGH_UI_MANAGER self) {
 /* get XML state */
 LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_GetXmlSceneState(HANDLE_MPEGH_UI_MANAGER self, char* xmlOut,
                                                     UINT xmlOutSize, UINT flagsIn, UINT* flagsOut) {
+  if (!xmlOut || !flagsOut) {
+    return MPEGH_UI_INVALID_PARAM;
+  }
+
   return (MPEGH_UI_ERROR)UI_Manager_GetXmlSceneState(self->hUiManager, xmlOut, xmlOutSize, flagsIn,
                                                      flagsOut);
 }
@@ -152,6 +156,10 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_GetXmlSceneState(HANDLE_MPEGH_UI_MANAGER self
 /* apply XML action */
 LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_ApplyXmlAction(HANDLE_MPEGH_UI_MANAGER self, const char* xmlIn,
                                                   UINT xmlInSize, UINT* flagsOut) {
+  if (!xmlIn || !flagsOut) {
+    return MPEGH_UI_INVALID_PARAM;
+  }
+
   if (!self->isActive) return MPEGH_UI_NOT_ALLOWED;
 
   return (MPEGH_UI_ERROR)UI_Manager_ApplyXmlAction(self->hUiManager, xmlIn, xmlInSize, flagsOut);

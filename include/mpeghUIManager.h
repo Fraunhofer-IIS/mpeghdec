@@ -99,7 +99,7 @@ amm-info@iis.fraunhofer.de
  * \brief  MPEG-H UI Manager library interface header file.
  */
 
-#include "sys/machine_type.h"
+#include "mpeghexport.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -166,7 +166,7 @@ typedef enum {
  *
  * @return  UI manager handle
  */
-LINKSPEC_H HANDLE_MPEGH_UI_MANAGER mpegh_UI_Manager_Open(void);
+MPEGHDEC_EXPORT HANDLE_MPEGH_UI_MANAGER mpegh_UI_Manager_Open(void);
 
 /**
  * @brief  De-allocate all resources of a mpegh UI manager instance.
@@ -174,7 +174,7 @@ LINKSPEC_H HANDLE_MPEGH_UI_MANAGER mpegh_UI_Manager_Open(void);
  * @param[in,out] self  UI manager handle.
  * @return              void
  */
-LINKSPEC_H void mpegh_UI_Manager_Close(HANDLE_MPEGH_UI_MANAGER self);
+MPEGHDEC_EXPORT void mpegh_UI_Manager_Close(HANDLE_MPEGH_UI_MANAGER self);
 
 /**
  * @brief  Get XML description of audio scene and available user interactivity parameters
@@ -199,8 +199,10 @@ LINKSPEC_H void mpegh_UI_Manager_Close(HANDLE_MPEGH_UI_MANAGER self);
  *                         the remaining part.
  * @return                 Error code.
  */
-LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_GetXmlSceneState(HANDLE_MPEGH_UI_MANAGER self, char* xmlOut,
-                                                    UINT xmlOutSize, UINT flagsIn, UINT* flagsOut);
+MPEGHDEC_EXPORT MPEGH_UI_ERROR mpegh_UI_GetXmlSceneState(HANDLE_MPEGH_UI_MANAGER self, char* xmlOut,
+                                                         unsigned int xmlOutSize,
+                                                         unsigned int flagsIn,
+                                                         unsigned int* flagsOut);
 
 /**
  * @brief  Send XML description of UI command to the UI manager
@@ -212,8 +214,9 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_GetXmlSceneState(HANDLE_MPEGH_UI_MANAGER self
  *                        used.
  * @return                Error code.
  */
-LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_ApplyXmlAction(HANDLE_MPEGH_UI_MANAGER self, const char* xmlIn,
-                                                  UINT xmlInSize, UINT* flagsOut);
+MPEGHDEC_EXPORT MPEGH_UI_ERROR mpegh_UI_ApplyXmlAction(HANDLE_MPEGH_UI_MANAGER self,
+                                                       const char* xmlIn, unsigned int xmlInSize,
+                                                       unsigned int* flagsOut);
 
 /**
  * @brief  Feed MHAS input into UI manager
@@ -223,8 +226,9 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_ApplyXmlAction(HANDLE_MPEGH_UI_MANAGER self, 
  * @param[in] mhasLength  Size of MHAS packets in bytes.
  * @return                Error code.
  */
-LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_FeedMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR* mhasBuffer,
-                                            UINT mhasLength);
+MPEGHDEC_EXPORT MPEGH_UI_ERROR mpegh_UI_FeedMHAS(HANDLE_MPEGH_UI_MANAGER self,
+                                                 unsigned char* mhasBuffer,
+                                                 unsigned int mhasLength);
 
 /**
  * @brief  Update MHAS buffer, inserting UI and DRC packets from UI manager.
@@ -241,8 +245,10 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_FeedMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR*
  *                                  buffer in bytes.
  * @return                          Error code.
  */
-LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_UpdateMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR* mhasBuffer,
-                                              UINT mhasBufferLength, UINT* mhasLength);
+MPEGHDEC_EXPORT MPEGH_UI_ERROR mpegh_UI_UpdateMHAS(HANDLE_MPEGH_UI_MANAGER self,
+                                                   unsigned char* mhasBuffer,
+                                                   unsigned int mhasBufferLength,
+                                                   unsigned int* mhasLength);
 
 /**
  * @brief  Set memory block for storing UI persistency data (activates internal persistence
@@ -267,9 +273,9 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_UpdateMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHA
  *                                    fails and returns an error.
  * @return                            Error code.
  */
-LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_SetPersistenceMemory(HANDLE_MPEGH_UI_MANAGER self,
-                                                        void* persistenceMemoryBlock,
-                                                        USHORT persistenceMemorySize);
+MPEGHDEC_EXPORT MPEGH_UI_ERROR mpegh_UI_SetPersistenceMemory(HANDLE_MPEGH_UI_MANAGER self,
+                                                             void* persistenceMemoryBlock,
+                                                             unsigned short persistenceMemorySize);
 
 /**
  * @brief  Get current UI persistency memory block (updates content, call is required before
@@ -286,9 +292,9 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_SetPersistenceMemory(HANDLE_MPEGH_UI_MANAGER 
  *                                        memory block in bytes.
  * @return                                Error code.
  */
-LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_GetPersistenceMemory(HANDLE_MPEGH_UI_MANAGER self,
-                                                        void** persistenceMemoryBlock,
-                                                        USHORT* persistenceMemorySize);
+MPEGHDEC_EXPORT MPEGH_UI_ERROR mpegh_UI_GetPersistenceMemory(HANDLE_MPEGH_UI_MANAGER self,
+                                                             void** persistenceMemoryBlock,
+                                                             unsigned short* persistenceMemorySize);
 
 #ifdef __cplusplus
 }

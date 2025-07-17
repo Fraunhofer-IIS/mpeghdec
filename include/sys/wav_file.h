@@ -105,6 +105,7 @@ amm-info@iis.fraunhofer.de
 #define WAV_FILE_H
 
 #include "genericStds.h"
+#include "mpeghexport.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -185,7 +186,7 @@ typedef struct WAV* HANDLE_WAV;
  *
  * \return  0 on success and non-zero on failure.
  */
-INT WAV_InputOpen(HANDLE_WAV* pWav, const char* filename);
+MPEGHDEC_EXPORT INT WAV_InputOpen(HANDLE_WAV* pWav, const char* filename);
 
 /**
  * \brief  Read samples from a WAVE file. The samples are automatically re-ordered to the
@@ -199,13 +200,14 @@ INT WAV_InputOpen(HANDLE_WAV* pWav, const char* filename);
  *
  *  \return  Number of samples actually read.
  */
-INT WAV_InputRead(HANDLE_WAV wav, void* sampleBuffer, UINT numSamples, int nBufBits);
+MPEGHDEC_EXPORT INT WAV_InputRead(HANDLE_WAV wav, void* sampleBuffer, UINT numSamples,
+                                  int nBufBits);
 
 /**
  * \brief       Close a WAV file reading handle.
  * \param pWav  Pointer to a WAV file reading handle.
  */
-void WAV_InputClose(HANDLE_WAV* pWav);
+MPEGHDEC_EXPORT void WAV_InputClose(HANDLE_WAV* pWav);
 
 /**
  * \brief  Open WAV output/writer handle.
@@ -218,8 +220,8 @@ void WAV_InputClose(HANDLE_WAV* pWav);
  *
  * \return  0: ok; -1: error
  */
-INT WAV_OutputOpen(HANDLE_WAV* pWav, const char* outputFilename, INT sampleRate, INT numChannels,
-                   INT bitsPerSample);
+MPEGHDEC_EXPORT INT WAV_OutputOpen(HANDLE_WAV* pWav, const char* outputFilename, INT sampleRate,
+                                   INT numChannels, INT bitsPerSample);
 
 /**
  * \brief  Write data to WAV file asociated to WAV handle.
@@ -232,14 +234,14 @@ INT WAV_OutputOpen(HANDLE_WAV* pWav, const char* outputFilename, INT sampleRate,
  *
  * \return 0: ok; -1: error
  */
-INT WAV_OutputWrite(HANDLE_WAV wav, void* sampleBuffer, UINT numberOfSamples, int nBufBits,
-                    int nSigBits);
+MPEGHDEC_EXPORT INT WAV_OutputWrite(HANDLE_WAV wav, void* sampleBuffer, UINT numberOfSamples,
+                                    int nBufBits, int nSigBits);
 
 /**
  * \brief       Close WAV output handle.
  * \param pWav  Pointer to WAV handle. *pWav is set to NULL.
  */
-void WAV_OutputClose(HANDLE_WAV* pWav);
+MPEGHDEC_EXPORT void WAV_OutputClose(HANDLE_WAV* pWav);
 
 #ifdef __cplusplus
 }
