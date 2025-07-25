@@ -508,7 +508,7 @@ static INT aacDecoder_EarconSetBSCallback(void* handle, HANDLE_FDK_BITSTREAM bs)
           hAacDecoder->earconDecoder.BaseframeSize = 2048;
           break;
         case 16000:
-          hAacDecoder->earconDecoder.BaseframeSize = 3096;
+          hAacDecoder->earconDecoder.BaseframeSize = 3072;
           break;
         default:
           /* unsupported sampling frequency */
@@ -522,7 +522,7 @@ static INT aacDecoder_EarconSetBSCallback(void* handle, HANDLE_FDK_BITSTREAM bs)
     }
     /*Sanity check for buffer fullness*/
     if (((hAacDecoder->earconDecoder.AccumulatedFrameSize +
-          hAacDecoder->earconDecoder.BaseframeSize * numPcmSignalsInFrame)) >= EARCON_BUFFER_SIZE) {
+          hAacDecoder->earconDecoder.BaseframeSize * numPcmSignalsInFrame)) > EARCON_BUFFER_SIZE) {
       return 0;
     }
 
@@ -539,8 +539,8 @@ static INT aacDecoder_EarconSetBSCallback(void* handle, HANDLE_FDK_BITSTREAM bs)
     INT diff = fMax(0, MPEGH_frameSize - frameSize);
 
     /*Sanity check for buffer fullness*/
-    if (((hAacDecoder->earconDecoder.AccumulatedFrameSize + frameSize + diff)) >=
-        EARCON_BUFFER_SIZE) {
+    if (((hAacDecoder->earconDecoder.AccumulatedFrameSize +
+          (frameSize + diff) * numPcmSignalsInFrame)) > EARCON_BUFFER_SIZE) {
       return 0;
     }
     if (diff) {
@@ -1433,10 +1433,10 @@ LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_DecodeFrame(HANDLE_AACDECODER self, IN
                                                      i * self->stftFrameSize + 256]),
                                         self->stftFrameSize));
               }
-              /* Ensure 8 bit headroom */
-              STFT_headroom_prescaling = fMax(STFT_headroom - 8, 0);
+              /* Ensure PCM_OUT_HEADROOM bit headroom */
+              STFT_headroom_prescaling = fMax(STFT_headroom - PCM_OUT_HEADROOM, 0);
               /* Don't prescale more than necessary */
-              STFT_headroom_prescaling = fMin(STFT_headroom_prescaling, 8);
+              STFT_headroom_prescaling = fMin(STFT_headroom_prescaling, PCM_OUT_HEADROOM);
               /* Ensure at least one bit headroom for FFT */
               if (STFT_headroom == 0) STFT_headroom_prescaling = -1;
 
@@ -1669,8 +1669,9 @@ LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_DecodeFrame(HANDLE_AACDECODER self, IN
       }
 
       /* Truncation */
+      int truncStart = 0, truncStop = 0;
       if (!(flags & (AACDEC_CONCEAL | AACDEC_FLUSH))) {
-        int truncStart, truncStop, truncLength;
+        int truncLength;
 
         /* if a truncation right occurs at startup frameSize is not yet initialized in
          * TruncationMsgCallback thus it is added here */
@@ -1774,10 +1775,10 @@ LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_DecodeFrame(HANDLE_AACDECODER self, IN
       }
 
       if (self->flags[0] & AC_MPEGH3DA) {
-        if ((accessUnit == numAccessUnits - 1) && (self->truncateFrameSize > 0)) {
+        if (accessUnit == numAccessUnits - 1) {
           PcmDataPayload(&self->earconDecoder, self->pTimeData2, self->streamInfo.frameSize,
                          self->drcStatus.targetLoudness, self->defaultTargetLoudness,
-                         self->targetLayout, self->truncateFrameSize);
+                         self->targetLayout, truncStart, truncStop);
         }
       }
 

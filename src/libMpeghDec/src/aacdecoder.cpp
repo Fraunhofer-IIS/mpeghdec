@@ -2995,7 +2995,6 @@ void EarconDecoder_Init(HANDLE_EARCONDECODER hEarconDecoderH) {
   hEarconDecoderH->First_Frame = 1;
   hEarconDecoderH->AccumulatedFrameSize = 0;
   hEarconDecoderH->BaseframeSize = 1024;
-  hEarconDecoderH->StartDelay = 775;
   hEarconDecoderH->numPcmSignals_old = 0;
   hEarconDecoderH->CurrentFrameHasEarcon = 0;
   hEarconDecoderH->LastFrameHadEarcon = 0;
@@ -3003,8 +3002,8 @@ void EarconDecoder_Init(HANDLE_EARCONDECODER hEarconDecoderH) {
 
 TRANSPORTDEC_ERROR PcmDataPayload(EarconDecoder* earconDecoder, FIXP_DBL* TimeData,
                                   UINT BaseframeSize, SCHAR drcStatus_targetLoudness,
-                                  SCHAR defaultTargetLoudness, INT targetLayout,
-                                  SHORT truncateFrameSize) {
+                                  SCHAR defaultTargetLoudness, INT targetLayout, SHORT truncStart,
+                                  SHORT truncStop) {
   FIXP_DBL EarconGain, AttGain;
   FIXP_DBL AttGain_increment;
   INT EarconShift, AttGainShift;
@@ -3013,7 +3012,7 @@ TRANSPORTDEC_ERROR PcmDataPayload(EarconDecoder* earconDecoder, FIXP_DBL* TimeDa
   if (earconDecoder->AccumulatedFrameSize <= 0) {
     /*Prepare for the next time*/
     earconDecoder->AccumulatedFrameSize = 0;
-    earconDecoder->First_Frame = 1;
+    if (earconDecoder->BaseframeSize - truncStop + truncStart > 0) earconDecoder->First_Frame = 1;
     return TRANSPORTDEC_OK;
   }
 
@@ -3146,7 +3145,7 @@ TRANSPORTDEC_ERROR PcmDataPayload(EarconDecoder* earconDecoder, FIXP_DBL* TimeDa
     } else {
       /* Loudness Normalization off. Use gain of 1.0 */
       EarconGainNew = (FIXP_DBL)0x40000000;
-      EarconShiftNew = 7;
+      EarconShiftNew = PCM_OUT_HEADROOM - 1;
     }
 
     /*Store for the future*/
@@ -3161,19 +3160,21 @@ TRANSPORTDEC_ERROR PcmDataPayload(EarconDecoder* earconDecoder, FIXP_DBL* TimeDa
     /*Calculate old/new signal lengths and startPoint */
     INT LastFrameSamples;
     INT NewFrameSamples;
-    INT startPoint;
+    INT startPoint = 0;
 
-    if (earconDecoder->First_Frame == 1) {
-      NewFrameSamples = fMax(0, truncateFrameSize - 775);
-      LastFrameSamples = 0;
-      startPoint = 775;
+    if (truncStart > 0) {
+      NewFrameSamples = fMax(0, truncStart - 775);
+      LastFrameSamples = fMin((int)truncStart, 775);
     } else {
-      NewFrameSamples = fMax(0, truncateFrameSize - 775);
-      LastFrameSamples = fMin((int)truncateFrameSize, 775);
-      startPoint = 0;
+      NewFrameSamples = earconDecoder->BaseframeSize - fMax(775, (INT)truncStop);
+      LastFrameSamples = fMax(0, 775 - truncStop);
     }
 
-    earconDecoder->StartDelay = 0;
+    if (earconDecoder->First_Frame == 1) {
+      startPoint = LastFrameSamples;
+      LastFrameSamples = 0;
+    }
+
     earconDecoder->First_Frame = 0;
 
     {
@@ -3262,8 +3263,8 @@ TRANSPORTDEC_ERROR PcmDataPayload(EarconDecoder* earconDecoder, FIXP_DBL* TimeDa
 
         /* Limit samples read */
         if (LoopCounterValue > 0 && numSpeakers > 0) {
-          LoopCounterValue =
-              fMin(LoopCounterValue, earconDecoder->AccumulatedFrameSize / numSpeakers);
+          LoopCounterValue = fMin(LoopCounterValue,
+                                  startPoint + earconDecoder->AccumulatedFrameSize / numSpeakers);
         }
         if ((numSpeakers == 1) && (numSignalsMixed == 1)) {
           for (; i < LoopCounterValue; i++) {
@@ -3336,11 +3337,9 @@ TRANSPORTDEC_ERROR PcmDataPayload(EarconDecoder* earconDecoder, FIXP_DBL* TimeDa
       if (earconDecoder->AccumulatedFrameSize < 0) {
         earconDecoder->AccumulatedFrameSize = 0;
       }
-      if (((earconDecoder->AccumulatedFrameSize + OverallSamplesUsed) * numSpeakers) <
-          EARCON_BUFFER_SIZE) {
-        FDKmemmove(&earconDecoder->EarconData[0], &earconDecoder->EarconData[OverallSamplesUsed],
-                   sizeof(FIXP_SGL) * earconDecoder->AccumulatedFrameSize);
-      }
+      FDK_ASSERT((earconDecoder->AccumulatedFrameSize + OverallSamplesUsed) <= EARCON_BUFFER_SIZE);
+      FDKmemmove(&earconDecoder->EarconData[0], &earconDecoder->EarconData[OverallSamplesUsed],
+                 sizeof(FIXP_SGL) * earconDecoder->AccumulatedFrameSize);
       earconDecoder->numPcmSignals_old = numSpeakers;
 
       /* Save intermediate gain for next time to finish the current frame */

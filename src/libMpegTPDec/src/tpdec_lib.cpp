@@ -1044,9 +1044,6 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
               }
               hTp->parser.mhas.flags[mhasSubstream] |= MHAS_CONFIG_PRESENT;
               hTp->parser.mhas.flags[mhasSubstream] &= ~MHAS_UI_PRESENT;
-              if (hTp->callbacks.cbEarconUpdate != NULL) {
-                hTp->callbacks.cbEarconUpdate(hTp->callbacks.cbEarconUpdateData);
-              }
             } else {
               err = TRANSPORTDEC_SYNC_ERROR;
             }
@@ -1293,17 +1290,17 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
             crcType = 0; /* Signal CRC for next item in MHAS */
             break;
           case MHA_PACTYPE_EARCON: {
-            if (hTp->callbacks.cbEarconBSData != NULL) {
+            if (hTp->callbacks.cbEarconInfo != NULL) {
               EarconInfo earcon_info;
               if (earconInfo(hBs, &earcon_info)) {
                 earcon_config.EarconParseError = 1;
                 break;
               }
-              hTp->callbacks.cbEarconInfo(hTp->callbacks.cbEarconBSData, &earcon_info);
+              hTp->callbacks.cbEarconInfo(hTp->callbacks.cbEarconInfoData, &earcon_info);
             }
           } break;
           case MHA_PACTYPE_PCMCONFIG: {
-            if (hTp->callbacks.cbEarconConfigData != NULL) {
+            if (hTp->callbacks.cbEarconConfig != NULL) {
               if (earcon_config.EarconParseError) {
                 break;
               }
@@ -1317,7 +1314,7 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
             }
           } break;
           case MHA_PACTYPE_PCMDATA: {
-            if (hTp->callbacks.cbEarconBSData != NULL) {
+            if (hTp->callbacks.cbEarconBS != NULL) {
               if (earcon_config.EarconParseError) {
                 break;
               }

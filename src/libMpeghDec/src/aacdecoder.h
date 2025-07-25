@@ -192,7 +192,6 @@ typedef struct {
   INT AccumulatedFrameSize; /* Amount of buffered earcon samples in EarconData. Stereo samples
                                account as 2. */
   INT BaseframeSize;
-  INT StartDelay;
   INT TruncationPresent;
   INT numPcmSignalsInFrame; /* Current amount of earcon signals */
   INT numPcmSignals_old;    /* Past amount of earcon signals */
@@ -210,8 +209,8 @@ typedef EarconDecoder* HANDLE_EARCONDECODER;
 // Add PCM earcon to pTimeData2.
 TRANSPORTDEC_ERROR PcmDataPayload(EarconDecoder* earconDecoder, FIXP_DBL* TimeData,
                                   UINT BaseframeSize, SCHAR drcStatus_targetLoudness,
-                                  SCHAR defaultTargetLoudness, INT targetLayout,
-                                  SHORT truncateFrameSize);
+                                  SCHAR defaultTargetLoudness, INT targetLayout, SHORT truncStart,
+                                  SHORT truncStop);
 
 /* AAC decoder (opaque toward userland) struct declaration */
 struct AAC_DECODER_INSTANCE {

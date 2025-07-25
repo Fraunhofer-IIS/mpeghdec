@@ -612,9 +612,9 @@ int asiCheckISO639_2(char* buf);
 
 #define EARCON_MAX_NUM_SIGNALS 2
 #define EARCON_NUM_LANGUAGES (1 << 4)
-/*Buffer size= 2(stereo Earcon) * 2 (max frames in the buffer at one time) * 3 (maximum resampling
- * ratio for MPEGH) * 1024 (MPEGH base length) */
-#define EARCON_BUFFER_SIZE (EARCON_MAX_NUM_SIGNALS * 2 * 3 * 1024)
+/*Buffer size= 2(stereo Earcon) * (3 (maximum resampling ratio for MPEGH) * 1024 (MPEGH base
+ * length)) + 775 (delayed samples before the limiter) ) */
+#define EARCON_BUFFER_SIZE (EARCON_MAX_NUM_SIGNALS * (3 * 1024 + 775))
 
 typedef struct {
   UINT m_numEarcons;
@@ -683,9 +683,6 @@ typedef struct {
 
   cbEarconInfo_t cbEarconInfo; /*!< Function pointer for earcon decoder set info callback. */
   void* cbEarconInfoData;      /*!< User data pointer for earcon decoder set info data callback. */
-
-  cbEarconUpdate_t cbEarconUpdate; /*!< Function pointer for earcon decoder update callback. */
-  void* cbEarconUpdateData; /*!< User data pointer for earcon decoder update data callback. */
 } CSTpCallBacks;
 
 static const UINT SamplingRateTable[] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050,
