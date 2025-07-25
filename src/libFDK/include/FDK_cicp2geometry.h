@@ -250,30 +250,10 @@ CICP2GEOMETRY_ERROR cicp2geometry_get_geometry_from_cicp_loudspeaker_index(
         AzElLfe /**< out:pointer to an array with CICP2GEOMETRY_CHANNEL_GEOMETRYs */
 );
 
-#ifdef FDK_FC_MISPLACED_SPEAKER_ENABLE
-/**********************************************************************/ /**
- cicp2geometry_compare_geometry() compares two CICP2GEOMETRY_CHANNEL_GEOMETRY
- arrays.
-
- \return returns 0 if both geometries are equal.
- **************************************************************************/
-int cicp2geometry_compare_geometry(
-    CICP2GEOMETRY_CHANNEL_GEOMETRY geoOne[CICP2GEOMETRY_MAX_LOUDSPEAKERS],
-    unsigned int numChannelsOne,
-    CICP2GEOMETRY_CHANNEL_GEOMETRY geoTwo[CICP2GEOMETRY_MAX_LOUDSPEAKERS],
-    unsigned int numChannelsTwo, unsigned int tolerance);
-#endif
-
 /*********************************************************************/ /**
                                                                          *************************************************************************/
 CICP2GEOMETRY_ERROR cicp2geometry_get_number_of_lfes(CICP2GEOMETRY_CHANNEL_GEOMETRY* AzElLfe,
                                                      UINT numChannels, UINT* numLfes);
-
-/*********************************************************************/ /**
-                                                                         *************************************************************************/
-CICP2GEOMETRY_ERROR cicp2geometry_get_deviation_angles(
-    CICP2GEOMETRY_CHANNEL_GEOMETRY* AzElLfe, UINT numSpeaker, INT* azDev, INT* elDev,
-    INT* isDeviated, CICP2GEOMETRY_CHANNEL_GEOMETRY* normalizedGeo);
 
 /**
  * \brief Obtain indices and gains to a given target layout speaker geometry

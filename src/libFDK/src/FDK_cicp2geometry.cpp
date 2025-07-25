@@ -1499,38 +1499,6 @@ CICP2GEOMETRY_ERROR cicp2geometry_get_number_of_lfes(CICP2GEOMETRY_CHANNEL_GEOME
   return result;
 }
 
-#ifdef FDK_FC_MISPLACED_SPEAKER_ENABLE
-CICP2GEOMETRY_ERROR cicp2geometry_get_deviation_angles(
-    CICP2GEOMETRY_CHANNEL_GEOMETRY* AzElLfe, UINT numSpeaker, INT* azDev, INT* elDev,
-    INT* isDeviated, CICP2GEOMETRY_CHANNEL_GEOMETRY* normalizedGeo) {
-  CICP2GEOMETRY_ERROR result = CICP2GEOMETRY_OK;
-  CICP2GEOMETRY_CHANNEL_GEOMETRY normedGeo;
-  UINT ch;
-
-  for (ch = 0; ch < numSpeaker; ch++) {
-    result = cicp2geometry_get_geometry_from_cicp_loudspeaker_index(
-        AzElLfe[ch].cicpLoudspeakerIndex, &normedGeo);
-    if (result) {
-      return result;
-    }
-
-    azDev[ch] = AzElLfe[ch].Az - normedGeo.Az;
-    elDev[ch] = AzElLfe[ch].El - normedGeo.El;
-    if (normalizedGeo != NULL) {
-      if (&(normalizedGeo[ch]) != &(AzElLfe[ch]))
-        memcpy(&(normalizedGeo[ch]), &(AzElLfe[ch]), sizeof(normalizedGeo[ch]));
-
-      normalizedGeo[ch].Az = normedGeo.Az;
-      normalizedGeo[ch].El = normedGeo.El;
-    }
-
-    if ((azDev[ch] != 0) || (elDev[ch] != 0)) *isDeviated = 1;
-  }
-
-  return result;
-}
-#endif
-
 CICP2GEOMETRY_ERROR cicp2geometry_get_front_speakers(const INT targetLayout, const INT numSpeakers,
                                                      INT* numSignalsMix, INT* speakerPosIndices,
                                                      INT* speakerGains) {
