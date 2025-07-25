@@ -121,12 +121,9 @@ H_ALLOC_MEM(ArcoData, CArcoData)
     Dimension: 1                                                                        */
 C_ALLOC_MEM(ArcoData, CArcoData, 1)
 
-/*
-   This define triggers the use of the pre-known return values of function get_pk_v2()
-   for the cases, where parameter s is in range 0x00000000..0x0000000F.
-   Note: These 16 bytes have been moved into the first 4 entries of ari_merged_hash_ps
-         that are no more referenced.
-*/
+/* 16 bytes qucik lookup for ari_merged_hash_ps */
+static const ULONG ari_merged_hash_ps_ext[4] = {0x0A340401UL, 0x1613100DUL, 0x251F1212UL,
+                                                0x2E252525UL};
 
 static const ULONG ari_merged_hash_ps[742] = {
     0x00001044UL, 0x00003D0AUL, 0x00005350UL, 0x000074D6UL, 0x0000A49FUL, 0x0000F96EUL,
@@ -507,8 +504,11 @@ static inline void copyTableAmrwbArith2(UCHAR tab[], int sizeIn, int sizeOut) {
 }
 
 static inline ULONG get_pk_v2(ULONG s) {
+  /* Bypass complex table search for s in range 0..0xF */
+  if (s <= (ULONG)0xF) return ((const UCHAR*)ari_merged_hash_ps_ext)[s];
+
   const ULONG* p = ari_merged_hash_ps;
-  ULONG s12 = (fMax((UINT)s, (UINT)1) << 12) - 1;
+  ULONG s12 = (s << 12) - 1;
   if (s12 > p[485]) {
     p += 486; /* 742 - 256 = 486 */
   } else {

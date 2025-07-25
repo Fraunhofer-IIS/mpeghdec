@@ -3896,9 +3896,9 @@ static inline void __A64_smov_Xt(INT width, INT size, INT64 &dst, INT64 &src, IN
 /* chapter  5.7.4 vector arithmetic */
 /* ARMv8 GCC */
 #define __A64_fmul(dst, src1, src2)                 "FMUL  " #dst ", " #src1 ", " #src2 "\n\t"
-#define A64_fmul(size, width, dst, src1, src2)       __A64_fmul(dst, src1, src2)
+#define A64_fmul(width, size, dst, src1, src2)       __A64_fmul(dst, src1, src2)
 #else
-#define A64_fmul(size, width, dst, src1, src2)       __A64_fmul((INT) size, (INT) width, dst, src1, src2);
+#define A64_fmul(width, size, dst, src1, src2)       __A64_fmul((INT) width, (INT) size, dst, src1, src2);
 
 static void __A64_fmul(INT size, INT width, A64_SP dst, A64_SP src1, A64_SP src2)
 {
@@ -3925,9 +3925,9 @@ static void __A64_fmul(INT size, INT width, A64_SP dst, A64_SP src1, A64_SP src2
 /* chapter  5.7.4 vector arithmetic */
 /* ARMv8 GCC */
 #define __A64_fadd(dst, src1, src2)                 "FADD  " #dst ", " #src1 ", " #src2 "\n\t"
-#define A64_fadd(size, width, dst, src1, src2)       __A64_fadd(dst, src1, src2)
+#define A64_fadd(width, size, dst, src1, src2)       __A64_fadd(dst, src1, src2)
 #else
-#define A64_fadd(size, width, dst, src1, src2)       __A64_fadd((INT) size, (INT) width, dst, src1, src2);
+#define A64_fadd(width, size, dst, src1, src2)       __A64_fadd((INT) width, (INT) size, dst, src1, src2);
 
 static void __A64_fadd(INT size, INT width, A64_SP dst, A64_SP src1, A64_SP src2)
 {
@@ -3954,9 +3954,9 @@ static void __A64_fadd(INT size, INT width, A64_SP dst, A64_SP src1, A64_SP src2
 /* chapter  5.7.4 vector arithmetic */
 /* ARMv8 GCC */
 #define __A64_fmls(dst, src1, src2)                 "FMLS  " #dst ", " #src1 ", " #src2 "\n\t"
-#define A64_fmls(size, width, dst, src1, src2)       __A64_fmls(dst, src1, src2)
+#define A64_fmls(width, size, dst, src1, src2)       __A64_fmls(dst, src1, src2)
 #else
-#define A64_fmls(size, width, dst, src1, src2)       __A64_fmls((INT) size, (INT) width, dst, src1, src2);
+#define A64_fmls(width, size, dst, src1, src2)       __A64_fmls((INT) width, (INT) size, dst, src1, src2);
 
 static void __A64_fmls(INT size, INT width, A64_SP dst, A64_SP src1, A64_SP src2)
 {
@@ -3983,9 +3983,9 @@ static void __A64_fmls(INT size, INT width, A64_SP dst, A64_SP src1, A64_SP src2
 /* chapter  5.7.4 vector arithmetic */
 /* ARMv8 GCC */
 #define __A64_fmla(dst, src1, src2)                 "FMLA  " #dst ", " #src1 ", " #src2 "\n\t"
-#define A64_fmla(size, width, dst, src1, src2)       __A64_fmls(dst, src1, src2)
+#define A64_fmla(width, size, dst, src1, src2)       __A64_fmls(dst, src1, src2)
 #else
-#define A64_fmla(size, width, dst, src1, src2)       __A64_fmla((INT) size, (INT) width, dst, src1, src2);
+#define A64_fmla(width, size, dst, src1, src2)       __A64_fmla((INT) width, (INT) size, dst, src1, src2);
 
 static void __A64_fmla(INT size, INT width, A64_SP dst, A64_SP src1, A64_SP src2)
 {
@@ -4011,11 +4011,11 @@ static void __A64_fmla(INT size, INT width, A64_SP dst, A64_SP src1, A64_SP src2
 /* chapter  5.7.4 vector arithmetic */
 /* ARMv8 GCC */
 #define __A64_fsub(dst, src1, src2)                 "FSUB  " #dst ", " #src1 ", " #src2 "\n\t"
-#define A64_fsub(size, width, dst, src1, src2)       __A64_fsub(dst, src1, src2)
+#define A64_fsub(width, size, dst, src1, src2)       __A64_fsub(dst, src1, src2)
 #else
-#define A64_fsub(size, width, dst, src1, src2)       __A64_fsub((INT) size, (INT) width, dst, src1, src2);
+#define A64_fsub(width, size, dst, src1, src2)       __A64_fsub((INT) width, (INT) size, dst, src1, src2);
 
-static void __A64_fsub(INT size, INT width, A64_SP dst, A64_SP src1, A64_SP src2)
+static void __A64_fsub(INT width, INT size, A64_SP dst, A64_SP src1, A64_SP src2)
 {
     INT i, num = size/width;
     switch (width)
@@ -4064,160 +4064,175 @@ static void __A64_fsub(INT size, INT width, A64_SP dst, A64_SP src1, A64_SP src2
 #define FDK_mvpop(first_src, last_src)                             ;
 #endif
 
-
-
-
-
-
-
+/* Reference: https://www.cs.princeton.edu/courses/archive/spr19/cos217/reading/ArmInstructionSetOverview.pdf     */
+/* Chapter: 5.7.8 Vector Unary Arithmetic                                                                         */
+/* ABS Vd.<T>, Vn.<T>:   Integer absolute value(vector).              Where <T> is 8B, 16B, 4H, 8H, 2S, 4S or 2D. */
+/* SQABS Vd.<T>, Vn.<T>: Signed integer saturating absolute(vector).  Where <T> is 8B, 16B, 4H, 8H, 2S, 4S or 2D. */
+/* NEG Vd.<T>, Vn.<T>:   Signed integer saturating absolute (vector). Where <T> is 8B, 16B, 4H, 8H, 2S, 4S or 2D. */
+/* SQNEG Vd.<T>, Vn.<T>: Signed integer saturating negate(vector).    Where <T> is 8B, 16B, 4H, 8H, 2S, 4S or 2D. */
 #ifdef __ARM_AARCH64_NEON__
-#define FDK_vneg_q( size, dst, src)  "VNEG.S" #size " " #dst ", " #src " \n\t"
-#define FDK_vneg_d( size, dst, src)  "VNEG.S" #size " " #dst ", " #src " \n\t"
-#define FDK_vqneg_q(size, dst, src)  "VQNEG.S" #size " " #dst ", " #src " \n\t"
-#define FDK_vqneg_d(size, dst, src)  "VQNEG.S" #size " " #dst ", " #src " \n\t"
+#define A64_abs(width, size, dst, src)        "ABS   " #dst ", " #src "\n\t"
+#define A64_sqabs(width, size, dst, src)      "SQABS " #dst ", " #src "\n\t"
+#define A64_neg(width, size, dst, src)        "NEG   " #dst ", " #src "\n\t"
+#define A64_sqneg(width, size, dst, src)      "SQNEG " #dst ", " #src "\n\t"
 #else
-#define FDK_vneg_q(size, dst, src)  { if (size == 32) FDK_vneg_s32_q(dst, src);  else if (size == 16) FDK_vneg_s16_q(dst, src); }
-#define FDK_vneg_d(size, dst, src)  { if (size == 32) FDK_vneg_s32_d(dst, src);  else if (size == 16) FDK_vneg_s16_d(dst, src); }
-#define FDK_vqneg_q(size, dst, src) { if (size == 32) FDK_vqneg_s32_q(dst, src); else if (size == 16) FDK_vqneg_s16_q(dst, src); }
-#define FDK_vqneg_d(size, dst, src) { if (size == 32) FDK_vqneg_s32_d(dst, src); else if (size == 16) FDK_vqneg_s16_d(dst, src); }
+#define A64_abs(width, size, dst, src)        {  __A64_abs(  width, size, (INT64 &) dst, (INT64 &) dst); }
+#define A64_sqabs(width, size, dst, src)      {  __A64_sqabs(width, size, (INT64 &) dst, (INT64 &) dst); }
+#define A64_neg(width, size, dst, src)        {  __A64_neg(  width, size, (INT64 &) dst, (INT64 &) dst); }
+#define A64_sqneg(width, size, dst, src)      {  __A64_sqneg(width, size, (INT64 &) dst, (INT64 &) dst); }
 
-static void inline FDK_vneg_s32_q (A64_V dst, A64_V src)
+static void inline __A64_abs(INT64& dst, INT64& src)
 {
-  A64_S* Dst = (A64_S*) dst;
-  A64_S* Src = (A64_S*) src;
-  for(int i = 0; i < 4; i++)
+  FDK_ASSERT((width == 8) || (width == 16) || (width == 32 || (width == 64));
+  FDK_ASSERT((size == 64) || (size == 128));
+
+  INT i, num = size / width;
+  switch (width)
   {
-    FDK_check_s32_overflow((INT64) -Src[i]);
-    Dst[i] = -Src[i];
-  }
-}
-static void inline FDK_vneg_s32_d (A64_X dst, A64_X src)
-{
-  A64_S *Dst = (A64_S*) dst;
-  A64_S *Src = (A64_S*) src;
-  for(int i = 0; i < 2; i++)
-  {
-    FDK_check_s32_overflow((INT64) -Src[i]);
-    Dst[i] = -Src[i];
-  }
-}
-static void inline FDK_vneg_s16_q (A64_V dst, A64_V src)
-{
-  A64_H *Dst = (A64_H*) dst;
-  A64_H *Src = (A64_H*) src;
-  for(int i = 0; i < 4; i++)
-  {
-    FDK_check_s16_overflow((A64_S) -Src[i]);
-    Dst[i] = -Src[i];
-  }
-}
-static void inline FDK_vneg_s16_d (A64_X dst, A64_X src)
-{
-  A64_H *Dst = (A64_H *) dst;
-  A64_H *Src = (A64_H *) src;
-  for(int i = 0; i < 2; i++)
-  {
-    FDK_check_s16_overflow((A64_S) -Src[i]);
-    Dst[i] = -Src[i];
+    case 64:
+    {
+      A64_D * Dst = (A64_D*)dst;
+      A64_D* Src = (A64_D*)src;
+      for (i = 0; i < num; i++)  Dst[i] = (Src[i] < 0) ? -Src[i] : Src[i];
+        break;
+    }
+    case 32:
+    {
+      A64_S* Dst = (A64_S*)dst;
+      A64_S* Src = (A64_S*)src;
+      for (i = 0; i < num; i++)  Dst[i] = (Src[i] < 0) ? -Src[i] : Src[i];
+    }
+    break;
+    case 16:
+    {
+      A64_H* Dst = (A64_H*)dst;
+      A64_H* Src = (A64_H*)src;
+      for (i = 0; i < num; i++)  Dst[i] = (Src[i] < 0) ? -Src[i] : Src[i];
+    }
+    break;
+    case 8:
+    {
+      A64_B* Dst = (A64_B*)dst;
+      A64_B* Src = (A64_B*)src;
+      for (i = 0; i < num; i++)  Dst[i] = (Src[i] < 0) ? -Src[i] : Src[i];
+    }
+    break;
   }
 }
 
-static void inline FDK_vqneg_s32_q (A64_V dst, A64_V src)
+static void inline __A64_sqabs(INT64& dst, INT64& src)
 {
-  A64_S *Dst = (A64_S *) dst;
-  A64_S *Src = (A64_S *) src;
-  for(int i = 0; i < 4; i++)
-    Dst[i] = fQNeg32(Src[i]);
-}
-static void inline FDK_vqneg_s32_d (A64_X dst, A64_X src)
-{
-  A64_S *Dst = (A64_S *) dst;
-  A64_S *Src = (A64_S *) src;
-  for(int i = 0; i < 2; i++)
-    Dst[i] = fQNeg32(Src[i]);
-}
-static void inline FDK_vqneg_s16_q (A64_V dst, A64_V src)
-{
-  A64_H *Dst = (A64_H *) dst;
-  A64_H *Src = (A64_H *) src;
-  for(int i = 0; i < 4; i++)
-    Dst[i] = fQNeg16(Src[i]);
-}
-static void inline FDK_vqneg_s16_d (A64_X dst, A64_X src)
-{
-  A64_H *Dst = (A64_H *) dst;
-  A64_H *Src = (A64_H *) src;
-  for(int i = 0; i < 2; i++)
-    Dst[i] = fQNeg16(Src[i]);
-}
-#endif
+  FDK_ASSERT((width == 8) || (width == 16) || (width == 32 || (width == 64));
+  FDK_ASSERT((size == 64) || (size == 128));
 
-#ifdef __ARM_AARCH64_NEON__
-#define FDK_vabs_q( size, dst, src)  "VABS.S" #size " " #dst ", " #src " \n\t"
-#define FDK_vabs_d( size, dst, src)  "VABS.S" #size " " #dst ", " #src " \n\t"
-#define FDK_vqabs_q(size, dst, src)  "VQABS.S" #size " " #dst ", " #src " \n\t"
-#define FDK_vqabs_d(size, dst, src)  "VQABS.S" #size " " #dst ", " #src " \n\t"
-#else
-#define FDK_vabs_q(size, dst, src) { if (size == 32)  FDK_vabs_s32_q(dst, src);   else if (size == 16) FDK_vabs_s16_q(dst, src); }
-#define FDK_vabs_d(size, dst, src) { if (size == 32)  FDK_vabs_s32_d(dst, src);   else if (size == 16) FDK_vabs_s16_d(dst, src); }
-#define FDK_vqabs_q(size, dst, src){ if (size == 32)  FDK_vqabs_s32_q(dst, src);  else if (size == 16) FDK_vqabs_s16_q(dst, src); }
-#define FDK_vqabs_d(size, dst, src){ if (size == 32)  FDK_vqabs_s32_d(dst, src);  else if (size == 16) FDK_vqabs_s16_d(dst, src); }
+  INT i, num = size / width;
+  switch (width)
+  {
+    case 64:
+    {
+      A64_D* Dst = (A64_D*)dst;
+      A64_D* Src = (A64_D*)src;
+      for (i = 0; i < num; i++)  Dst[i] = (Src[i] == (A64_D) 0x8000000000000000LL) ? 0x7FFFFFFFFFFFFFFFLL : (Src[i] < 0) ? -Src[i] : Src[i];
+      break;
+    }
+    case 32:
+    {
+      A64_S* Dst = (A64_S*)dst;
+      A64_S* Src = (A64_S*)src;
+      for (i = 0; i < num; i++)  Dst[i] = (Src[i] == (A64_S) 0x80000000) ? 0x7FFFFFFF : (Src[i] < 0) ? -Src[i] : Src[i];
+      break;
+    }
+    case 16:
+    {
+        A64_H* Dst = (A64_H*)dst;
+        A64_H* Src = (A64_H*)src;
+        for (i = 0; i < num; i++)  Dst[i] = (Src[i] == (A64_H) 0x8000) ? 0x7FFF : (Src[i] < 0) ? -Src[i] : Src[i];
+        break;
+    }
+    case 8:
+    {
+        A64_B* Dst = (A64_B*)dst;
+        A64_B* Src = (A64_B*)src;
+        for (i = 0; i < num; i++)  Dst[i] = (Src[i] == (A64_B) 0x8000) ? 0x7FFF : (Src[i] < 0) ? -Src[i] : Src[i];
+    }
+    break;
+    }
+}
 
-static void inline FDK_vabs_s32_q(A64_V dst, A64_V src)
+static void inline __A64_neg(INT64 &dst, INT64 &src)
 {
-  A64_S *Dst = (A64_S *) dst;
-  A64_S *Src = (A64_S *) src;
-  for(int i = 0; i < 4; i++)
-    Dst[i] = fAbs(Src[i]);
+  FDK_ASSERT((width == 8) || (width == 16) || (width == 32 || (width == 64));
+  FDK_ASSERT((size == 64) || (size  == 128));
+
+  INT i, num = size / width;
+  switch (width)
+  {
+    case 64:
+        A64_D* Dst = (A64_D*) dst;
+        A64_D* Src = (A64_D*) src;
+        for (i = 0; i < num; i++)  Dst[i] = -Src[i];
+        break;
+    case 32:
+      {
+        A64_S* Dst = (A64_S*) dst;
+        A64_S* Src = (A64_S*) src;
+        for (i = 0; i < num; i++)  Dst[i] = -Src[i];
+    }
+      break;
+    case 16:
+    {
+        A64_H* Dst = (A64_H*) dst;
+        A64_H* Src = (A64_H*) src;
+        for (i = 0; i < num; i++)  Dst[i] = -Src[i];
+    }
+    break;
+    case 8:
+      {
+        A64_B* Dst = (A64_B*) dst;
+        A64_B* Src = (A64_B*) src;
+        for (i = 0; i < num; i++)  Dst[i] = -Src[i];
+      }
+      break;
+  }
 }
-static void inline FDK_vabs_s32_d(A64_X dst, A64_X src)
+
+static void inline __A64_sqneg(INT64& dst, INT64& src)
 {
-  A64_S *Dst = (A64_S *) dst;
-  A64_S *Src = (A64_S *) src;
-  for(int i = 0; i < 2; i++)
-    Dst[i] = fAbs(Src[i]);
-}
-static void inline FDK_vabs_s16_q(A64_V dst, A64_V src)
-{
-  A64_H *Dst = (A64_H *) dst;
-  A64_H *Src = (A64_H *) src;
-  for(int i = 0; i < 8; i++)
-    Dst[i] = fAbs(Src[i]);
-}
-static void inline FDK_vabs_s16_d(A64_X dst, A64_X src)
-{
-  A64_H *Dst = (A64_H *) dst;
-  A64_H *Src = (A64_H *) src;
-  for(int i = 0; i < 4; i++)
-    Dst[i] = fAbs(Src[i]);
-}
-static void inline FDK_vqabs_s32_q(A64_V dst, A64_V src)
-{
-  A64_S *Dst = (A64_S *) dst;
-  A64_S *Src = (A64_S*) src;
-  for(int i = 0; i < 4; i++)
-    Dst[i] = fQAbs32(Src[i]);
-}
-static void inline FDK_vqabs_s32_d(A64_X dst, A64_X src)
-{
-  A64_S *Dst = (A64_S *) dst;
-  A64_S *Src = (A64_S *) src;
-  for(int i = 0; i < 2; i++)
-    Dst[i] = fQAbs32(Src[i]);
-}
-static void inline FDK_vqabs_s16_q(A64_V dst, A64_V src)
-{
-  A64_H *Dst = (A64_H *) dst;
-  A64_H *Src = (A64_H *) src;
-  for(int i = 0; i < 8; i++)
-    Dst[i] = fQAbs16(Src[i]);
-}
-static void inline FDK_vqabs_s16_d(A64_X dst, A64_X src)
-{
-  A64_H *Dst = (A64_H *) dst;
-  A64_H *Src = (A64_H *) src;
-  for(int i = 0; i < 4; i++)
-    Dst[i] = fQAbs16(Src[i]);
+  FDK_ASSERT((width == 8) || (width == 16) || (width == 32 || (width == 64));
+  FDK_ASSERT((size == 64) || (size == 128));
+
+  INT i, num = size / width;
+  switch (width)
+  {
+    case 64:
+    {
+      A64_D * Dst = (A64_D*)dst;
+      A64_D* Src = (A64_D*)src;
+      for (i = 0; i < num; i++)  Dst[i] = (Src[i] == (A64_D) 0x8000000000000000LL) ? 0x7FFFFFFFFFFFFFFFLL:  -Src[i];
+      break;
+    }
+    case 32:
+    {
+      A64_S* Dst = (A64_S*)dst;
+      A64_S* Src = (A64_S*)src;
+      for (i = 0; i < num; i++)  Dst[i] = (Src[i] == (A64_S) 0x80000000) ? (A64_S) 0x7FFFFFFF : -Src[i];
+      break;
+    }
+    case 16:
+    {
+      A64_H* Dst = (A64_H*)dst;
+      A64_H* Src = (A64_H*)src;
+      for (i = 0; i < num; i++)  Dst[i] = (Src[i] == (A64_H) 0x8000) ? (A64_H) 0x7FFF : -Src[i];
+      break;
+    }
+    case 8:
+    {
+      A64_B* Dst = (A64_B*)dst;
+      A64_B* Src = (A64_B*)src;
+      for (i = 0; i < num; i++)  Dst[i] = (Src[i] == (A64_B) 0x80) ? (A64_B) 0x7F : -Src[i];
+    }
+    break;
+  }
 }
 #endif
 
@@ -4858,78 +4873,6 @@ static inline void FDK_vsri_d(INT size, A64_X dst, A64_X src, int immediate)
 }
 #endif
 
-// reference: NEON and VFP programming, chapter 4.4.8: VSWP
-#ifdef __ARM_AARCH64_NEON__
-#define FDK_vswp(size, v0, v1)    "VSWP " #v0 ", " #v1 " \n\t"
-#else
-#define FDK_vswp(size, v0, v1)   { if (size == 128) { FDK_vswp_q(v0, v1); } else if (size == 64) { FDK_vswp_d(v0,v1); } }
-
-static void inline FDK_vswp_q (A64_V q0, A64_V q1)
-{
-  A64_S tmp;
-  tmp = q1[0]; q1[0] = q0[0]; q0[0] = tmp;
-  tmp = q1[1]; q1[1] = q0[1]; q0[1] = tmp;
-  tmp = q1[2]; q1[2] = q0[2]; q0[2] = tmp;
-  tmp = q1[3]; q1[3] = q0[3]; q0[3] = tmp;
-}
-static void inline FDK_vswp_d (A64_S *d0, A64_S *d1)
-{
-  A64_S tmp;
-  tmp = d1[0]; d1[0] = d0[0]; d0[0] = tmp;
-  tmp = d1[1]; d1[1] = d0[1]; d0[1] = tmp;
-}
-#endif
-
-// reference: NEON and VFP programming, chapter 4.3.1: VAND, VBIC, VEOR, VORN, VORR (register)
-#ifdef __ARM_AARCH64_NEON__
-#define FDK_vand(size, dst, src1, src2)   "VAND " #dst ", " #src1 ", " #src2 " \n\t"
-#define FDK_vbic(size, dst, src1, src2)   "VBIC " #dst ", " #src1 ", " #src2 " \n\t"
-#define FDK_veor(size, dst, src1, src2)   "VEOR " #dst ", " #src1 ", " #src2 " \n\t"
-#define FDK_vorr(size, dst, src1, src2)   "VORR " #dst ", " #src1 ", " #src2 " \n\t"
-#define FDK_vorn(size, dst, src1, src2)   "VORN " #dst ", " #src1 ", " #src2 " \n\t"
-#else
-#define FDK_vand(size, dst,  src1, src2)   __FDK_vand((INT)size, (A64_S) dst, (A64_S) src1, (A64_S) src2);
-#define FDK_vbic(size, dst,  src1, src2)   __FDK_vbic((INT)size, (A64_S) dst, (A64_S) src1, (A64_S) src2);
-#define FDK_veor(size, dst,  src1, src2)   __FDK_veor((INT)size, (A64_S) dst, (A64_S) src1, (A64_S) src2);
-#define FDK_vorr(size, dst,  src1, src2)   __FDK_vorr((INT)size, (A64_S) dst, (A64_S) src1, (A64_S) src2);
-#define FDK_vorn(size, dst,  src1, src2)   __FDK_vorn((INT)size, (A64_S) dst, (A64_S) src1, (A64_S) src2);
-
-static inline void __FDK_vand(INT size, A64_S *dst, A64_S *src1, A64_S *src2)
-{
-  for (int i = 0; i < (size>>5); i++)
-  {
-    dst[i] = src1[i] & src2[i];
-  }
-}
-static inline void __FDK_vbic(INT size, A64_S *dst, A64_S *src1, A64_S *src2)
-{
-  for (int i = 0; i < (size>>5); i++)
-  {
-    dst[i] = src1[i] & (~src2[i]);
-  }
-}
-static inline void __FDK_veor(INT size, A64_S *dst, A64_S *src1, A64_S *src2)
-{
-  for (int i = 0; i < (size>>5); i++)
-  {
-    dst[i] = src1[i] ^ src2[i];
-  }
-}
-static inline void __FDK_vorr(INT size, A64_S *dst, A64_S *src1, A64_S *src2)
-{
-  for (int i = 0; i < (size>>5); i++)
-  {
-    dst[i] = src1[i] | src2[i];
-  }
-}
-static inline void __FDK_vorn(INT size, A64_S *dst, A64_S *src1, A64_S *src2)
-{
-  for (int i = 0; i < (size>>5); i++)
-  {
-    dst[i] = src1[i] | (~src2[i]);
-  }
-}
-#endif //__ARM_AARCH64_NEON__
 
 
 #ifdef __ARM_AARCH64_NEON__
@@ -5054,12 +4997,15 @@ static inline void __FDK_vpmin_s16(INT size, A64_H *dst, A64_H *src1, A64_H *src
 
 
 #ifdef __ARM_AARCH64_NEON__
-#define __A64_smax(dst, src1, src2)               "SMAX " #dst ", " #src1 ", " #src2 " \n\t"
-#define __A64_smin(dst, src1, src2)               "SMIN " #dst ", " #src1 ", " #src2 " \n\t"
+#define __A64_smax(dst, src1, src2)               "SMAX  " #dst ", " #src1 ", " #src2 " \n\t"
+#define __A64_smaxv(dst, src)                     "SMAXV " #dst ", " #src " \n\t"
+#define __A64_smin(dst, src1, src2)               "SMIN  " #dst ", " #src1 ", " #src2 " \n\t"
 #define A64_smax(width, size, dst, src1, src2)    __A64_smax(dst, src1, src2)
+#define A64_smaxv(width, size, dst, src)          __A64_smaxv(dst, src)
 #define A64_smin(width, size, dst, src1, src2)    __A64_smin(dst, src1, src2)
 #else
 #define A64_smax(width, size, dst, src1, src2)    __A64_smax((INT) width, (INT) size, (INT64 &)dst, (INT64 &)src1, (INT64 &)src2);
+#define A64_smaxv(width, size, dst, src)          __A64_smaxv((INT) width, (INT) size, (INT64 &)dst, (INT64 &)src);
 #define A64_smin(width, size, dst, src1, src2)    __A64_smin((INT) width, (INT) size, (INT64 &)dst, (INT64 &)src1, (INT64 &)src2);
 
 static inline void __A64_smax(INT width, INT size, INT64& dst, INT64& src1, INT64& src2)
@@ -5108,6 +5054,82 @@ static inline void __A64_smax(INT width, INT size, INT64& dst, INT64& src1, INT6
     break;
   }
 }
+
+
+static inline void __A64_smaxv(INT width, INT size, INT64& dst, INT64& src)
+{
+  FDK_ASSERT((size == 128) || (size == 64));
+  FDK_ASSERT((width == 32) || (width == 16) || (width == 8));
+  INT i, num = size / width;
+  INT maxsize = 128, minwidth = 8;
+  INT Tmp[(maxsize/minwidth)];
+
+  switch (width)
+  {
+  case 32:
+  {
+    INT* Src = (INT*)src;
+    INT* Dst = (INT*)dst;
+
+    for (i = 0; i < num; i++)
+      Tmp[i] = Src[i];
+
+    /*Nested max*/
+    while (num >= 4) /*loop max 3 times if num was 16*/
+    {
+      for (i = 0; i < num / 2; i++)
+        Tmp[i] = fMax(Tmp[2 * i], Tmp[2 * i + 1]);
+
+      num >>= 1;
+    }
+
+
+    Dst[0] = fMax(Tmp[0], Tmp[1]);
+  }
+  break;
+  case 16:
+  {
+    SHORT* Src = (SHORT*)src;
+    SHORT* Dst = (SHORT*)dst;
+    for (i = 0; i < num; i++)
+      Tmp[i] = Src[i];
+
+    /*Nested max*/
+    while (num >= 4) /*loop max 3 times if num was 16*/
+    {
+      for (i = 0; i < num / 2; i++)
+        Tmp[i] = fMax(Tmp[2 * i], Tmp[2 * i + 1]);
+
+      num >>= 1;
+    }
+
+
+    Dst[0] = fMax(Tmp[0], Tmp[1]);
+  }
+  break;
+  case 8:
+  {
+    SCHAR* Src = (SCHAR*)src;
+    SCHAR* Dst = (SCHAR*)dst;
+    for (i = 0; i < num; i++)
+      Tmp[i] = Src[i];
+
+    /*Nested max*/
+    while (num >= 4) /*loop max 3 times if num was 16*/
+    {
+      for (i = 0; i < num / 2; i++)
+        Tmp[i] = fMax(Tmp[2 * i], Tmp[2 * i + 1]);
+
+      num >>= 1;
+    }
+
+
+    Dst[0] = fMax(Tmp[0], Tmp[1]);
+  }
+  break;
+  }
+}
+
 
 static inline void __A64_smin(INT width, INT size, INT64& dst, INT64& src1, INT64& src2)
 {

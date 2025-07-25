@@ -137,7 +137,7 @@ static FIXP_DBL scaleValueSaturate(FIXP_DBL val, INT shl) {
       : "=r"(result)
       : "r"(val), "r"(shl)
       : "s0", "s1");
-  return result;
+  return fMax((FIXP_DBL)0x80000001, result);
 }
 #endif /* FUNCTION_scaleValueSaturate */
 #endif /*  defined(__ARM_ARCH_8__) && defined(__GNUC__) */

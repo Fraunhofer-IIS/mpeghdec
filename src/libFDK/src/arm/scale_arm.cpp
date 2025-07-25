@@ -104,7 +104,7 @@ amm-info@iis.fraunhofer.de
 #include "scale_arm_neon.cpp"
 #endif
 
-#if defined(__ARM_ARCH_5TE__)
+#if defined(__ARM_ARCH_5TE__) && !defined(__THUMBEL__)
 #include "arm/FDK_arm_funcs.h"
 
 #if !defined(FUNCTION_scaleValues_DBL)
@@ -297,7 +297,7 @@ void scaleValues (
 }
 
 #endif /* defined(__CC_ARM) || defined(__GNUC__) */
-#endif /* #if !defined(FUNCTION_scaleValues_DBL_DBL) */
+#endif /* #if !defined(FUNCTION_scaleValues_DBLDBL) */
 
 #if !defined(FUNCTION_scaleValues_DBLDBL)
 #if defined(__GNUC__)
@@ -517,12 +517,95 @@ void scaleValues (
 #endif
 
 #ifdef __ARM_AARCH64_NEON__
+#define FUNCTION_getScalefactor_DBL
+//#define FUNCTION_getScalefactor_SGL /*TBD*/
 #define FUNCTION_scaleValuesSaturate_SGL_DBL
 #define FUNCTION_scaleValuesSaturate_DBL_DBL
+#define FUNCTION_scaleValues_DBLDBL
 #endif
+
 #ifdef FUNCTION_scaleValuesSaturate_DBL_DBL
 #define FUNCTION_scaleValuesSaturate_DBL
 #endif
+#ifdef FUNCTION_scaleValues_DBLDBL
+#define FUNCTION_scaleValues_DBL
+#endif
+
+#ifdef FUNCTION_getScalefactor_DBL
+  A64_ASM_ROUTINE_START(INT, getScalefactor_DBL_NeonV8,(const FIXP_DBL* vector, INT len))
+  /* stack contents:
+       none
+
+     register contents:
+       X0: vector                    format: <pointer to Q1.31>
+       W1: length                    format: int, in range [0...]
+
+     NEON registers:
+       V0: maximum
+       V1: minimum
+       V2: vector data: 1st 4 values
+       V3: vector data: 2nd 4 values
+
+
+     return value:
+       r0: logical-or of all data[i]^data[i]>>31
+  */
+  A64_movi(32, 128, V0_4S, 0)    // current maximum
+  A64_movi(32, 128, V1_4S, 0)    // current minimum
+  A64_movi(32, 128, V2_4S, 0)    // working register for intro values
+
+  A64_tbz_Wt(W1, 0, getScalefactor_DBL_2x)
+    // test 1 samples
+    A64_ld1_lane_IA(32, V2_S, 0, X0, 4)                //  V2  :           0         0         0         in[0]     //
+    A64_smax(32, 128, V0_4S, V0_4S, V2_4S)
+    A64_smin(32, 128, V1_4S, V1_4S, V2_4S)
+
+A64_label(getScalefactor_DBL_2x)
+  A64_tbz_Wt(W1, 1, getScalefactor_DBL_4x)
+    // test 2 samples
+    A64_ld1x1_IA(32, 64, V2_2S, X0, 8)                //  V2  :           0         0         in[1]     in[0]     //
+    A64_smax(32, 128, V0_4S, V0_4S, V2_4S)
+    A64_smin(32, 128, V1_4S, V1_4S, V2_4S)
+
+A64_label(getScalefactor_DBL_4x)
+  A64_tbz_Wt(W1, 2, getScalefactor_DBL_8x_check_z)
+    // test 4 samples
+    A64_ld1x1_IA(32, 128, V2_4S, X0, 16)              //  V2  :           in[3]     in[2]     in[1]     in[0]     //
+    A64_smax(32, 128, V0_4S, V0_4S, V2_4S)
+    A64_smin(32, 128, V1_4S, V1_4S, V2_4S)
+
+A64_label(getScalefactor_DBL_8x_check_z)
+  A64_adds_Wt_asr_imm(W1, WZR, W1, 3)                 // W1: length / 8
+  A64_branch(EQ, getScalefactor_DBL_8x_end)
+
+A64_label(getScalefactor_DBL_8x)
+    // test 8 samples
+    A64_ld1x2_IA(32, 128, V2_4S, V3_4S, X0, 32)       //  V2  :           in[3]     in[2]     in[1]     in[0]     //
+                                                      //  V3  :           in[7]     in[6]     in[5]     in[4]     //
+    A64_subs_imm(W1, W1, 1)
+    A64_smax(32, 128, V0_4S, V0_4S, V2_4S)
+    A64_smin(32, 128, V1_4S, V1_4S, V2_4S)
+    A64_smax(32, 128, V0_4S, V0_4S, V3_4S)
+    A64_smin(32, 128, V1_4S, V1_4S, V3_4S)
+    A64_branch(NE, getScalefactor_DBL_8x)
+
+A64_label(getScalefactor_DBL_8x_end)
+  A64_sshr_imm(32, 128, V3_4S, V1_4S, 31)             // V3 : negative minimum >> 31
+  A64_eor(32, 128, V1_16B, V1_16B, V3_16B)            // V1 : absolute(minimum)
+  A64_smax(32, 128, V0_4S, V0_4S, V1_4S)              // V0 : max(maximum, abs(minimum))
+  A64_smaxv(32, 128, S0, V0_4S)                       // S0 : Maximum of pos/neg values
+  A64_clz(32, 128, V0_2S, V0_2S)                      // S0 : Leading zeroes in range 1..32
+  A64_umov_Wt(W0, V0_S, 0)                            // W0 : fixnormz(maxabs)
+  A64_sub_Wt_imm(W0, W0, 1)                           // W0 : return value in range 0..31
+
+A64_ASM_ROUTINE_RETURN(INT)
+
+INT getScalefactor(const FIXP_DBL *vector, INT len)
+{
+    return getScalefactor_DBL_NeonV8(vector, len);
+}
+
+#endif /*FUNCTION_getScalefactor_DBL*/
 
 #ifdef FUNCTION_scaleValuesSaturate_SGL_DBL
 /*!
@@ -587,8 +670,7 @@ A64_label(scaleValuesSaturate_SGL_4x)
 
   A64_label(scaleValuesSaturate_SGL_loop_8x_check_z)
 
-  A64_asr_Xt_imm(W2, W2, 3)          /* w2: length / 8 */
-  A64_cmp_Wt_imm(W2, 0)
+  A64_adds_Wt_asr_imm(W2, WZR, W2, 3)                 // W2: length / 8
 
   A64_branch(EQ, scaleValuesSaturate_SGL_loop_8x_end)
 
@@ -607,7 +689,6 @@ A64_label(scaleValuesSaturate_SGL_loop_8x)
 
 A64_label(scaleValuesSaturate_SGL_loop_8x_end)
 
-  A64_subs_imm(W2, W2, 1)            /* dummy instruction, needed for branching */
 
 A64_ASM_ROUTINE_END()
 
@@ -683,8 +764,7 @@ A64_label(scaleValuesSaturate_DBL_4x)
 
 A64_label(scaleValuesSaturate_DBL_loop_8x_check_z)
 
-  A64_asr_Xt_imm(W2, W2, 3)          /* w2: length / 8 */
-  A64_cmp_Wt_imm(W2, 0)
+  A64_adds_Wt_asr_imm(W2, WZR, W2, 3)                 // W2: length / 8
 
   A64_branch(EQ, scaleValuesSaturate_DBL_loop_8x_end)
 
@@ -702,22 +782,7 @@ A64_label(scaleValuesSaturate_DBL_loop_8x)
 
 A64_label(scaleValuesSaturate_DBL_loop_8x_end)
 
-  A64_subs_imm(W2, W2, 1)            /* dummy instruction, needed for branching */
-
 A64_ASM_ROUTINE_END()
-#endif /* FUNCTION_scaleValuesSaturate_DBL_DBL */
-
-#ifdef FUNCTION_scaleValuesSaturate_DBL
-
-#define FUNCTION_scaleValuesSaturate_DBL_DBL
-SCALE_INLINE void scaleValuesSaturate(
-                  FIXP_DBL* dst,
-                  const INT len,
-                  const INT scaleFactor    /* positive means: shift left */
-                  )
-{
-  scaleValuesSaturate_ARMneonV8_DD(dst, (const FIXP_DBL*)dst, len, fMax(fMin(scaleFactor, DFRACT_BITS-1), -(DFRACT_BITS-1)));
-}
 
 SCALE_INLINE void scaleValuesSaturate(
                   FIXP_DBL* dst,
@@ -728,7 +793,116 @@ SCALE_INLINE void scaleValuesSaturate(
 {
   scaleValuesSaturate_ARMneonV8_DD(dst, src, len, fMax(fMin(scaleFactor, DFRACT_BITS-1), -(DFRACT_BITS-1)));
 }
+#endif /* FUNCTION_scaleValuesSaturate_DBL_DBL */
+
+#ifdef FUNCTION_scaleValuesSaturate_DBL
+
+SCALE_INLINE void scaleValuesSaturate(
+                  FIXP_DBL* dst,
+                  const INT len,
+                  const INT scaleFactor    /* positive means: shift left */
+                  )
+{
+  scaleValuesSaturate_ARMneonV8_DD(dst, (const FIXP_DBL*)dst, len, fMax(fMin(scaleFactor, DFRACT_BITS-1), -(DFRACT_BITS-1)));
+}
+
 #endif /* FUNCTION_scaleValuesSaturate_DBL */
+
+#ifdef FUNCTION_scaleValues_DBLDBL
+/*!
+ *
+ *  \brief  Multiply input vector by \f$ 2^{scalefactor} \f$
+ *  \param dst         destination buffer
+ *  \param src         source buffer
+ *  \param len         length of vector
+ *  \param scalefactor amount of shifts to be applied
+ *  \return void
+ *
+ */
+A64_ASM_ROUTINE_START(void, scaleValues_ARMneonV8_DD,
+  (FIXP_DBL* dst,        /*!< Output */
+    const FIXP_DBL* src,  /*!< Input  */
+    const INT len,        /*!< Length */
+    const INT scalefactor /*!< Scalefactor */
+    ))
+
+#ifndef __ARM_AARCH64_NEON__
+  /* Assign call parameter to registers */
+  X0 = (INT64)dst;
+  X1 = (INT64)src;
+  W2 = len;
+  W3 = scalefactor;
+#endif
+
+  A64_dup_Wt(32, 128, V6_4S, W3)
+  A64_tbz_Wt(W2, 0, scaleValues_DBL_2x)
+
+// scale 1 samples
+  A64_ld1_lane_IA(32, V4_S, 0, X1, 4)
+  A64_sshl(32, 128, V4_4S, V4_4S, V6_4S)
+  A64_st1_lane_IA(32, V4_S, 0, X0, 4)
+
+A64_label(scaleValues_DBL_2x)
+
+  A64_tbz_Wt(W2, 1, scaleValues_DBL_4x)
+
+// scale 2 samples
+  A64_ld1x1_IA(32, 64, V4_2S, X1, 8)
+  A64_sshl(32, 128, V4_4S, V4_4S, V6_4S)
+  A64_st1x1_IA(32, 64, V4_2S, X0, 8)
+
+A64_label(scaleValues_DBL_4x)
+
+  A64_tbz_Wt(W2, 2, scaleValues_DBL_loop_8x_check_z)
+
+// scale 4 samples
+  A64_ld1x1_IA(32, 128, V4_4S, X1, 16)
+  A64_sshl(32, 128, V4_4S, V4_4S, V6_4S)
+  A64_st1x1_IA(32, 128, V4_4S, X0, 16)
+
+A64_label(scaleValues_DBL_loop_8x_check_z)
+
+  A64_adds_Wt_asr_imm(W2, WZR, W2, 3)                 // W2: length / 8
+
+  A64_branch(EQ, scaleValues_DBL_loop_8x_end)
+
+A64_label(scaleValues_DBL_loop_8x)
+
+// scale 8 samples
+  A64_ld1x2_IA(64, 128, V4_2D, V5_2D, X1, 32)
+  A64_sshl(32, 128, V4_4S, V4_4S, V6_4S)
+  A64_sshl(32, 128, V5_4S, V5_4S, V6_4S)
+  A64_st1x2_IA(32, 128, V4_4S, V5_4S, X0, 32)
+  A64_subs_imm(W2, W2, 1)            /* decrement 8x loop counter */
+  A64_branch(GT, scaleValues_DBL_loop_8x)
+
+A64_label(scaleValues_DBL_loop_8x_end)
+
+A64_ASM_ROUTINE_END()
+
+SCALE_INLINE void scaleValues(
+  FIXP_DBL* dst,
+  const FIXP_DBL* src,
+  const INT len,
+  const INT scaleFactor    /* positive means: shift left */
+)
+{
+  scaleValues_ARMneonV8_DD(dst, src, len, fMax(fMin(scaleFactor, DFRACT_BITS - 1), -(DFRACT_BITS - 1)));
+}
+#endif /* FUNCTION_scaleValues_DBLDBL */
+
+#ifdef FUNCTION_scaleValues_DBL
+
+SCALE_INLINE void scaleValues(
+                  FIXP_DBL* dst,
+                  const INT len,
+                  const INT scaleFactor    /* positive means: shift left */
+                  )
+{
+  scaleValues_ARMneonV8_DD(dst, (const FIXP_DBL*)dst, len, fMax(fMin(scaleFactor, DFRACT_BITS-1), -(DFRACT_BITS-1)));
+}
+
+#endif /* FUNCTION_scaleValues_DBL */
 
 #endif /* __ARM_ARCH_8__ */
 

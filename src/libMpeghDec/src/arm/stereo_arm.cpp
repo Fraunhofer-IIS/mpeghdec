@@ -89,7 +89,7 @@ amm-info@iis.fraunhofer.de
 *******************************************************************************/
 
 /* clang-format off */
-#if defined(__ARM_ARCH_5TE__)
+#if defined(__ARM_ARCH_5TE__) && !defined(__THUMBEL__)
 #if defined(__GNUC__)
 #include "arm/FDK_arm_funcs.h"
 #define FUNCTION_CJointStereo_GenerateMSOutput

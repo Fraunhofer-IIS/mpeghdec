@@ -175,7 +175,7 @@ inline FIXP_DBL scaleValueSaturate(const FIXP_DBL value, INT scalefactor /* in r
   } else {
     scalefactor = -scalefactor;
     /* shift right: clear in case of 32-headroom greater/equal -scalefactor */
-    if ((DFRACT_BITS - headroom) <= scalefactor) {
+    if ((DFRACT_BITS - headroom) < scalefactor) {
       return (FIXP_DBL)0;
     } else {
       return fMax((value >> scalefactor), (FIXP_DBL)MINVAL_DBL + (FIXP_DBL)1);

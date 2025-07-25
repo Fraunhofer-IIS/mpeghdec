@@ -228,7 +228,7 @@ FDK_ASM_ROUTINE_START(void, activeDmxProcess_STFT_func1,
     FDK_mov_imm(lr, 0)
     FDK_ldr(r5, sp, 0x28, eq_ptr)                                       /* r5 = (FIXP_DBL *) *eq_ptr */
     FDK_str(lr, r0, 4, inputBuffer[1])                                  /* inputBuffer[1] = FIXP_DBL(0) */
-    FDK_vmov_dsn(S2, S3, r0, r1)                                        /* Q0,D1: S3: &realizedSig[0]    S2: &inputBuffer[0] */
+    FDK_vmov_dsn(s2, s3, r0, r1)                                        /* Q0,D1: S3: &realizedSig[0]    S2: &inputBuffer[0] */
     FDK_ldr( r6, sp, 0x2C, dmxMatrixL_FDK)                              /* r6 = (FIXP_SGL) dmx_coeff_mtx = dmxMatrixL_FDK */
     FDK_ldrd(r8, r9, sp, 0x34, erb_is4GVH_L, erb_is4GVH_H)              /* r8 = (UINT) max_erb = erb_is4GVH_L || r9 = *erb_is4GVH_H */
     FDK_ldr(r4, sp, 0x44, inBufStftHeadroom)                            /* r4 = (INT *) inBufStftHeadroom */
@@ -383,7 +383,7 @@ FDK_label(activeDmxProcess_STFT_func1_it1)
 
 FDK_label(activeDmxProcess_STFT_func1_end)
     /* Process loop run-out*/
-    FDK_vmov_dreg(r0, r1, S2, S3)                                       /* r1: &realizedSig[0]         r0: &inputBuffer[0]  */
+    FDK_vmov_dreg(r0, r1, s2, s3)                                       /* r1: &realizedSig[0]         r0: &inputBuffer[0]  */
     FDK_add_imm(r0, r0, 4, 2)                                           /* r0: &inputBuffer[1]                              */
     FDK_vst1(32, S1, r0)                                                /* S1: inputBuffer[1] = savIm0                      */
     FDK_vshl_s32_d(D0, D0, D20)                                         /* D0,S1:  savIm0 << inBufStftHeadroom[erb]         */
@@ -962,7 +962,7 @@ FDK_label(activeDmxProcess_STFT_func4_loop4x)   // 56/4=14 iterations
 
   FDK_mpop(r4, r5)
 
-FDK_return()
+  FDK_return()
 
 FDK_ASM_ROUTINE_END()
 
