@@ -1186,8 +1186,13 @@ LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_DecodeFrame(HANDLE_AACDECODER self, IN
             ErrorStatus = AAC_DEC_NOT_ENOUGH_BITS;
             goto bail;
           case TRANSPORTDEC_SYNC_ERROR:
-            self->streamInfo.numLostAccessUnits = aacDecoder_EstimateNumberOfLostFrames(self);
-            fTpInterruption = 1;
+            if (TT_IS_PACKET(transportDec_GetFormat(self->hInput))) {
+              ErrorStatus = AAC_DEC_PARSE_ERROR;
+              fTpConceal = 1;
+            } else {
+              self->streamInfo.numLostAccessUnits = aacDecoder_EstimateNumberOfLostFrames(self);
+              fTpInterruption = 1;
+            }
             break;
           case TRANSPORTDEC_NEED_TO_RESTART:
             ErrorStatus = AAC_DEC_NEED_TO_RESTART;

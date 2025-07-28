@@ -2528,7 +2528,11 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
       }
     }
 
-    element_count++;
+    /* Support arbitrary amount of FIL elements for General Audio bitstreams by not increasing
+     * element_count */
+    if ((self->flags[0] & (AC_USAC | AC_RSVD50 | AC_MPEGH3DA | AC_ELD | AC_SCALABLE | AC_ER))) {
+      element_count++;
+    }
 
   } /* while ( (type != ID_END) ... ) */
 
@@ -2569,7 +2573,6 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
            streamIndex == 0) ||
           (self->prerollAULength[self->accessUnit] && 0 < unreadBits && unreadBits <= 7)) {
         self->frameOK = 0;
-
         /* Do not overwrite current error */
         if (ErrorStatus == AAC_DEC_OK && self->frameOK == 0) {
           ErrorStatus = AAC_DEC_PARSE_ERROR;
@@ -2771,7 +2774,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
     ErrorStatus = AAC_DEC_UNKNOWN;
   }
 
-  /* If there is no valid data to transfrom into time domain, return. */
+  /* If there is no valid data to transform into time domain, return. */
   if (!IS_OUTPUT_VALID(ErrorStatus)) {
     return ErrorStatus;
   }

@@ -233,10 +233,15 @@ int CMct_Initialize(CMctPtr* pCMctPtr, const ULONG mctChanMask, int firstSigIdx,
     }
   }
 
-  mct->prevOutSpec = (FIXP_DBL*)FDKmalloc(mct->numMctChannels * 1024 * sizeof(FIXP_DBL));
-  if (!mct->prevOutSpec) goto bail;
-  mct->prevOutSpec_exp = (SHORT*)FDKmalloc(mct->numMctChannels * 8 * 16 * sizeof(SHORT));
-  if (!mct->prevOutSpec_exp) goto bail;
+  if (mct->numMctChannels) {
+    mct->prevOutSpec = (FIXP_DBL*)FDKmalloc(mct->numMctChannels * 1024 * sizeof(FIXP_DBL));
+    if (!mct->prevOutSpec) goto bail;
+    mct->prevOutSpec_exp = (SHORT*)FDKmalloc(mct->numMctChannels * 8 * 16 * sizeof(SHORT));
+    if (!mct->prevOutSpec_exp) goto bail;
+  } else {
+    mct->prevOutSpec = NULL;
+    mct->prevOutSpec_exp = NULL;
+  }
 
   (*pCMctPtr) = mct;
 
