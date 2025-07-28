@@ -294,31 +294,71 @@ static INT aacDecoder_CtrlCFGChangeCallback(void* handle,
 }
 
 static INT aacDecoder_TruncationMsgCallback(void* handle, INT nTruncSamples, INT truncType) {
-  TRANSPORTDEC_ERROR errTp = TRANSPORTDEC_OK;
   HANDLE_AACDECODER self = (HANDLE_AACDECODER)handle;
-  SHORT delay = 3 * 256 + TD_UPSAMPLER_MAX_DELAY;
+  const int delay = 3 * 256 + TD_UPSAMPLER_MAX_DELAY;
+  int q = 0;
 
-  if (self != NULL) {
-    self->truncateSampleCount = nTruncSamples;
-    /* set truncation offset */
-    if (truncType == 0) { /* right truncation */
-      self->truncateStartOffset = delay - nTruncSamples;
-      self->truncateStopOffset = delay;
-      self->truncateFromEndFlag = 1;
-      if (self->discardSamplesAtStartCnt == -2) self->discardSamplesAtStartCnt = -1;
-    } else if (truncType == 1) { /* left truncation */
-      self->truncateStopOffset = nTruncSamples + delay;
-      if (self->discardSamplesAtStartCnt == -1) self->discardSamplesAtStartCnt = -2;
-    } else { /* generate truncation for config change without truncation message */
-      self->truncateStartOffset = delay;
-      self->truncateStopOffset = delay;
-      if (self->discardSamplesAtStartCnt == -2) self->discardSamplesAtStartCnt = -1;
+  FDK_ASSERT(self != NULL);
+
+  int startOffset, stopOffset;
+
+  /* Determine truncation boundaries */
+  if (truncType == 0) { /* right truncation */
+    if (self->truncateFrameSize <= 0) {
+      return TRANSPORTDEC_PARSE_ERROR;
     }
-  } else {
-    errTp = TRANSPORTDEC_UNKOWN_ERROR;
+    startOffset = delay + self->truncateFrameSize - nTruncSamples;
+    stopOffset = delay + self->truncateFrameSize;
+  } else if (truncType == 1) { /* left truncation */
+    startOffset = delay;
+    stopOffset = delay + nTruncSamples;
+  } else { /* generate truncation for config change without truncation message */
+    startOffset = delay;
+    stopOffset = delay;
   }
 
-  return errTp;
+  for (q = 0; q < TRUNC_QUEUE_SIZE; q++) {
+    if ((self->truncateStartOffset[q] > 0 || self->truncateStopOffset[q] > 0) &&
+        !(self->truncateStartOffset[q] == stopOffset ||
+          self->truncateStopOffset[q] >= startOffset)) {
+      continue;
+    }
+
+    /* The truncation segment list is required to be ordered. Reorder in case required. */
+    if (q < (TRUNC_QUEUE_SIZE - 1) &&
+        (self->truncateStartOffset[q + 1] > 0 || self->truncateStopOffset[q + 1] > 0)) {
+      FDKmemmove(self->truncateStartOffset + q, self->truncateStartOffset + q + 1,
+                 sizeof(SHORT) * (TRUNC_QUEUE_SIZE - q - 1));
+      FDKmemmove(self->truncateStopOffset + q, self->truncateStopOffset + q + 1,
+                 sizeof(SHORT) * (TRUNC_QUEUE_SIZE - q - 1));
+      self->truncateStartOffset[TRUNC_QUEUE_SIZE - 1] = -128;
+      self->truncateStopOffset[TRUNC_QUEUE_SIZE - 1] = -128;
+      continue;
+    }
+
+    self->truncateSampleCount += nTruncSamples;
+    if (self->truncateStopOffset[q] > 0) {
+      self->truncateStartOffset[q] = fMin((int)self->truncateStartOffset[q], startOffset);
+      self->truncateStopOffset[q] = fMax((int)self->truncateStopOffset[q], stopOffset);
+    } else {
+      self->truncateStartOffset[q] = startOffset;
+      self->truncateStopOffset[q] = stopOffset;
+    }
+    if (truncType == 0) { /* right truncation */
+      FDK_ASSERT(self->truncateFrameSize > 0);
+      if (q == 0 && self->discardSamplesAtStartCnt == -2) self->discardSamplesAtStartCnt = -1;
+    } else if (truncType == 1) { /* left truncation */
+      if (q == 0 && self->discardSamplesAtStartCnt == -1) self->discardSamplesAtStartCnt = -2;
+    } else { /* generate truncation for config change without truncation message */
+      if (q == 0 && self->discardSamplesAtStartCnt == -2) self->discardSamplesAtStartCnt = -1;
+    }
+
+    break;
+  }
+
+  FDK_ASSERT(q < TRUNC_QUEUE_SIZE);
+
+  return TRANSPORTDEC_OK;
 }
 
 static INT aacDecoder_UniDrcCallback(void* handle, HANDLE_FDK_BITSTREAM hBs,
@@ -1038,9 +1078,10 @@ LINKSPEC_CPP HANDLE_AACDECODER aacDecoder_Open(TRANSPORT_TYPE transportFmt, UINT
   aacDec->limiterEnableCurr = 0;
   aacDec->discardSamplesAtStartCnt = -1; /* initialized for startup detection */
 
-  aacDec->truncateStartOffset = -128;
-  aacDec->truncateStopOffset = -128;
-  aacDec->truncateFromEndFlag = 0;
+  for (int q = 0; q < TRUNC_QUEUE_SIZE; q++) {
+    aacDec->truncateStartOffset[q] = -128;
+    aacDec->truncateStopOffset[q] = -128;
+  }
 
   /* Assure that all modules have same delay */
   if (setConcealMethod(aacDec, CConcealment_GetMethod(&aacDec->concealCommonData))) {
@@ -1147,6 +1188,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_DecodeFrame(HANDLE_AACDECODER self, IN
   int fTpInterruption = 0; /* Transport originated interruption detection. */
   int fTpConceal = 0;      /* Transport originated concealment. */
   int streamIndex = 0;
+  int truncateFrameSize = -1; /* not set */
   UINT accessUnit = 0;
   UINT numAccessUnits = 1;
   UINT numPrerollAU = 0;
@@ -1345,8 +1387,6 @@ LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_DecodeFrame(HANDLE_AACDECODER self, IN
     self->streamInfo.numChannels = self->streamInfo.aacNumChannels;
 
     /* MPEG-H Rendering */
-
-    self->truncateFrameSize = -1; /* not set */
 
     if ((self->flags[0] & AC_MPEGH3DA) && (self->targetLayout_config >= 0) &&
         (self->streamInfo.numChannels > 0)) {
@@ -1674,116 +1714,168 @@ LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_DecodeFrame(HANDLE_AACDECODER self, IN
       }
 
       /* Truncation */
-      int truncStart = 0, truncStop = 0;
       if (!(flags & (AACDEC_CONCEAL | AACDEC_FLUSH))) {
-        int truncLength;
+        int frameSizeRemaining = self->streamInfo.frameSize;
+        int lastFrameSamples = 775, newFrameSamples = frameSizeRemaining - lastFrameSamples;
 
-        /* if a truncation right occurs at startup frameSize is not yet initialized in
-         * TruncationMsgCallback thus it is added here */
-        if (self->truncateFromEndFlag) {
-          self->truncateFromEndFlag = 0;
-          self->truncateStartOffset += self->streamInfo.frameSize;
-          self->truncateStopOffset += self->streamInfo.frameSize;
-        }
-
-        /* extend truncation for flushed and preroll frames */
-        if ((self->flushStatus) || (accessUnit < numPrerollAU)) {
-          if (self->truncateStopOffset > 0) self->truncateStopOffset += self->streamInfo.frameSize;
-        }
-        /* current frame start and stop sample index of truncated part */
-        truncStart = fMax(0, fMin(self->streamInfo.frameSize, (INT)self->truncateStartOffset));
-        truncStop = fMax(0, fMin(self->streamInfo.frameSize, (INT)self->truncateStopOffset));
-
-        /* length of truncated and remaining part */
-        truncLength = truncStop - truncStart;
-        self->truncateFrameSize = self->streamInfo.frameSize - truncLength;
-
-        /* save samples for crossfade */
-        if ((self->truncateStartOffset + 128 > 0) &&
-            (self->truncateStartOffset < self->streamInfo.frameSize)) {
-          int ch, l;
-
-          l = fMin(self->streamInfo.frameSize, (INT)self->truncateStartOffset + 128) - truncStart;
-
-          for (ch = 0; ch < self->streamInfo.numChannels; ch++) {
-            FDKmemcpy(self->crossfadeMem + 128 * ch + truncStart - self->truncateStartOffset,
-                      pTimeData2 + self->streamInfo.frameSize * ch + truncStart,
-                      l * sizeof(PCM_DEC));
-          }
-        }
-
-        /* apply crossfade */
-        if (self->applyCrossfade != AACDEC_CROSSFADE_BITMASK_OFF) {
-          if ((self->truncateStopOffset + 128 > 0) &&
-              (self->truncateStopOffset < self->streamInfo.frameSize)) {
-            int i, ch;
-
-            {
-              FIXP_SGL alpha, step = FL2FXCONST_SGL(1.0 / 127);
-              int stop;
-
-              stop = fMin(self->streamInfo.frameSize, (INT)self->truncateStopOffset + 128);
-              alpha = (FIXP_SGL)((truncStop - self->truncateStopOffset) * (int)step) - step;
-              for (i = truncStop; i < stop; i++) {
-                alpha += step; /* increment alpha before the loop to avoid FIXP_SGL overflow */
-                for (ch = 0; ch < self->streamInfo.numChannels; ch++) {
-                  PCM_DEC tmpIn, tmpOut;
-
-                  tmpIn = pTimeData2[self->streamInfo.frameSize * ch + i];
-                  tmpOut = self->crossfadeMem[128 * ch + i - self->truncateStopOffset];
-                  pTimeData2[self->streamInfo.frameSize * ch + i] =
-                      fMult(alpha, tmpIn) + fMult((FIXP_SGL)(FL2FXCONST_SGL(1.0) - alpha), tmpOut);
-                }
+        /* extend/shift truncation range for flushed and preroll frames */
+        for (int q = 0; q < TRUNC_QUEUE_SIZE; q++) {
+          if (self->flushStatus) {
+            if (self->truncateStopOffset[q] >= 775) {
+              self->truncateStopOffset[q] += self->streamInfo.frameSize;
+              /* If there is a trunc segment starting after position 0 (+ delay) it has to be
+              shifted instead of extended because it is after the inserted flush/preroll */
+              if (self->truncateStartOffset[q] > 775) {
+                self->truncateStartOffset[q] += self->streamInfo.frameSize;
               }
             }
-
-            if (self->truncateStopOffset + 128 <= self->streamInfo.frameSize) {
-              self->applyCrossfade =
-                  AACDEC_CROSSFADE_BITMASK_OFF; /* disable cross-fade between frames at nect config
-                                                   change */
+          }
+          if (accessUnit < numPrerollAU) {
+            if (self->truncateStopOffset[q] > 0) {
+              self->truncateStopOffset[q] += self->streamInfo.frameSize;
+              /* If there is a trunc segment starting after position 0 (+ delay) it has to be
+              shifted instead of extended because it is after the inserted flush/preroll */
+              if (self->truncateStartOffset[q] > 775) {
+                self->truncateStartOffset[q] += self->streamInfo.frameSize;
+              }
             }
           }
         }
 
-        /* apply truncation */
-        /* This version keeps the distance (self->streamInfo.frameSize) of the channel data
-           There are 2 exclusive cases:
-           In case of truncStart !=0, we truncate all data [truncStart
-           ...self->streamInfo.frameSize-1]
-              => no copy required
-           In case of truncStop !=0, we truncate all data [0 ... truncStop-1]
-              => copy [truncStop ... self->streamInfo.frameSize-1] to [0 ...truncFrameSize-1]
-         */
-        if ((truncLength > 0) && (self->truncateFrameSize > 0)) {
-          int ch;
+        /* Go through truncation queue */
+        for (int q = 0; q < TRUNC_QUEUE_SIZE; q++) {
+          int truncateFrameSizeCurrent;
+          int truncStart, truncStop, truncLength;
 
-          for (ch = 0; ch < self->streamInfo.numChannels; ch++) {
-            if (truncStop < self->streamInfo.frameSize) {
-              /* Truncate first samples [0..truncStop-1]: move remaining to start at 0 for each
-               * channel */
-              FDKmemmove(pTimeData2 + self->streamInfo.frameSize * ch,
-                         pTimeData2 + self->streamInfo.frameSize * ch + truncStop,
-                         self->truncateFrameSize * sizeof(PCM_DEC));
-              if (truncStart) truncStart += 0;
+          /* update offsets from previous iteration truncation segment */
+          self->truncateStartOffset[q] =
+              fMax(-128, self->truncateStartOffset[q] -
+                             (self->streamInfo.frameSize - frameSizeRemaining));
+          self->truncateStopOffset[q] =
+              fMax(-128,
+                   self->truncateStopOffset[q] - (self->streamInfo.frameSize - frameSizeRemaining));
+
+          /* Skip inactive truncation segments. */
+          if (q > 0 && (self->truncateStartOffset[q] < 0 && self->truncateStopOffset[q] < 0)) {
+            continue;
+          }
+
+          /* current frame start and stop sample index of truncated part */
+          truncStart = fMax(0, fMin(frameSizeRemaining, (INT)self->truncateStartOffset[q]));
+          truncStop = fMax(0, fMin(frameSizeRemaining, (INT)self->truncateStopOffset[q]));
+
+          /* length of truncated and remaining part */
+          truncLength = truncStop - truncStart;
+          truncateFrameSizeCurrent = frameSizeRemaining - truncLength;
+
+          /* number of new frame and last frame samples for Earcon */
+          newFrameSamples -= fMax(lastFrameSamples, truncStop) - fMax(lastFrameSamples, truncStart);
+          lastFrameSamples -=
+              fMin(lastFrameSamples, truncStop) - fMin(lastFrameSamples, truncStart);
+
+          /* save samples for crossfade */
+          if ((self->truncateStartOffset[q] + 128 > 0) &&
+              (self->truncateStartOffset[q] < frameSizeRemaining)) {
+            int ch, l;
+
+            l = fMin(frameSizeRemaining, (INT)self->truncateStartOffset[q] + 128) - truncStart;
+
+            for (ch = 0; ch < self->streamInfo.numChannels; ch++) {
+              FDKmemcpy(self->crossfadeMem + 128 * ch + truncStart - self->truncateStartOffset[q],
+                        pTimeData2 + self->streamInfo.frameSize * ch + truncStart,
+                        l * sizeof(PCM_DEC));
             }
+          }
+
+          /* apply crossfade */
+          if (self->applyCrossfade != AACDEC_CROSSFADE_BITMASK_OFF) {
+            if ((self->truncateStopOffset[q] + 128 > 0) &&
+                (self->truncateStopOffset[q] < frameSizeRemaining)) {
+              int i, ch;
+
+              {
+                FIXP_SGL alpha, step = FL2FXCONST_SGL(1.0 / 127);
+                int stop;
+
+                stop = fMin(frameSizeRemaining, (INT)self->truncateStopOffset[q] + 128);
+                alpha = (FIXP_SGL)((truncStop - self->truncateStopOffset[q]) * (int)step) - step;
+                for (i = truncStop; i < stop; i++) {
+                  alpha += step; /* increment alpha before the loop to avoid FIXP_SGL overflow */
+                  for (ch = 0; ch < self->streamInfo.numChannels; ch++) {
+                    PCM_DEC tmpIn, tmpOut;
+
+                    tmpIn = pTimeData2[self->streamInfo.frameSize * ch + i];
+                    tmpOut = self->crossfadeMem[128 * ch + i - self->truncateStopOffset[q]];
+                    pTimeData2[self->streamInfo.frameSize * ch + i] =
+                        fMult(alpha, tmpIn) +
+                        fMult((FIXP_SGL)(FL2FXCONST_SGL(1.0) - alpha), tmpOut);
+                  }
+                }
+              }
+
+              if (self->truncateStopOffset[q] + 128 <= frameSizeRemaining) {
+                self->applyCrossfade =
+                    AACDEC_CROSSFADE_BITMASK_OFF; /* disable cross-fade between frames at nect
+                                                     config change */
+              }
+            }
+          }
+
+          /* apply truncation */
+          /* This version keeps the distance (self->streamInfo.frameSize) of the channel data
+             There are 2 exclusive cases:
+             In case of truncStart !=0, we truncate all data [truncStart
+             ...self->streamInfo.frameSize-1]
+                => no copy required
+             In case of truncStop !=0, we truncate all data [0 ... truncStop-1]
+                => copy [truncStop ... self->streamInfo.frameSize-1] to [0
+             ...truncateFrameSizeCurrent-1]
+           */
+          if ((truncLength > 0) && (truncateFrameSizeCurrent > 0)) {
+            int ch;
+
+            for (ch = 0; ch < self->streamInfo.numChannels; ch++) {
+              if (truncStop < frameSizeRemaining) {
+                /* Truncate first samples [0..truncStop-1]: move remaining to start at 0 for each
+                 * channel */
+                FDKmemmove(pTimeData2 + self->streamInfo.frameSize * ch,
+                           pTimeData2 + self->streamInfo.frameSize * ch + truncStop,
+                           truncateFrameSizeCurrent * sizeof(PCM_DEC));
+              }
+            }
+          }
+
+          /* update offsets for next iteration preroll/flushing/decoding */
+          self->truncateStartOffset[q] =
+              fMax(-128, self->truncateStartOffset[q] - frameSizeRemaining);
+          self->truncateStopOffset[q] =
+              fMax(-128, self->truncateStopOffset[q] - frameSizeRemaining);
+
+          frameSizeRemaining -= truncLength;
+        } /* for (int q=0...) */
+
+        if (self->flags[0] & AC_MPEGH3DA) {
+          if (accessUnit == numAccessUnits - 1) {
+            PcmDataPayload(&self->earconDecoder, self->pTimeData2, self->streamInfo.frameSize,
+                           self->drcStatus.targetLoudness, self->defaultTargetLoudness,
+                           self->targetLayout, fMax(0, lastFrameSamples), fMax(0, newFrameSamples));
           }
         }
 
-        /* update offsets */
-        self->truncateStartOffset =
-            fMax(-128, self->truncateStartOffset - self->streamInfo.frameSize);
-        self->truncateStopOffset =
-            fMax(-128, self->truncateStopOffset - self->streamInfo.frameSize);
+        truncateFrameSize = frameSizeRemaining;
+      } else {
+        /* Clear truncation queue */
+        for (int q = 0; q < TRUNC_QUEUE_SIZE; q++) {
+          self->truncateStartOffset[q] = -128;
+          self->truncateStopOffset[q] = -128;
+        }
 
-        /* set new frame size */
-        /* self->streamInfo.frameSize = truncFrameSize; */
-      }
-
-      if (self->flags[0] & AC_MPEGH3DA) {
-        if (accessUnit == numAccessUnits - 1) {
-          PcmDataPayload(&self->earconDecoder, self->pTimeData2, self->streamInfo.frameSize,
-                         self->drcStatus.targetLoudness, self->defaultTargetLoudness,
-                         self->targetLayout, truncStart, truncStop);
+        if (self->flags[0] & AC_MPEGH3DA) {
+          if (accessUnit == numAccessUnits - 1) {
+            PcmDataPayload(&self->earconDecoder, self->pTimeData2, self->streamInfo.frameSize,
+                           self->drcStatus.targetLoudness, self->defaultTargetLoudness,
+                           self->targetLayout, 775, self->streamInfo.frameSize - 775);
+          }
         }
       }
 
@@ -1902,8 +1994,8 @@ LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_DecodeFrame(HANDLE_AACDECODER self, IN
     FDK_interleave(pTimeData2, pInterleaveBuffer, self->streamInfo.numChannels, blockLength,
                    self->streamInfo.frameSize);
 
-    if (self->truncateFrameSize != -1) {
-      self->streamInfo.frameSize = self->truncateFrameSize;
+    if (truncateFrameSize != -1) {
+      self->streamInfo.frameSize = truncateFrameSize;
     }
 
     if (self->limiterEnableCurr) {

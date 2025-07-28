@@ -1869,6 +1869,8 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
     self->aacChannelsPrev = 0;
   }
 
+  self->truncateFrameSize = (1024 * 48000) / self->samplingRateInfo[0].samplingRate;
+
   /* Update structures */
   if (*configChanged) {
     /* Things to be done for each channel, which do not involve allocating memory.
@@ -3005,8 +3007,8 @@ void EarconDecoder_Init(HANDLE_EARCONDECODER hEarconDecoderH) {
 
 TRANSPORTDEC_ERROR PcmDataPayload(EarconDecoder* earconDecoder, FIXP_DBL* TimeData,
                                   UINT BaseframeSize, SCHAR drcStatus_targetLoudness,
-                                  SCHAR defaultTargetLoudness, INT targetLayout, SHORT truncStart,
-                                  SHORT truncStop) {
+                                  SCHAR defaultTargetLoudness, INT targetLayout,
+                                  SHORT LastFrameSamples, SHORT NewFrameSamples) {
   FIXP_DBL EarconGain, AttGain;
   FIXP_DBL AttGain_increment;
   INT EarconShift, AttGainShift;
@@ -3015,7 +3017,7 @@ TRANSPORTDEC_ERROR PcmDataPayload(EarconDecoder* earconDecoder, FIXP_DBL* TimeDa
   if (earconDecoder->AccumulatedFrameSize <= 0) {
     /*Prepare for the next time*/
     earconDecoder->AccumulatedFrameSize = 0;
-    if (earconDecoder->BaseframeSize - truncStop + truncStart > 0) earconDecoder->First_Frame = 1;
+    if (LastFrameSamples + NewFrameSamples > 0) earconDecoder->First_Frame = 1;
     return TRANSPORTDEC_OK;
   }
 
@@ -3161,17 +3163,7 @@ TRANSPORTDEC_ERROR PcmDataPayload(EarconDecoder* earconDecoder, FIXP_DBL* TimeDa
   /* Process delayed past signal LastFrameSamples and part of current NewFrameSamples */
   {
     /*Calculate old/new signal lengths and startPoint */
-    INT LastFrameSamples;
-    INT NewFrameSamples;
     INT startPoint = 0;
-
-    if (truncStart > 0) {
-      NewFrameSamples = fMax(0, truncStart - 775);
-      LastFrameSamples = fMin((int)truncStart, 775);
-    } else {
-      NewFrameSamples = earconDecoder->BaseframeSize - fMax(775, (INT)truncStop);
-      LastFrameSamples = fMax(0, 775 - truncStop);
-    }
 
     if (earconDecoder->First_Frame == 1) {
       startPoint = LastFrameSamples;

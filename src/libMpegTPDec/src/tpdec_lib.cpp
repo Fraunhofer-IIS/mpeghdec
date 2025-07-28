@@ -1241,12 +1241,6 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
                 }
               }
 
-              if (isActive && !truncFromBegin &&
-                  (hTp->ctrlCFGChange[mhasSubstream].buildUpStatus != TPDEC_BUILD_UP_OFF)) {
-                /* ignore invalid right truncation */
-                isActive = 0;
-              }
-
               if (isActive && hTp->callbacks.cbTruncationMsg) {
                 /* truncation callback should not be executed if a left truncation without content
                  * change or without config change occurred */

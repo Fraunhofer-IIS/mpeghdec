@@ -1228,7 +1228,7 @@ AAC_DECODER_ERROR applyUserInteractivity(HANDLE_AACDECODER self, PCM_DEC* pTimeD
 
   if (self->useElementSkipping && self->uiSignalChanged) {
     if ((self->flushStatus == AACDEC_FLUSH_OFF) && (self->buildUpStatus == AACDEC_BUILD_UP_OFF) &&
-        (self->truncateStopOffset ==
+        (self->truncateStopOffset[0] ==
          -128)) { /* make sure no config change is in progress before forcing one */
       transportDec_SetParam(self->hInput, TPDEC_PARAM_FORCE_CONFIG_CHANGE, 0);
       self->applyCrossfade |= AACDEC_CROSSFADE_BITMASK_UI; /* cross-fade shall be applied */
