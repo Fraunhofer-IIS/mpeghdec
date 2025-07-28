@@ -644,8 +644,11 @@ Where N equals to CStreamInfo::frameSize .
 
 MPEG-H supports user interactivity, e.g. turning on/off or changing gain of certain audio tracks.
 This functionality is implemented with a separate interface (libMpeghUIManager).
-Please refer to the separately provided documentation (MPEG-H_UI_manager.pdf) on how to correctly
-implement the user interactivity features.
+Please refer to the online documentation:
+
+https://github.com/Fraunhofer-IIS/mpeghdec/wiki/MPEG-H-UI-manager
+
+https://github.com/Fraunhofer-IIS/mpeghdec/wiki/MPEG-H-UI-manager-XML-format
 */
 
 #include "machine_type.h"
