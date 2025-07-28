@@ -243,6 +243,8 @@ int CMct_Initialize(CMctPtr* pCMctPtr, const ULONG mctChanMask, int firstSigIdx,
     mct->prevOutSpec_exp = NULL;
   }
 
+  mct->MCTSignalingTypePrev = -1;
+
   (*pCMctPtr) = mct;
 
   return AAC_DEC_OK;
@@ -389,11 +391,6 @@ static int Read_MultichannelCodingBox(const int MCTSignalingType, const int usac
     work->bDeltaTime[i] = FDKreadBit(hbitBuffer);
   }
 
-  /*Sanity check*/
-  if ((work->bDeltaTime[i]) && (self->MCCSignalingType != self->MCTSignalingTypePrev)) {
-    return 1;
-  }
-
   if (work->bHasBandwiseCoeffs[i] == 0) {
     /* use fullband angle */
     int val =
@@ -439,8 +436,8 @@ int CMct_inverseMctParseBS(CMctPtr self, HANDLE_FDK_BITSTREAM hbitBuffer, int us
     default_value = DEFAULT_BETA;
   }
 
-  if (usacIndepFlag > 0) {
-    FDK_ASSERT(work->keepTree == 0);
+  if (usacIndepFlag > 0 || self->MCTSignalingTypePrev != self->MCCSignalingType) {
+    // FDK_ASSERT(work->keepTree == 0);
 
     /* reset coefficient memory on indepFlag */
     for (i = 0; i < MAX_NUM_MCT_BOXES; i++) {
