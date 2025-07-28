@@ -1291,9 +1291,9 @@ static void iisIGFDecoderMappingAndMSStereo(
     IGF_PRIVATE_STATIC_DATA_HANDLE hPrivateStaticDataL,
     IGF_PRIVATE_STATIC_DATA_HANDLE hPrivateStaticDataR, IGF_PRIVATE_DATA_HANDLE hPrivateDataL,
     IGF_PRIVATE_DATA_HANDLE hPrivateDataR, FIXP_DBL** temp_IGF_bandL, FIXP_DBL** temp_IGF_bandR,
-    const UCHAR* iUseMSTab, UCHAR* TNF_mask,
+    const UCHAR* MsUsed, UCHAR* TNF_mask,
     const INT window_sequence, /**< in: 1==SHORT 0==LONG window seq */
-    const INT win, const INT frameType) {
+    const INT win, const INT group, const INT frameType) {
   IGF_GRID_INFO_HANDLE hGridL;
   IGF_GRID_INFO_HANDLE hGridR;
   IGF_MAP_INFO_HANDLE hMapL;
@@ -1312,8 +1312,8 @@ static void iisIGFDecoderMappingAndMSStereo(
   /*make sure it is a common window*/
   FDK_ASSERT(hGridL->iIGFNumTile == hGridR->iIGFNumTile);
 
-  /* Adjust iUseMSTab to the IGF range and set pairing if active */
-  iUseMSTab += hGridL->iIGFStartSfb;
+  /* Adjust MsUsed to the IGF range and set pairing if active */
+  MsUsed += hGridL->iIGFStartSfb;
   TNF_mask += hGridL->iIGFStartLine;
 
   sfbStep = 1;
@@ -1372,7 +1372,7 @@ static void iisIGFDecoderMappingAndMSStereo(
     sfb_jump = 0;
     if (hMapL->iSfbSplit) {
       sfb_jump = 1;
-      iUseMSTab--;
+      MsUsed--;
     }
 
     for (sfb = 0; sfb < hMapL->iSfbCnt; sfb++) {
@@ -1388,7 +1388,7 @@ static void iisIGFDecoderMappingAndMSStereo(
       FIXP_DBL* p2_temp_IGF_bandR = *temp_IGF_bandR;
 
       /*Just for MS/stereo case*/
-      if (*iUseMSTab) {
+      if (*MsUsed & ((UCHAR)1 << group)) {
         INT width_count = width;
         while (width_count--) {
           /*Shift left to get maximum resolution of the output.*/
@@ -1424,10 +1424,10 @@ static void iisIGFDecoderMappingAndMSStereo(
       *temp_IGF_bandR += width;
 
       if (sfb_jump) {
-        iUseMSTab++;
+        MsUsed++;
         sfb_jump = 0;
       } else {
-        iUseMSTab += sfbStep;
+        MsUsed += sfbStep;
       }
     }
   }
@@ -2039,8 +2039,8 @@ void CIgf_apply_stereo(IGF_PRIVATE_STATIC_DATA_HANDLE hPrivateStaticDataL,
                        FIXP_DBL* p2_spectrumL, FIXP_DBL* p2_spectrumR, SHORT* specScaleL,
                        SHORT* specScaleR, const INT window_sequence, const INT numOfGroups,
                        const INT NumberOfSpectra, const UCHAR* groupLength, ULONG* randomSeedL,
-                       ULONG* randomSeedR, const UCHAR* iUseMSTab, UCHAR* TNF_maskL,
-                       UCHAR* TNF_maskR, const UCHAR flag_INF_active, const INT frameType) {
+                       ULONG* randomSeedR, const UCHAR* MsUsed, UCHAR* TNF_maskL, UCHAR* TNF_maskR,
+                       const UCHAR flag_INF_active, const INT frameType) {
   IGF_GRID_INFO_HANDLE hGridL;
   IGF_GRID_INFO_HANDLE hGridR;
   INT group;
@@ -2152,9 +2152,8 @@ void CIgf_apply_stereo(IGF_PRIVATE_STATIC_DATA_HANDLE hPrivateStaticDataL,
 
       /* Map data from source to IGF band and implement MS */
       iisIGFDecoderMappingAndMSStereo(hPrivateStaticDataL, hPrivateStaticDataR, hPrivateDataL,
-                                      hPrivateDataR, &p2_temp_IGF_bandL, &p2_temp_IGF_bandR,
-                                      iUseMSTab + group * 64, TNF_mask, window_sequence, winOffset,
-                                      frameType);
+                                      hPrivateDataR, &p2_temp_IGF_bandL, &p2_temp_IGF_bandR, MsUsed,
+                                      TNF_mask, window_sequence, winOffset, group, frameType);
 
       /* Calculate survived and tile energies */
       iisIGFDecoderCollectEnergiesMono(hPrivateStaticDataL, hPrivateDataL,

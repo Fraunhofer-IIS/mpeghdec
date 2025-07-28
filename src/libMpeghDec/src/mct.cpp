@@ -541,8 +541,8 @@ static void clean_sfb_band_MCT_STEFI_DMX(FIXP_DBL* outCoefficient, INT outCoeffi
   }
 }
 
-static int inverseDpcmAngleCoding(CMctPtr self, SHORT pairCoeffQSfb[], SHORT* pairCoeffQFb,
-                                  int pair, int bIsShortBlock, int windowsPerFrame) {
+static int inverseDpcmAngleCoding(CMctPtr self, SHORT pairCoeffQSfb[], int pair, int bIsShortBlock,
+                                  int windowsPerFrame) {
   int lastVal;
   int coeffQ;
   int band = 0;
@@ -669,8 +669,6 @@ static int inverseDpcmAngleCoding(CMctPtr self, SHORT pairCoeffQSfb[], SHORT* pa
       if ((coeffQ < 0) || (coeffQ >= CODE_BOOK_BETA_LAV)) {
         return -1;
       }
-
-      *pairCoeffQFb = coeffQ;
 
       self->pairCoeffQFbPrev[pair] = coeffQ;
 
@@ -916,8 +914,8 @@ static void applyMctPrediction(FIXP_DBL* dmx, SHORT* dmxExp, FIXP_DBL* res, SHOR
 
 static void applyMctRotationWrapper(const CMctPtr self, FIXP_DBL* RESTRICT dmx, SHORT* dmxSfbExp,
                                     FIXP_DBL* RESTRICT res, SHORT* resSfbExp, SHORT* alphaQSfb,
-                                    const UINT64 mctMask, const int numMctBands, const SHORT alphaQ,
-                                    const int totalSfb, const int pair, const SHORT* BandOffsets) {
+                                    const UINT64 mctMask, const int numMctBands, const int totalSfb,
+                                    const int pair, const SHORT* BandOffsets) {
   CMctWorkPtr work = self->mctWork;
 
   if (self->MCCSignalingType == 0) {
@@ -990,7 +988,7 @@ static void CMct_StereoFilling_GetPreviousDmx(
     FIXP_DBL* prevSpec2, SHORT* prevSpec2_exp, FIXP_DBL* dmx_prev, SHORT* dmx_prev_win_exp,
     INT pair, const SHORT* pScaleFactorBandOffsets, const UCHAR* pWindowGroupLength,
     const int windowGroups, const INT max_noise_sfb, UCHAR* band_is_noise,
-    const int applyPrediction) {
+    const int applyPrediction, const int mctBandsPerWindow) {
   int window, group;
   int noiseFillingStartOffset, sfb, nfStartOffset_sfb;
   int lScale, rScale, temp;
@@ -1105,6 +1103,8 @@ static void CMct_StereoFilling_GetPreviousDmx(
     }     /* window */
 
   } else {
+    int mctBandOffset = 0;
+
     for (window = 0, group = 0; group < windowGroups; group++) {
       for (int groupwin = 0; groupwin < pWindowGroupLength[group]; groupwin++, window++) {
         leftSpectrum = prevSpec1 + window * pAacDecoderChannelInfo->granuleLength;
@@ -1112,6 +1112,8 @@ static void CMct_StereoFilling_GetPreviousDmx(
         outSpectrum = dmx_prev + window * pAacDecoderChannelInfo->granuleLength;
 
         for (sfb = nfStartOffset_sfb; sfb < max_noise_sfb; sfb++) {
+          int mctBand = sfb >> 1;
+
           /* Run algorithm only if the particular band has been fully noise filled, i.e. that it has
           been empty before the noise-filling process */
           if (!band_is_noise[group * 16 + sfb]) {
@@ -1122,7 +1124,8 @@ static void CMct_StereoFilling_GetPreviousDmx(
           FIXP_DBL* rightCoefficient = &rightSpectrum[pScaleFactorBandOffsets[sfb]];
           FIXP_DBL* outCoefficient = &outSpectrum[pScaleFactorBandOffsets[sfb]];
 
-          if (READ_MASK(work->mctMask[pair], sfb >> 1)) {
+          if (mctBand < mctBandsPerWindow &&
+              READ_MASK(work->mctMask[pair], mctBand + mctBandOffset)) {
             /* Find if a difference between the scalings exists. */
             temp = prevSpec1_exp[window * 16 + sfb] - prevSpec2_exp[window * 16 + sfb];
             if (temp > 0) {
@@ -1135,7 +1138,7 @@ static void CMct_StereoFilling_GetPreviousDmx(
               dmx_prev_win_exp[window * 16 + sfb] = prevSpec2_exp[window * 16 + sfb] + 1;
             }
 
-            SHORT alphaQ = pairCoeffQSfb[sfb >> 1];
+            SHORT alphaQ = pairCoeffQSfb[mctBand + mctBandOffset];
 
             applyMctInverseRotationFrame(
                 leftCoefficient, lScale, rightCoefficient, rScale, outCoefficient, alphaQ,
@@ -1156,8 +1159,10 @@ static void CMct_StereoFilling_GetPreviousDmx(
           }
 
         } /*for (band=0; band<scaleFactorBandsTransmitted; band++)*/
-      }   /*  for (int groupwin=0; groupwin<pWindowGroupLength[group]; groupwin++, window++)*/
-    }     /* window */
+
+        mctBandOffset += mctBandsPerWindow;
+      } /*  for (int groupwin=0; groupwin<pWindowGroupLength[group]; groupwin++, window++)*/
+    }   /* window */
   }
 
   /* MS stereo */
@@ -1575,7 +1580,6 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
                            const UINT usacIndepFrame) {
   int ch1 = 0, ch2 = 0;
   int pair;
-  SHORT alphaQ = 0;
   SHORT* alphaQSfb = NULL;
 
   CMctWorkPtr work = self->mctWork;
@@ -1621,8 +1625,8 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
       bIsShortBlock = 1;
     }
 
-    mctBandsPerWindow = inverseDpcmAngleCoding(self, pairCoeffQSfb, &pairCoeffQFb, pair,
-                                               bIsShortBlock, windowsPerFrame);
+    mctBandsPerWindow =
+        inverseDpcmAngleCoding(self, pairCoeffQSfb, pair, bIsShortBlock, windowsPerFrame);
 
     if (mctBandsPerWindow < 0) {
       return -1;
@@ -1678,7 +1682,7 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
               prevSpec2, prevSpec2_exp, prevDmx, prevDmx_exp, pair,
               GetScaleFactorBandOffsets(icsInfo1, samplingRateInfo),
               GetWindowGroupLengthTable(icsInfo1), GetWindowGroups(icsInfo1), icsInfo2->MaxSfBands,
-              band_is_noise, zeroPrevOutSpec1 && zeroPrevOutSpec2);
+              band_is_noise, zeroPrevOutSpec1 && zeroPrevOutSpec2, mctBandsPerWindow);
 
         }
         /* General case: both of the previous elements are available for computing previous dmx */
@@ -1688,7 +1692,7 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
               prevSpec2, prevSpec2_exp, prevDmx, prevDmx_exp, pair,
               GetScaleFactorBandOffsets(icsInfo1, samplingRateInfo),
               GetWindowGroupLengthTable(icsInfo1), GetWindowGroups(icsInfo1), icsInfo2->MaxSfBands,
-              band_is_noise, 1);
+              band_is_noise, 1, mctBandsPerWindow);
         } /* else */
 
         /* PrevDMX is changed/modified during Stero Filling so it must be preserved for the
@@ -1739,7 +1743,6 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
 
     } /* if(work->hasStereoFilling[pair]) */
 
-    alphaQ = pairCoeffQFb;
     alphaQSfb = pairCoeffQSfb;
 
     icsInfo1->MaxSfBands = icsInfo2->MaxSfBands = fMax(icsInfo1->MaxSfBands, icsInfo2->MaxSfBands);
@@ -1759,8 +1762,8 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
         SHORT* resSfbExp = &(chInfo2->pDynData->aSfbScale[win * 16]);
 
         applyMctRotationWrapper(self, dmx, dmxSfbExp, res, resSfbExp, &alphaQSfb[mctBandOffset],
-                                work->mctMask[pair] << mctBandOffset, mctBandsPerWindow, alphaQ,
-                                totalSfb, pair, BandOffsets);
+                                work->mctMask[pair] << mctBandOffset, mctBandsPerWindow, totalSfb,
+                                pair, BandOffsets);
 
         if ((MCT_elFlags[chTag[ch1]] & AC_EL_ENHANCED_NOISE) &&
             (MCT_elFlags[chTag[ch2]] & AC_EL_ENHANCED_NOISE)) {
@@ -1793,7 +1796,7 @@ int CMct_MCT_StereoFilling(CMctPtr self, CStreamInfo* streamInfo,
               applyMctRotationWrapper(self, dmx, &dmxSfbExp[win * 16], res, &resSfbExp[win * 16],
                                       &alphaQSfb[mctBandOffset],
                                       work->mctMask[pair] << mctBandOffset, mctBandsPerWindow,
-                                      alphaQ, totalSfb, pair, BandOffsets);
+                                      totalSfb, pair, BandOffsets);
 
             } /* for(int tileIdx=0;tileIdx<NumTiles;tileIdx++) */
 

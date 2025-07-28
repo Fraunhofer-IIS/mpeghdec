@@ -199,20 +199,6 @@ void CChannelElement_Decode(
       /* Apply IGF stereo */
       if ((elFlags & AC_EL_ENHANCED_NOISE) && !(elFlags & AC_EL_IGF_AFTER_TNS) &&
           !(elFlags & AC_EL_IGF_INDEP_TILING)) {
-        UCHAR* iUseMSTab =
-            (UCHAR*)pAacDecoderChannelInfo[0]->pComStaticData->pWorkBufferCore1->mdctOutTemp;
-
-        for (int group = 0; group < GetWindowGroups(&pAacDecoderChannelInfo[L]->icsInfo); group++) {
-          UCHAR groupMask = (UCHAR)1 << group;
-          UCHAR* p2_MsUsed = pAacDecoderChannelInfo[L]->pComData->pJointStereoData->MsUsed;
-          UCHAR* p2_iUseMSTab = &iUseMSTab[group << 6];
-          for (int band = 0; band < 64; band++) {
-            UCHAR temp = 0;
-            if (*p2_MsUsed++ & groupMask) temp = 1;
-            *p2_iUseMSTab++ = temp;
-          }
-        }
-
         UCHAR* TNF_maskL =
             (UCHAR*)pAacDecoderChannelInfo[0]->pComStaticData->pWorkBufferCore1->mdctOutTemp + 512;
         UCHAR* TNF_maskR =
@@ -234,7 +220,8 @@ void CChannelElement_Decode(
             IsLongBlock(&pAacDecoderChannelInfo[L]->icsInfo) ? 1 : 8,
             GetWindowGroupLengthTable(&pAacDecoderChannelInfo[L]->icsInfo),
             &(pAacDecoderStaticChannelInfo[L]->nfRandomSeed),
-            &(pAacDecoderStaticChannelInfo[R]->nfRandomSeed), iUseMSTab, TNF_maskL, TNF_maskR,
+            &(pAacDecoderStaticChannelInfo[R]->nfRandomSeed),
+            pAacDecoderChannelInfo[L]->pComData->pJointStereoData->MsUsed, TNF_maskL, TNF_maskR,
             (UCHAR)(elFlags & AC_EL_IGF_USE_ENF ? 1 : 0), IGF_FRAME_DIVISION_AAC_OR_TCX_LONG);
 
         int igfStartSfb;
@@ -317,20 +304,6 @@ void CChannelElement_Decode(
       /* Apply IGF stereo */
       if ((elFlags & AC_EL_ENHANCED_NOISE) && (elFlags & AC_EL_IGF_AFTER_TNS) &&
           !(elFlags & AC_EL_IGF_INDEP_TILING)) {
-        UCHAR* iUseMSTab =
-            (UCHAR*)pAacDecoderChannelInfo[0]->pComStaticData->pWorkBufferCore1->mdctOutTemp;
-
-        for (int group = 0; group < GetWindowGroups(&pAacDecoderChannelInfo[L]->icsInfo); group++) {
-          UCHAR groupMask = (UCHAR)1 << group;
-          UCHAR* p2_MsUsed = pAacDecoderChannelInfo[L]->pComData->pJointStereoData->MsUsed;
-          UCHAR* p2_iUseMSTab = &iUseMSTab[group << 6];
-          for (int band = 0; band < 64; band++) {
-            UCHAR temp = 0;
-            if (*p2_MsUsed++ & groupMask) temp = 1;
-            *p2_iUseMSTab++ = temp;
-          }
-        }
-
         UCHAR* TNF_maskL =
             (UCHAR*)pAacDecoderChannelInfo[0]->pComStaticData->pWorkBufferCore1->mdctOutTemp + 512;
         UCHAR* TNF_maskR =
@@ -352,7 +325,8 @@ void CChannelElement_Decode(
             IsLongBlock(&pAacDecoderChannelInfo[L]->icsInfo) ? 1 : 8,
             GetWindowGroupLengthTable(&pAacDecoderChannelInfo[L]->icsInfo),
             &(pAacDecoderStaticChannelInfo[L]->nfRandomSeed),
-            &(pAacDecoderStaticChannelInfo[R]->nfRandomSeed), iUseMSTab, TNF_maskL, TNF_maskR,
+            &(pAacDecoderStaticChannelInfo[R]->nfRandomSeed),
+            pAacDecoderChannelInfo[L]->pComData->pJointStereoData->MsUsed, TNF_maskL, TNF_maskR,
             (UCHAR)(elFlags & AC_EL_IGF_USE_ENF ? 1 : 0), IGF_FRAME_DIVISION_AAC_OR_TCX_LONG);
 
         int igfStartSfb;

@@ -274,8 +274,8 @@ void CIgf_apply_stereo(IGF_PRIVATE_STATIC_DATA_HANDLE hPrivateStaticDataL,
                        FIXP_DBL* p2_spectrumL, FIXP_DBL* p2_spectrumR, SHORT* specScaleL,
                        SHORT* specScaleR, const INT window_sequence, const INT numOfGroups,
                        const INT NumberOfSpectra, const UCHAR* groupLength, ULONG* randomSeedL,
-                       ULONG* randomSeedR, const UCHAR* iUseMSTab, UCHAR* TNF_maskL,
-                       UCHAR* TNF_maskR, const UCHAR flag_INF_active, const INT frameType);
+                       ULONG* randomSeedR, const UCHAR* MsUsed, UCHAR* TNF_maskL, UCHAR* TNF_maskR,
+                       const UCHAR flag_INF_active, const INT frameType);
 
 void iisIGFDecLibInjectSourceSpectrumNew(
     IGF_PRIVATE_STATIC_DATA_HANDLE hPrivateStaticData, IGF_PRIVATE_DATA_HANDLE hPrivateData,
