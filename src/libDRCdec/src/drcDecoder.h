@@ -93,6 +93,7 @@ amm-info@iis.fraunhofer.de
 
 /* drcDecoder.h: definitions used in all submodules */
 
+/* Maximum number of DRC sets applied simulateneously, see section 6.3.5 of ISO/IEC 23003-4. */
 #define MAX_ACTIVE_DRCS 3
 #define ACTIVE_DRC_LOCATIONS 2
 

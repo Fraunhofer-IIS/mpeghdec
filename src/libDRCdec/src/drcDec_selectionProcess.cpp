@@ -766,15 +766,6 @@ static DRCDEC_SELECTION_PROCESS_RETURN _initCodecModeParams(HANDLE_SEL_PROC_INPU
       Therefore the maximum output peak level is reduced to 0 dB. */
       hSelProcInput->outputPeakLevelMax = (FIXP_DBL)0;
       break;
-    case SEL_PROC_MPEG_4_AAC:
-    case SEL_PROC_MPEG_D_USAC:
-      hSelProcInput->loudnessDeviationMax = DEFAULT_LOUDNESS_DEVIATION_MAX;
-      hSelProcInput->peakLimiterPresent = 1;
-      /* A peak limiter is present at the end of the decoder, therefore we can allow for a maximum
-       * output peak level greater than full scale
-       */
-      hSelProcInput->outputPeakLevelMax = FL2FXCONST_DBL(6.0f / (float)(1 << 7));
-      break;
     case SEL_PROC_TEST_TIME_DOMAIN:
     case SEL_PROC_TEST_QMF_DOMAIN:
     case SEL_PROC_TEST_STFT_DOMAIN:

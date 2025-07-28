@@ -215,7 +215,9 @@ static DRC_ERROR _processNodeSegments(
     FIXP_DBL* pChannelGainPrevious,     /* e = 8 */
     FIXP_DBL* buffer) {
   DRC_ERROR err = DE_OK;
-  SHORT timePrev, duration, start, stop, time;
+  SHORT timePrev; /* The last sample of the last interpolation segment. */
+  SHORT time;     /* The last sample of the current interpolation segment. */
+  SHORT duration, start, stop;
   int n;
   FIXP_DBL gainLin = FL2FXCONST_DBL(1.0f / (float)(1 << 7)), gainLinPrev; /* e = 7 */
   FIXP_DBL gainLinChan, gainLinChanPrev;                                  /* e = 7 */
