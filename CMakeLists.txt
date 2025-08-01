@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.16)
-project(mpeghdec LANGUAGES CXX)
-set (CMAKE_CXX_STANDARD 11)
+project(mpeghdec
+  VERSION 3.0.0
+  DESCRIPTION "The Fraunhofer MPEG-H decoder"
+  HOMEPAGE_URL "https://github.com/Fraunhofer-IIS/mpeghdec"
+  LANGUAGES CXX
+)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN TRUE)
 
 # Set output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -54,4 +61,9 @@ endif()
 if(mpeghdec_BUILD_DOC)
   add_subdirectory(doc)
 endif()
+
+# Install
+include(GNUInstallDirs)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/mpeghdec.pc.in ${CMAKE_CURRENT_BINARY_DIR}/mpeghdec.pc @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/mpeghdec.pc DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/pkgconfig)
 
