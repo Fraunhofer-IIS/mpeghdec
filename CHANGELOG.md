@@ -1,5 +1,11 @@
 # Changelog
 
+## [r3.0.1] - 2025-08-29
+
+### Changed
+
+- Update mmtisobmff (ISOBMFF reader and writer library) dependency
+
 ## [r3.0.0] - 2025-08-01
 
 ### Added
