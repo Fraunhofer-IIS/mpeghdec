@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 project(mpeghdec
-  VERSION 3.0.0
+  VERSION 3.0.1
   DESCRIPTION "The Fraunhofer MPEG-H decoder"
   HOMEPAGE_URL "https://github.com/Fraunhofer-IIS/mpeghdec"
   LANGUAGES CXX
@@ -27,7 +27,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   mmtisobmff
   GIT_REPOSITORY https://github.com/Fraunhofer-IIS/mmtisobmff.git
-  GIT_TAG        r1.0.0
+  GIT_TAG        r1.0.1
 )
 
 get_directory_property(parentDir PARENT_DIRECTORY)
