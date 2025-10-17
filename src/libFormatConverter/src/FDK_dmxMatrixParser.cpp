@@ -482,7 +482,7 @@ INT DecodeDownmixMatrix(INT inputIndex, INT inputCount, SpeakerInformation* inpu
                         FIXP_DBL* p_buffer) {
   INT i = 0, j = 0;
   FIXP_DBL* downmixMatrixTmp = (FIXP_DBL*)p_buffer;
-  p_buffer += (FDK_MPEGHAUDIO_DEC_MAX_OUTPUT_CHANNELS * FDK_MPEGHAUDIO_DEC_MAX_OUTPUT_CHANNELS);
+  p_buffer += (FDK_DOWNMIX_MATRIX_DEC_MAX_INPUT_CHANNELS * FDK_MPEGHAUDIO_DEC_MAX_OUTPUT_CHANNELS);
   SpeakerInformation* compactInputConfig[DMX_MATRIX_MAX_SPEAKER_COUNT];
   INT compactInputCount = 0;
   SpeakerInformation* compactOutputConfig[DMX_MATRIX_MAX_SPEAKER_COUNT];

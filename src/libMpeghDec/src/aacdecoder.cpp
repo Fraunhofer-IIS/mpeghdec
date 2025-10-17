@@ -587,7 +587,7 @@ static AAC_DECODER_ERROR applyDownmixMatrixPerSignalGroup(IIS_FORMATCONVERTER_IN
 
     if (pUsacConfig->m_signalGroupType[grp].bUseCustomDownmixMatrix) {
       /* Decode downmix matrix per signal group */
-      SpeakerInformation inputConfig[FDK_MPEGHAUDIO_DEC_MAX_OUTPUT_CHANNELS];
+      SpeakerInformation inputConfig[FDK_DOWNMIX_MATRIX_DEC_MAX_INPUT_CHANNELS];
       CICP2GEOMETRY_CHANNEL_GEOMETRY outputConfig_geo[FDK_MPEGHAUDIO_DEC_MAX_OUTPUT_CHANNELS];
 
       INT numOutputCh = 0, numOutLfes = 0;
