@@ -1526,20 +1526,16 @@ static void MCT_StereoFilling(FIXP_DBL* pSpec, SHORT* pSpec_exp,
         /*Calculate sqrt(enTarget / enRes) */
         FIXP_DBL tmp = sqrtFixp_lookup(temp_FIXP_DBL, &temp_int);
 
-        /* We have to limit the gain we compute according to the RefSoft to 10. In RefSoft
-        however they use unscaled data  while we use scaled data. Therefore we have to
-        compare to a scaled threshold, i.e. 10* "Scaled_One" */
-        const FIXP_SGL Ten = 0x5000;
+        /* We have to limit the gain we compute according to the RefSoft to 10. */
+        const FIXP_DBL Ten = 0x50000000;
         const INT Ten_exp = 4;
-        FIXP_DBL Ten_Scaled = fMult(Ten, Scaled_One);
-        INT Ten_Scaled_exp = Ten_exp + Scaled_One_exp;
 
         /* Temporary values for comparison purposes */
-        FIXP_DBL temp_Ten_Scaled = Ten_Scaled;
+        FIXP_DBL temp_Ten_Scaled = Ten;
         FIXP_DBL temp_tmp = tmp;
 
         /* We align the values to the same exponent */
-        delta = temp_int - Ten_Scaled_exp;
+        delta = temp_int - Ten_exp;
         if (delta >= 0) {
           delta = fMin(31, delta);
           temp_Ten_Scaled >>= delta;
@@ -1550,8 +1546,8 @@ static void MCT_StereoFilling(FIXP_DBL* pSpec, SHORT* pSpec_exp,
         }
         /* Compare and limit if necessary */
         if (temp_tmp > temp_Ten_Scaled) {
-          tmp = Ten_Scaled;
-          temp_int = Ten_Scaled_exp;
+          tmp = Ten;
+          temp_int = Ten_exp;
         }
 
         /* Stereo filling changes the dynamic range of the signal,despite keeping the energy of
