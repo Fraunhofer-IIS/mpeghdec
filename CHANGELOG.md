@@ -1,5 +1,15 @@
 # Changelog
 
+## [r3.0.2] - 2025-10-17
+
+### Changed
+
+- Update mmtisobmff and ilo dependencies
+
+### Fixed
+
+- Fixes for two decoding edge cases
+
 ## [r3.0.1] - 2025-08-29
 
 ### Changed
