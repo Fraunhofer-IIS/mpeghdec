@@ -95,6 +95,13 @@ amm-info@iis.fraunhofer.de
 #include "uiManager.h"
 #include "tpdec_lib.h"
 
+/* In case sizeof(mhasBuffer), supplied with mpegh_UI_FeedMHAS(), is not a
+ *  power of 2 then invalid memory reads may occur in case of erred input data.
+ *  Enable the following define to circumvent that by copying the source buffer
+ *  to a large enough internal buffer.
+ */
+#define SAFE_BUFFER_READ
+
 struct MPEGH_UI_MANAGER {
   HANDLE_UI_MANAGER hUiManager;
   UCHAR isActive;
@@ -106,6 +113,9 @@ struct MPEGH_UI_MANAGER {
   UCHAR numberOfSecondaryASI;
   UCHAR numberOfMPEGH3DA;
   UINT insertOffset;
+#ifdef SAFE_BUFFER_READ
+  UCHAR bs_buffer[64 * 1024]; /* 64 KiB for Level 4 and 32 KiB for Level 3 */
+#endif
 };
 
 static UINT nextPow2(UINT x) {
@@ -173,7 +183,16 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_FeedMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR*
   INT nBitsIns = 0;
   UCHAR frameFound = 0, uiPacketFound = 0;
 
+#ifdef SAFE_BUFFER_READ
+  const UINT buf_size = sizeof(self->bs_buffer);
+  if (mhasLength > buf_size) {
+    return MPEGH_UI_PARSE_ERROR;
+  }
+  FDKmemcpy(self->bs_buffer, mhasBuffer, mhasLength);
+  FDKinitBitStream(hBs, self->bs_buffer, buf_size, mhasLength * 8);
+#else
   FDKinitBitStream(hBs, mhasBuffer, nextPow2(mhasLength), mhasLength * 8);
+#endif
 
   nBitsIns = FDKgetValidBits(hBs);
 
