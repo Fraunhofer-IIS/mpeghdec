@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 project(mpeghdec
-  VERSION 3.0.2
+  VERSION 3.0.3
   DESCRIPTION "The Fraunhofer MPEG-H decoder"
   HOMEPAGE_URL "https://github.com/Fraunhofer-IIS/mpeghdec"
   LANGUAGES CXX
@@ -20,12 +20,12 @@ include(FetchContent)
 FetchContent_Declare(
   ilo
   GIT_REPOSITORY https://github.com/Fraunhofer-IIS/ilo.git
-  GIT_TAG        r2.0.0
+  GIT_TAG        r2.0.2
 )
 FetchContent_Declare(
   mmtisobmff
   GIT_REPOSITORY https://github.com/Fraunhofer-IIS/mmtisobmff.git
-  GIT_TAG        r1.0.2
+  GIT_TAG        r1.0.4
 )
 
 get_directory_property(parentDir PARENT_DIRECTORY)
@@ -46,6 +46,8 @@ else()
   set(mpeghdec_BUILD_BINARIES ON  CACHE BOOL   "Build demo binaries")
 endif()
 set(mpeghdec_BUILD_DOC OFF CACHE BOOL "Build mpeghdec documentation")
+
+set(USE_PKGCONFIG_DEPS   OFF CACHE BOOL   "Use pkg-config to find dependencies")
 
 # Add libraries
 add_subdirectory(src)
