@@ -105,11 +105,12 @@ The following project-specific CMake parameters are available:
 </tr>
 <tr>
 <td><code>mpeghdec_BUILD_DOC</code></td>
-<td>
-
-Enable / Disable documentation generation (requires a working [Doxygen](https://www.doxygen.nl/) installation).
-
+<td>Enable / Disable documentation generation (requires a working [Doxygen](https://www.doxygen.nl/) installation).
 </td>
+</tr>
+<tr>
+<td><code>USE_PKGCONFIG_DEPS</code></td>
+<td>Consume the dependencies via pkg-config from a system-wide installation instead of downloading and building them locally.</td>
 </tr>
 </table>
 
