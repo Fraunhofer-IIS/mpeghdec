@@ -1,4 +1,12 @@
-FetchContent_MakeAvailable(ilo mmtisobmff)
+if(USE_PKGCONFIG_DEPS)
+  find_package(PkgConfig)
+  pkg_check_modules(ILO REQUIRED IMPORTED_TARGET GLOBAL ilo>=2.0)
+  add_library(ilo ALIAS PkgConfig::ILO)
+  pkg_check_modules(MMTISOBMFF REQUIRED IMPORTED_TARGET GLOBAL mmtisobmff>=1.0)
+  add_library(mmtisobmff ALIAS PkgConfig::MMTISOBMFF)
+else()
+  FetchContent_MakeAvailable(ilo mmtisobmff)
+endif()
 
 if(${mpeghdec_BUILD_DECODER})
   add_executable(mpeghDecoder "mpeghDecoder/main_mpeghDecoder.cpp")

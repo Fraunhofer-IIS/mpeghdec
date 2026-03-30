@@ -1,5 +1,15 @@
 # Changelog
 
+## [r3.0.3] - 2026-03-30
+
+### Added
+
+- Enable installing of static library on Linux systems and consumption of dependencies
+
+### Changed
+
+- Update mmtisobmff and ilo dependencies
+
 ## [r3.0.2] - 2025-10-17
 
 ### Changed
