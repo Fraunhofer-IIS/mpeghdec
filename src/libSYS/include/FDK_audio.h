@@ -330,6 +330,8 @@ typedef enum {
   0x000001 /*!< Config mode signalizes the callback to work in config change detection mode */
 #define AC_CM_ALLOC_MEM \
   0x000002 /*!< Config mode signalizes the callback to work in memory allocation mode */
+#define AC_CM_LAST_SUBSTREAM \
+  0x000004 /*!< Flag signalizes the callback that this is the last substream */
 
 /**
  * Audio Codec flags (element specific).

@@ -107,7 +107,7 @@ extern "C" {
 
 typedef struct MPEGH_UI_MANAGER* HANDLE_MPEGH_UI_MANAGER;
 
-#define MAX_NUMBER_SECONDARY_STREAMS 16
+#define MAX_NUMBER_SUBSTREAMS 16
 
 typedef enum {
   MPEGH_UI_OK = 0,
@@ -155,9 +155,7 @@ typedef enum {
 #define MPEGH_UI_INCOMPLETE_XML 4
 /*!
   \brief
-  Flag returned by mpegh_UI_GetXmlSceneState(): only minimal
-  XML output was generated, a further call of the function will
-  return the full XML scene description.
+  DEPRECATED, no longer used.
 */
 #define MPEGH_UI_SHORT_OUTPUT 8
 

@@ -102,7 +102,7 @@ amm-info@iis.fraunhofer.de
 #define UI_MANAGER_NO_CHANGE 1      /* nothing changed, no XML written */
 #define UI_MANAGER_CONTINUES_XML 2  /* partial XML output, continues output of previous call */
 #define UI_MANAGER_INCOMPLETE_XML 4 /* XML output is not complete, further call required */
-#define UI_MANAGER_SHORT_OUTPUT 8   /* only minimal XML output was written */
+#define UI_MANAGER_SHORT_OUTPUT 8   /* DEPRECATED, no longer used */
 
 #define UI_MANAGER_USE_DEFAULT_TARGET_LOUDNESS -128
 #define UI_MANAGER_DRC_OFF 0xFFFFFFFF                  /* -1 */
@@ -116,7 +116,8 @@ typedef enum {
   UI_MANAGER_INVALID_PARAM,
   UI_MANAGER_NOT_ALLOWED,
   UI_MANAGER_INVALID_STATE,
-  UI_MANAGER_OK_BUT_NO_VALID_DATA
+  UI_MANAGER_OK_BUT_NO_VALID_DATA,
+  UI_MANAGER_NOT_AVAILABLE
 } UI_MANAGER_ERROR;
 
 /* UI state data */
@@ -159,6 +160,9 @@ AUDIO_SCENE_INFO* UI_Manager_GetAsiPointer(HANDLE_UI_MANAGER hUiManager);
 
 UI_MANAGER_ERROR UI_Manager_SetIsActive(HANDLE_UI_MANAGER hUiManager, UCHAR isActive);
 
+INT UI_Manager_GetXmlChanged(HANDLE_UI_MANAGER hUiManager);
+void UI_Manager_ResetXmlChanged(HANDLE_UI_MANAGER hUiManager);
+
 UI_MANAGER_ERROR UI_Manager_GetXmlSceneState(HANDLE_UI_MANAGER hUiManager, char* xmlOut,
                                              UINT xmlOutSize, UINT flagsIn, UINT* flagsOut);
 
@@ -167,6 +171,8 @@ UI_MANAGER_ERROR UI_Manager_ApplyXmlAction(HANDLE_UI_MANAGER hUiManager, const c
 
 UI_MANAGER_ERROR UI_Manager_SetUUID(HANDLE_UI_MANAGER hUiManager, UCHAR uuid[16],
                                     UCHAR applyAsiCrc);
+
+UI_MANAGER_ERROR UI_Manager_GetUUID(HANDLE_UI_MANAGER hUiManager, UCHAR uuid[16]);
 
 UI_MANAGER_ERROR UI_Manager_GetInteractivityStatus(HANDLE_UI_MANAGER hUiManager,
                                                    USER_INTERACTIVITY_STATUS* pUiStatus,

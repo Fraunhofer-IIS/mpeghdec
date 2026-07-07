@@ -159,13 +159,16 @@ int IIS_FormatConverter_Config_SetRendering3DTypeFlag(IIS_FORMATCONVERTER_HANDLE
                                                       UINT rendering3DtypeFlag);
 
 int IIS_FormatConverter_GetDelay(IIS_FORMATCONVERTER_HANDLE self, UINT* delay);
+
+int IIS_FormatConverter_IsOpen(IIS_FORMATCONVERTER_HANDLE self);
+
 /**  Call this open after all _Config_ methods have been called. The FormatConverter will then
    initialize itself acording to those settings.
 */
 int IIS_FormatConverter_Open(IIS_FORMATCONVERTER_HANDLE self, INT* p_buffer, UINT buf_size);
 
 INT IIS_FormatConverter_Process(IIS_FORMATCONVERTER_HANDLE self, HANDLE_DRC_DECODER hDrcDec,
-                                FIXP_DBL* deinBuffer, FIXP_DBL* deoutBuffer,
+                                FIXP_DBL** deinBuffer, FIXP_DBL* deoutBuffer,
                                 const int timeBufferChannelOffset);
 
 /**********************************************************************/ /**

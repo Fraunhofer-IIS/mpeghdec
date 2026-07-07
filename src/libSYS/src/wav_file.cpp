@@ -787,6 +787,7 @@ INT WAV_OutputWrite(HANDLE_WAV wav, void* sampleBuffer, UINT numberOfSamples, in
   }
 
   wav->header.ds64Chunk.dataSize64 += (numberOfSamples * (bps >> 3));
+
   return 0;
 }
 

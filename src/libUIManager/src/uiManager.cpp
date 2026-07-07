@@ -111,12 +111,32 @@ static UI_MANAGER_ERROR setGroupOnOff(HANDLE_UI_MANAGER hUiManager, UCHAR groupI
   if (!hUiManager->uiState.groups[grpIdx].allowOnOff) return UI_MANAGER_NOT_ALLOWED;
   if (hUiManager->asi.groups[grpIdx].switchGroupID != INVALID_ID) return UI_MANAGER_NOT_ALLOWED;
 
+  /* check if available */
+  if (onOff && !hUiManager->uiState.groups[grpIdx].isAvailable) return UI_MANAGER_NOT_AVAILABLE;
+
   /* set on/off */
   hUiManager->uiState.groups[grpIdx].onOff = onOff;
 
   hUiManager->uiStateChanged = 1;
 
   return UI_MANAGER_OK;
+}
+
+/* get first available switch group member */
+static UI_MANAGER_ERROR selectFirstAvailableSwitchGroupMember(HANDLE_UI_MANAGER hUiManager,
+                                                              int switchGroupIdx) {
+  for (int i = 0; i < hUiManager->asi.switchGroups[switchGroupIdx].numMembers; i++) {
+    int grpIdx =
+        asiGroupID2idx(&hUiManager->asi, hUiManager->asi.switchGroups[switchGroupIdx].memberID[i]);
+    if (grpIdx < 0) continue;
+
+    if (hUiManager->uiState.groups[grpIdx].isAvailable) {
+      hUiManager->uiState.switchGroups[switchGroupIdx].activeMemberIndex = i;
+      return UI_MANAGER_OK;
+    }
+  }
+
+  return UI_MANAGER_NOT_AVAILABLE;
 }
 
 /* set switch group on/off */
@@ -136,6 +156,21 @@ static UI_MANAGER_ERROR setSwitchGroupOnOff(HANDLE_UI_MANAGER hUiManager, UCHAR 
 
   /* check if allowed */
   if (!hUiManager->uiState.groups[grpIdx].allowOnOff) return UI_MANAGER_NOT_ALLOWED;
+
+  /* check if available */
+  if (onOff && !hUiManager->uiState.switchGroups[swgrpIdx].isAvailable)
+    return UI_MANAGER_NOT_AVAILABLE;
+
+  /* if active member not available, select first available member */
+  if (onOff && !hUiManager->uiState.groups[grpIdx].isAvailable) {
+    hUiManager->uiState.groups[grpIdx].onOff = 0;
+
+    selectFirstAvailableSwitchGroupMember(hUiManager, swgrpIdx);
+
+    memberIdx = hUiManager->uiState.switchGroups[swgrpIdx].activeMemberIndex;
+    grpIdx = asiGroupID2idx(&hUiManager->asi,
+                            hUiManager->asi.switchGroups[swgrpIdx].memberID[memberIdx]);
+  }
 
   /* set on/off */
   hUiManager->uiState.switchGroups[swgrpIdx].onOff = onOff;
@@ -369,6 +404,7 @@ static void selectAudioLang(HANDLE_UI_MANAGER hUiManager, UI_STATE* pUiState = N
       grpIdx = asiGroupID2idx(&hUiManager->asi, grpId);
       if (grpIdx < 0) continue;
       pGroup = &(hUiManager->asi.groups[grpIdx]);
+      if (!pGroup->isAvailable && pUiState == &hUiManager->uiState) continue;
 
       if (pGroup->contPresent && pGroup->contentData.contentLanguage[0]) {
         hasLang = 1;
@@ -407,7 +443,8 @@ static int setAccessibilityIndex(HANDLE_UI_MANAGER hUiManager, const UCHAR acces
                          light_hearing_impaired, heavy_hearing_impaired, visual_impaired */
 
   for (i = 0; i < hUiManager->asi.numGroupPresets; i++) {
-    if (hUiManager->asi.groupPresets[i].kind == map[accessibilityIndex]) {
+    if (hUiManager->asi.groupPresets[i].kind == map[accessibilityIndex] &&
+        hUiManager->uiState.groupPresets[i].isAvailable) {
       if (hUiManager->asi.groupPresets[i].groupPresetID < minId) {
         minId = hUiManager->asi.groupPresets[i].groupPresetID;
         found = 1;
@@ -423,8 +460,9 @@ static int setAccessibilityIndex(HANDLE_UI_MANAGER hUiManager, const UCHAR acces
 /* get presetId according to accessibility preference index */
 static int getAccessibilityPreset(HANDLE_UI_MANAGER hUiManager, UCHAR accessibilityIndex,
                                   UCHAR* groupPresetId) {
-  *groupPresetId = getMinPresetID(hUiManager); /* initialize with default preset, which is the
-                                                  preset with the lowest presetId */
+  *groupPresetId = getMinPresetID(
+      hUiManager,
+      1); /* initialize with default preset, which is the preset with the lowest presetId */
 
   if (!accessibilityIndex) {
     return asiGroupPresetID2idx(&hUiManager->asi, *groupPresetId) >= 0;
@@ -463,59 +501,57 @@ static void resetAvailability(HANDLE_UI_MANAGER hUiManager) {
   for (i = 0; i < hUiManager->asi.numSwitchGroups; i++) {
     UI_STATE_SWITCH_GROUP* pSwitchGroupState = &(hUiManager->uiState.switchGroups[i]);
 
-    pSwitchGroupState->isAvailable = 1;
+    pSwitchGroupState->isAvailable = 0;
 
     for (memberIdx = 0; memberIdx < hUiManager->asi.switchGroups[i].numMembers; memberIdx++) {
       int grpId = hUiManager->asi.switchGroups[i].memberID[memberIdx];
       int grpIdx = asiGroupID2idx(&hUiManager->asi, grpId);
       if (grpIdx < 0) continue;
 
-      /* Check if all members are available. */
-      if (hUiManager->asi.groups[grpIdx].isAvailable == 0) {
-        pSwitchGroupState->isAvailable = 0;
+      /* Check if at least one member is available. */
+      if (hUiManager->asi.groups[grpIdx].isAvailable) {
+        pSwitchGroupState->isAvailable = 1;
       }
     }
   }
 
   /* presets */
   for (int p = 0; p < hUiManager->asi.numGroupPresets; p++) {
+    int numConditions;
+    const ASI_GROUP_PRESET_CONDITION* conditions;
+
     hUiManager->uiState.groupPresets[p].isAvailable = 1;
 
-    for (memberIdx = 0; memberIdx < hUiManager->asi.groupPresets[p].numConditions; memberIdx++) {
-      int numConditions;
-      const ASI_GROUP_PRESET_CONDITION* conditions;
+    if (pASI->groupPresets[p].hasDownmixIdExtension) {
+      numConditions = pASI->groupPresets[p].downmixIdExtension.numConditions;
+      conditions = pASI->groupPresets[p].downmixIdExtension.conditions;
+    } else {
+      numConditions = pASI->groupPresets[p].numConditions;
+      conditions = pASI->groupPresets[p].conditions;
+    }
 
-      if (pASI->groupPresets[memberIdx].hasDownmixIdExtension) {
-        numConditions = pASI->groupPresets[memberIdx].downmixIdExtension.numConditions;
-        conditions = pASI->groupPresets[memberIdx].downmixIdExtension.conditions;
-      } else {
-        numConditions = pASI->groupPresets[memberIdx].numConditions;
-        conditions = pASI->groupPresets[memberIdx].conditions;
-      }
-      /* check conditions */
-      for (i = 0; i < numConditions; i++) {
-        if (!conditions[i].isSwitchGroupCondition) { /* group condition */
-          int grpIdx = asiGroupID2idx(pASI, conditions[i].referenceID);
-          if (grpIdx < 0) continue;
+    /* check conditions */
+    for (i = 0; i < numConditions; i++) {
+      if (!conditions[i].isSwitchGroupCondition) { /* group condition */
+        int grpIdx = asiGroupID2idx(pASI, conditions[i].referenceID);
+        if (grpIdx < 0) continue;
 
-          if (hUiManager->uiState.groups[grpIdx].isAvailable == 0) {
-            hUiManager->uiState.groupPresets[p].isAvailable = 0;
-          }
-        } else { /* switch group condition */
-          int swGrpIdx = asiSwitchGroupID2idx(pASI, conditions[i].referenceID);
-          if (swGrpIdx < 0) continue;
+        if (hUiManager->uiState.groups[grpIdx].isAvailable == 0 && conditions[i].conditionOnOff) {
+          hUiManager->uiState.groupPresets[p].isAvailable = 0;
+          break;
+        }
+      } else { /* switch group condition */
+        int swGrpIdx = asiSwitchGroupID2idx(pASI, conditions[i].referenceID);
+        if (swGrpIdx < 0) continue;
 
-          if (hUiManager->uiState.switchGroups[swGrpIdx].isAvailable == 0) {
-            hUiManager->uiState.groupPresets[p].isAvailable = 0;
-          }
+        if (hUiManager->uiState.switchGroups[swGrpIdx].isAvailable == 0 &&
+            conditions[i].conditionOnOff) {
+          hUiManager->uiState.groupPresets[p].isAvailable = 0;
+          break;
         }
       }
     }
   }
-
-  hUiManager->xmlStateChanged = 1;
-  hUiManager->uiStateChanged = 1;
-  hUiManager->configChanged = 1;
 }
 
 /* reset state to default */
@@ -554,67 +590,73 @@ static void reset(HANDLE_UI_MANAGER hUiManager, int keepSwitchGroups, UI_STATE* 
 
   /* switch groups */
   for (i = 0; i < hUiManager->asi.numSwitchGroups; i++) {
+    UI_MANAGER_ERROR err;
     UI_STATE_SWITCH_GROUP* pSwitchGroupState = &(pUiState->switchGroups[i]);
 
     pSwitchGroupState->onOff = hUiManager->asi.switchGroups[i].defaultOnOff;
     pSwitchGroupState->allowSwitch = 1;
 
-    if (!keepSwitchGroups) {
-      pSwitchGroupState->activeMemberIndex = 0;
-      selectSwitchGroup(hUiManager, i, hUiManager->asi.switchGroups[i].defaultGroupID, pUiState);
-    } else {
-      selectSwitchGroup(
-          hUiManager, i,
-          hUiManager->asi.switchGroups[i].memberID[pSwitchGroupState->activeMemberIndex], pUiState);
-    }
-
-    pSwitchGroupState->isAvailable = 1;
+    pSwitchGroupState->isAvailable = 0;
 
     for (memberIdx = 0; memberIdx < hUiManager->asi.switchGroups[i].numMembers; memberIdx++) {
       int grpId = hUiManager->asi.switchGroups[i].memberID[memberIdx];
       int grpIdx = asiGroupID2idx(&hUiManager->asi, grpId);
       if (grpIdx < 0) continue;
 
+      pUiState->groups[grpIdx].onOff = 0;
       pUiState->groups[grpIdx].allowOnOff = hUiManager->asi.switchGroups[i].allowOnOff;
 
-      /* Check if all members are available. */
-      if (hUiManager->asi.groups[grpIdx].isAvailable == 0) {
-        pSwitchGroupState->isAvailable = 0;
+      /* Check if at least one member is available. */
+      if (hUiManager->asi.groups[grpIdx].isAvailable) {
+        pSwitchGroupState->isAvailable = 1;
       }
     }
+
+    if (!keepSwitchGroups) {
+      pSwitchGroupState->activeMemberIndex = 0;
+      err = selectSwitchGroup(hUiManager, i, hUiManager->asi.switchGroups[i].defaultGroupID,
+                              pUiState);
+    } else {
+      err = selectSwitchGroup(
+          hUiManager, i,
+          hUiManager->asi.switchGroups[i].memberID[pSwitchGroupState->activeMemberIndex], pUiState);
+    }
+
+    if (err != UI_MANAGER_OK) pSwitchGroupState->onOff = 0;
   }
 
   /* presets */
   for (int p = 0; p < hUiManager->asi.numGroupPresets; p++) {
+    int numConditions;
+    const ASI_GROUP_PRESET_CONDITION* conditions;
+
     pUiState->groupPresets[p].isAvailable = 1;
 
-    for (memberIdx = 0; memberIdx < hUiManager->asi.groupPresets[p].numConditions; memberIdx++) {
-      int numConditions;
-      const ASI_GROUP_PRESET_CONDITION* conditions;
+    if (pASI->groupPresets[p].hasDownmixIdExtension) {
+      numConditions = pASI->groupPresets[p].downmixIdExtension.numConditions;
+      conditions = pASI->groupPresets[p].downmixIdExtension.conditions;
+    } else {
+      numConditions = pASI->groupPresets[p].numConditions;
+      conditions = pASI->groupPresets[p].conditions;
+    }
 
-      if (pASI->groupPresets[memberIdx].hasDownmixIdExtension) {
-        numConditions = pASI->groupPresets[memberIdx].downmixIdExtension.numConditions;
-        conditions = pASI->groupPresets[memberIdx].downmixIdExtension.conditions;
-      } else {
-        numConditions = pASI->groupPresets[memberIdx].numConditions;
-        conditions = pASI->groupPresets[memberIdx].conditions;
-      }
-      /* check conditions */
-      for (i = 0; i < numConditions; i++) {
-        if (!conditions[i].isSwitchGroupCondition) { /* group condition */
-          int grpIdx = asiGroupID2idx(pASI, conditions[i].referenceID);
-          if (grpIdx < 0) continue;
+    /* check conditions */
+    for (i = 0; i < numConditions; i++) {
+      if (!conditions[i].isSwitchGroupCondition) { /* group condition */
+        int grpIdx = asiGroupID2idx(pASI, conditions[i].referenceID);
+        if (grpIdx < 0) continue;
 
-          if (pUiState->groups[grpIdx].isAvailable == 0) {
-            pUiState->groupPresets[p].isAvailable = 0;
-          }
-        } else { /* switch group condition */
-          int swGrpIdx = asiSwitchGroupID2idx(pASI, conditions[i].referenceID);
-          if (swGrpIdx < 0) continue;
+        if (pUiState->groups[grpIdx].isAvailable == 0 && conditions[i].conditionOnOff) {
+          pUiState->groupPresets[p].isAvailable = 0;
+          break;
+        }
+      } else { /* switch group condition */
+        int swGrpIdx = asiSwitchGroupID2idx(pASI, conditions[i].referenceID);
+        if (swGrpIdx < 0) continue;
 
-          if (pUiState->switchGroups[swGrpIdx].isAvailable == 0) {
-            pUiState->groupPresets[p].isAvailable = 0;
-          }
+        if (pUiState->switchGroups[swGrpIdx].isAvailable == 0 && conditions[i].conditionOnOff) {
+          pUiState->groupPresets[p].isAvailable = 0;
+          break;
         }
       }
     }
@@ -675,6 +717,16 @@ static UI_MANAGER_ERROR selectSwitchGroup(HANDLE_UI_MANAGER hUiManager, int swit
 
   /* check if allowed */
   if (!pUiState->switchGroups[switchGrpIdx].allowSwitch) return UI_MANAGER_NOT_ALLOWED;
+
+  /* check if available */
+  if (pUiState == &hUiManager->uiState) {
+    if (!hUiManager->uiState.switchGroups[switchGrpIdx].isAvailable)
+      return UI_MANAGER_NOT_AVAILABLE;
+
+    grpIdx = asiGroupID2idx(&hUiManager->asi, groupID);
+    if (grpIdx < 0) return UI_MANAGER_INVALID_PARAM;
+    if (!pUiState->groups[grpIdx].isAvailable) return UI_MANAGER_NOT_AVAILABLE;
+  }
 
   /* get currently active group id */
   prevGrpIdx =
@@ -786,11 +838,16 @@ static UI_MANAGER_ERROR applyPreset(HANDLE_UI_MANAGER hUiManager, UCHAR presetID
   if (presetID == PRESET_ID_AUTO) {
     /* find appropriate preset (default preset is returned for accessibility preference 0) */
     getAccessibilityPreset(hUiManager, hUiManager->uiState.accessibilityPreference, &presetID);
+    if (asiGroupPresetID2idx(&hUiManager->asi, presetID) < 0) return UI_MANAGER_NOT_AVAILABLE;
   }
 
   /* get preset index and pointer */
   int presetIdx = asiGroupPresetID2idx(&hUiManager->asi, presetID);
   if (presetIdx < 0) return UI_MANAGER_INVALID_PARAM;
+
+  /* check if available */
+  if (pUiState == &hUiManager->uiState && !hUiManager->uiState.groupPresets[presetIdx].isAvailable)
+    return UI_MANAGER_NOT_AVAILABLE;
 
   preset = &hUiManager->asi.groupPresets[presetIdx];
 
@@ -872,6 +929,18 @@ static UI_MANAGER_ERROR applyPreset(HANDLE_UI_MANAGER hUiManager, UCHAR presetID
       grpId = switchGroup->memberID[pUiState->switchGroups[swgrpIdx].activeMemberIndex];
       grpIdx = asiGroupID2idx(&hUiManager->asi, grpId);
       if (grpIdx < 0) continue;
+
+      /* if active member not available, select first available member */
+      if (pUiState == &hUiManager->uiState && conditions[i].conditionOnOff &&
+          !pUiState->groups[grpIdx].isAvailable) {
+        pUiState->groups[grpIdx].onOff = 0;
+
+        selectFirstAvailableSwitchGroupMember(hUiManager, swgrpIdx);
+
+        grpId = switchGroup->memberID[pUiState->switchGroups[swgrpIdx].activeMemberIndex];
+        grpIdx = asiGroupID2idx(&hUiManager->asi, grpId);
+      }
+
       pUiState->groups[grpIdx].onOff = conditions[i].conditionOnOff;
 
       /* apply condition to members */
@@ -903,12 +972,12 @@ void simulatePreset(HANDLE_UI_MANAGER hUiManager, UCHAR presetID, UI_STATE* pUiS
 
 /* check/update state */
 static void update(HANDLE_UI_MANAGER hUiManager) {
-  if (hUiManager->asi.diffFlags == ASI_DIFF_AVAILABILITY) {
+  if (hUiManager->asi.diffFlags & ASI_DIFF_AVAILABILITY) {
     resetAvailability(hUiManager);
-
-  } else if (hUiManager->asi.diffFlags == ASI_DIFF_DESCRIPTION) {
     hUiManager->xmlStateChanged = 1;
-  } else if (hUiManager->asi.diffFlags) {
+  }
+
+  if (hUiManager->asi.diffFlags & ~(ASI_DIFF_AVAILABILITY | ASI_DIFF_DESCRIPTION)) {
     int i;
 
     for (i = 0; i < 15; i++) hUiManager->uiState.uuid[i] = 0;
@@ -928,6 +997,10 @@ static void update(HANDLE_UI_MANAGER hUiManager) {
     persistenceRestore(hUiManager);
 
     hUiManager->configChanged = 1;
+  }
+
+  if (hUiManager->asi.diffFlags & ASI_DIFF_DESCRIPTION) {
+    hUiManager->xmlStateChanged = 1;
   }
 
   hUiManager->asi.diffFlags = 0;
@@ -1000,17 +1073,21 @@ static int checkDrcEffectTypeFallback(const LONG drcEffectTypeRequested) {
 }
 
 /* get lowest groupPresetID */
-int getMinPresetID(HANDLE_UI_MANAGER hUiManager) {
+int getMinPresetID(HANDLE_UI_MANAGER hUiManager, int checkAvailability) {
   int i;
-  int minID = 31;
+  int minID = 255;
 
   if (hUiManager->asi.numGroupPresets == 0) return 0;
 
   for (i = 0; i < hUiManager->asi.numGroupPresets; i++) {
+    if (checkAvailability && !hUiManager->uiState.groupPresets[i].isAvailable) continue;
+
     if (hUiManager->asi.groupPresets[i].groupPresetID < minID) {
       minID = hUiManager->asi.groupPresets[i].groupPresetID;
     }
   }
+  if (minID == 255) minID = 0;
+
   return minID;
 }
 
@@ -1021,6 +1098,7 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
 
   switch (action->actionType) {
     case UI_MANAGER_COMMAND_RESET:
+      if (!hUiManager->isActive) return UI_MANAGER_NOT_ALLOWED;
       reset(hUiManager, 0);
       applyPreset(hUiManager, PRESET_ID_AUTO);
       break;
@@ -1090,6 +1168,7 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
       break;
 
     case UI_MANAGER_COMMAND_PRESET_SELECTED:
+      if (!hUiManager->isActive) return UI_MANAGER_NOT_ALLOWED;
       if (!compUUID(hUiManager->uiState.uuid, action->uuid) ||
           !(action->presentFlags & FLAG_XML_PARAM_INT)) {
         err = UI_MANAGER_INVALID_PARAM;
@@ -1104,6 +1183,7 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
       break;
 
     case UI_MANAGER_COMMAND_PRESET_SELECTED_NO_UUID:
+      if (!hUiManager->isActive) return UI_MANAGER_NOT_ALLOWED;
       if (!(action->presentFlags & FLAG_XML_PARAM_INT)) {
         err = UI_MANAGER_INVALID_PARAM;
         break;
@@ -1126,15 +1206,18 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
       } else {
         UCHAR groupPresetId;
         hUiManager->uiState.accessibilityPreference = (UCHAR)action->paramInt;
-        getAccessibilityPreset(hUiManager, hUiManager->uiState.accessibilityPreference,
-                               &groupPresetId);
-        reset(hUiManager, 0);
-        applyPreset(hUiManager, groupPresetId);
+        if (hUiManager->isActive) {
+          getAccessibilityPreset(hUiManager, hUiManager->uiState.accessibilityPreference,
+                                 &groupPresetId);
+          reset(hUiManager, 0);
+          applyPreset(hUiManager, groupPresetId);
+        }
         hUiManager->drcStateChanged = 1;
       }
       break;
 
     case UI_MANAGER_COMMAND_AUDIO_ELEMENT_MUTING_CHANGED:
+      if (!hUiManager->isActive) return UI_MANAGER_NOT_ALLOWED;
       if (!compUUID(hUiManager->uiState.uuid, action->uuid) ||
           !(action->presentFlags & FLAG_XML_PARAM_INT) ||
           !(action->presentFlags & FLAG_XML_PARAM_BOOL)) {
@@ -1145,6 +1228,7 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
       break;
 
     case UI_MANAGER_COMMAND_AUDIO_ELEMENT_BALANCE_CHANGED:
+      if (!hUiManager->isActive) return UI_MANAGER_NOT_ALLOWED;
       if (!compUUID(hUiManager->uiState.uuid, action->uuid) ||
           !(action->presentFlags & FLAG_XML_PARAM_INT) ||
           !(action->presentFlags & FLAG_XML_PARAM_FLOAT)) {
@@ -1152,10 +1236,11 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
         break;
       }
       err = setGroupGain(hUiManager, (UCHAR)action->paramInt,
-                         (SHORT)(LONG)(action->paramFloat >> 15));
+                         (SHORT)(((LONG)action->paramFloat + 0x8000) >> 15) & ~1);
       break;
 
     case UI_MANAGER_COMMAND_AUDIO_ELEMENT_AZIMUTH_CHANGED:
+      if (!hUiManager->isActive) return UI_MANAGER_NOT_ALLOWED;
       if (!compUUID(hUiManager->uiState.uuid, action->uuid) ||
           !(action->presentFlags & FLAG_XML_PARAM_INT) ||
           !(action->presentFlags & FLAG_XML_PARAM_FLOAT)) {
@@ -1163,10 +1248,11 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
         break;
       }
       err = setGroupAzOffset(hUiManager, (UCHAR)action->paramInt,
-                             (UCHAR)(((action->paramFloat * 2 / 3) >> 16) + 128));
+                             (UCHAR)((((action->paramFloat * 2 / 3) + 0x8000) >> 16) + 128));
       break;
 
     case UI_MANAGER_COMMAND_AUDIO_ELEMENT_ELEVATION_CHANGED:
+      if (!hUiManager->isActive) return UI_MANAGER_NOT_ALLOWED;
       if (!compUUID(hUiManager->uiState.uuid, action->uuid) ||
           !(action->presentFlags & FLAG_XML_PARAM_INT) ||
           !(action->presentFlags & FLAG_XML_PARAM_FLOAT)) {
@@ -1174,7 +1260,7 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
         break;
       }
       err = setGroupElOffset(hUiManager, (UCHAR)action->paramInt,
-                             (UCHAR)((((LONG)action->paramFloat / 3) >> 16) + 32));
+                             (UCHAR)(((((LONG)action->paramFloat / 3) + 0x8000) >> 16) + 32));
       break;
 
     case UI_MANAGER_COMMAND_AUDIO_ELEMENT_DISTANCE_CHANGED:
@@ -1182,6 +1268,7 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
       return UI_MANAGER_INVALID_PARAM;
 
     case UI_MANAGER_COMMAND_AUDIO_ELEMENT_SWITCH_SELECTED:
+      if (!hUiManager->isActive) return UI_MANAGER_NOT_ALLOWED;
       if (!compUUID(hUiManager->uiState.uuid, action->uuid) ||
           !(action->presentFlags & FLAG_XML_PARAM_INT) ||
           !(action->presentFlags & FLAG_XML_PARAM_FLOAT)) {
@@ -1199,6 +1286,7 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
       }
 
     case UI_MANAGER_COMMAND_AUDIO_ELEMENT_SWITCH_MUTING_CHANGED:
+      if (!hUiManager->isActive) return UI_MANAGER_NOT_ALLOWED;
       if (!compUUID(hUiManager->uiState.uuid, action->uuid) ||
           !(action->presentFlags & FLAG_XML_PARAM_INT) ||
           !(action->presentFlags & FLAG_XML_PARAM_BOOL)) {
@@ -1209,6 +1297,7 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
       break;
 
     case UI_MANAGER_COMMAND_AUDIO_ELEMENT_SWITCH_BALANCE_CHANGED:
+      if (!hUiManager->isActive) return UI_MANAGER_NOT_ALLOWED;
       if (!compUUID(hUiManager->uiState.uuid, action->uuid) ||
           !(action->presentFlags & FLAG_XML_PARAM_INT) ||
           !(action->presentFlags & FLAG_XML_PARAM_FLOAT)) {
@@ -1216,10 +1305,11 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
         break;
       }
       err = setSwitchGroupGain(hUiManager, (UCHAR)action->paramInt,
-                               (SHORT)(LONG)(action->paramFloat >> 15));
+                               (SHORT)(((LONG)action->paramFloat + 0x8000) >> 15) & ~1);
       break;
 
     case UI_MANAGER_COMMAND_AUDIO_ELEMENT_SWITCH_AZIMUTH_CHANGED:
+      if (!hUiManager->isActive) return UI_MANAGER_NOT_ALLOWED;
       if (!compUUID(hUiManager->uiState.uuid, action->uuid) ||
           !(action->presentFlags & FLAG_XML_PARAM_INT) ||
           !(action->presentFlags & FLAG_XML_PARAM_FLOAT)) {
@@ -1227,10 +1317,11 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
         break;
       }
       err = setSwitchGroupAzOffset(hUiManager, (UCHAR)action->paramInt,
-                                   (UCHAR)(((action->paramFloat * 2 / 3) >> 16) + 128));
+                                   (UCHAR)((((action->paramFloat * 2 / 3) + 0x8000) >> 16) + 128));
       break;
 
     case UI_MANAGER_COMMAND_AUDIO_ELEMENT_SWITCH_ELEVATION_CHANGED:
+      if (!hUiManager->isActive) return UI_MANAGER_NOT_ALLOWED;
       if (!compUUID(hUiManager->uiState.uuid, action->uuid) ||
           !(action->presentFlags & FLAG_XML_PARAM_INT) ||
           !(action->presentFlags & FLAG_XML_PARAM_FLOAT)) {
@@ -1238,7 +1329,7 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
         break;
       }
       err = setSwitchGroupElOffset(hUiManager, (UCHAR)action->paramInt,
-                                   (UCHAR)((((LONG)action->paramFloat / 3) >> 16) + 32));
+                                   (UCHAR)(((((LONG)action->paramFloat / 3) + 0x8000) >> 16) + 32));
       break;
 
     case UI_MANAGER_COMMAND_AUDIO_ELEMENT_SWITCH_DISTANCE_CHANGED:
@@ -1267,7 +1358,7 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
         hUiManager->uiState.prefAudioLanguages[action->paramInt][2] = language[2];
       }
 
-      selectAudioLang(hUiManager);
+      if (hUiManager->isActive) selectAudioLang(hUiManager);
 
       break;
 
@@ -1288,15 +1379,75 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
           break;
         }
         asiMapISO639_2_T2B_and_tolower(language);
+
+        if (hUiManager->asi.prefDescrLanguages[action->paramInt][0] != language[0] ||
+            hUiManager->asi.prefDescrLanguages[action->paramInt][1] != language[1] ||
+            hUiManager->asi.prefDescrLanguages[action->paramInt][2] != language[2]) {
+          hUiManager->xmlStateChanged = 1;
+        }
+
         hUiManager->asi.prefDescrLanguages[action->paramInt][0] = language[0];
         hUiManager->asi.prefDescrLanguages[action->paramInt][1] = language[1];
         hUiManager->asi.prefDescrLanguages[action->paramInt][2] = language[2];
       }
 
+#ifdef ASI_MAX_DESCRIPTION_LANGUAGES
+      if (hUiManager->asi.pDescriptions && hUiManager->isActive) {
+        /* loop over groups, switch groups, presets */
+        for (int type = 0; type < 3; type++) {
+          int num;
+          ASI_DESCRIPTION* pDescriptions;
+
+          switch (type) {
+            case 0:
+              num = hUiManager->asi.numGroups;
+              pDescriptions = hUiManager->asi.pDescriptions->groups;
+              break;
+            case 1:
+              num = hUiManager->asi.numSwitchGroups;
+              pDescriptions = hUiManager->asi.pDescriptions->switchGroups;
+              break;
+            case 2:
+              num = hUiManager->asi.numGroupPresets;
+              pDescriptions = hUiManager->asi.pDescriptions->groupPresets;
+              break;
+          }
+
+          /* loop over descriptions */
+          for (int i = 0; i < num; i++) {
+            if (pDescriptions[i].present) {
+              int currPrio = 1000;
+
+              /* loop over languages */
+              for (int lng = 0; lng < pDescriptions[i].numLanguages; lng++) {
+                int prio;
+                for (prio = 0; prio < ASI_MAX_PREF_DESCR_LANGUAGES; prio++) {
+                  if (pDescriptions[i].language[lng][0] &&
+                      (FDKstrncmp(pDescriptions[i].language[lng],
+                                  hUiManager->asi.prefDescrLanguages[prio], 3) == 0)) {
+                    break;
+                  }
+                }
+                if (prio == ASI_MAX_PREF_DESCR_LANGUAGES)
+                  prio += lng; /* if not in preferred list select first transmitted */
+
+                if (prio < currPrio) {
+                  pDescriptions[i].prefLangIdx = lng;
+                  currPrio = prio;
+                }
+              }
+            }
+          }
+        }
+      }
+#endif
+
       break;
 
     case UI_MANAGER_COMMAND_SET_GUID: {
       int i, chg = 0;
+
+      if (!hUiManager->isActive) return UI_MANAGER_NOT_ALLOWED;
 
       for (i = 0; i < 16; i++) {
         if (hUiManager->uiState.uuid[i] != action->uuid[i]) chg = 1;
@@ -1307,6 +1458,10 @@ static UI_MANAGER_ERROR performAction(HANDLE_UI_MANAGER hUiManager,
 
       break;
     }
+
+    case UI_MANAGER_COMMAND_FORCE_SCENESTATE_UPDATE:
+      hUiManager->xmlStateChanged = 1;
+      break;
 
     default:
       return UI_MANAGER_INVALID_PARAM;
@@ -1382,12 +1537,26 @@ UI_MANAGER_ERROR UI_Manager_SetIsActive(HANDLE_UI_MANAGER hUiManager, UCHAR isAc
         hUiManager->configChanged = 1;
         reset(hUiManager, 0);
         applyPreset(hUiManager, PRESET_ID_AUTO);
+
+        persistenceRestore(hUiManager);
       } else {
         hUiManager->configChanged = 0;
       }
     }
   }
   return UI_MANAGER_OK;
+}
+
+/* get XML state changed flag */
+INT UI_Manager_GetXmlChanged(HANDLE_UI_MANAGER hUiManager) {
+  update(hUiManager);
+
+  return hUiManager->xmlStateChanged;
+}
+
+/* reset XML state changed flag */
+void UI_Manager_ResetXmlChanged(HANDLE_UI_MANAGER hUiManager) {
+  hUiManager->xmlStateChanged = 0;
 }
 
 /* get XML scene data */
@@ -1418,10 +1587,8 @@ UI_MANAGER_ERROR UI_Manager_GetXmlSceneState(HANDLE_UI_MANAGER hUiManager, char*
   err = uiManagerWriteXML(hUiManager, xmlOut, xmlOutSize, flagsIn, flagsOut);
 
   if (err == UI_MANAGER_OK) {
-    if (!(*flagsOut & UI_MANAGER_SHORT_OUTPUT)) {
-      /* reset changed flag */
-      hUiManager->xmlStateChanged = 0;
-    }
+    /* reset changed flag */
+    hUiManager->xmlStateChanged = 0;
 
     /* reset config change flag */
     hUiManager->configChanged = 0;
@@ -1438,13 +1605,11 @@ UI_MANAGER_ERROR UI_Manager_ApplyXmlAction(HANDLE_UI_MANAGER hUiManager, const c
 
   *flagsOut = 0;
 
-  if (!hUiManager->isActive) {
-    return UI_MANAGER_INVALID_STATE;
-  }
-
   update(hUiManager);
 
-  uiManagerParseXmlAction(xmlIn, xmlInSize, &action);
+  if (uiManagerParseXmlAction(xmlIn, xmlInSize, &action) <= 0) {
+    return UI_MANAGER_INVALID_PARAM;
+  }
 
   err = performAction(hUiManager, &action);
 
@@ -1457,39 +1622,43 @@ UI_MANAGER_ERROR UI_Manager_ApplyXmlAction(HANDLE_UI_MANAGER hUiManager, const c
   return err;
 }
 
+/* get UUID */
+UI_MANAGER_ERROR UI_Manager_GetUUID(HANDLE_UI_MANAGER hUiManager, UCHAR uuid[16]) {
+  if (!hUiManager->isActive) {
+    return UI_MANAGER_INVALID_STATE;
+  }
+
+  FDKmemcpy(uuid, hUiManager->uiState.uuid, 16);
+
+  return UI_MANAGER_OK;
+}
+
 /* set UUID */
 UI_MANAGER_ERROR UI_Manager_SetUUID(HANDLE_UI_MANAGER hUiManager, UCHAR uuid[16],
                                     UCHAR applyAsiCrc) {
-  int i, chg = 0;
+  int chg = 0;
+  UCHAR prevUuid[16];
 
   if (!hUiManager->isActive) {
     return UI_MANAGER_INVALID_STATE;
   }
 
+  /* save previous UUID */
+  FDKmemcpy(prevUuid, hUiManager->uiState.uuid, 16);
+
   update(hUiManager);
+
+  /* copy new UUID */
+  FDKmemcpy(hUiManager->uiState.uuid, uuid, 16);
 
   if (applyAsiCrc) {
     /* xor upper 16 bits of UUID with partial ASI CRC */
-    UCHAR tmp0, tmp1;
-
-    tmp0 = uuid[0] ^ (hUiManager->asi.crcForUid >> 8);
-    tmp1 = uuid[1] ^ (hUiManager->asi.crcForUid & 0xFF);
-
-    if (hUiManager->uiState.uuid[0] != tmp0) chg = 1;
-    if (hUiManager->uiState.uuid[1] != tmp1) chg = 1;
-
-    hUiManager->uiState.uuid[0] = tmp0;
-    hUiManager->uiState.uuid[1] = tmp1;
-
-    i = 2;
-  } else {
-    i = 0;
+    hUiManager->uiState.uuid[0] ^= (hUiManager->asi.crcForUid >> 8);
+    hUiManager->uiState.uuid[1] ^= (hUiManager->asi.crcForUid & 0xFF);
   }
 
-  for (; i < 16; i++) {
-    if (hUiManager->uiState.uuid[i] != uuid[i]) chg = 1;
-    hUiManager->uiState.uuid[i] = uuid[i];
-  }
+  /* check if UUID changed */
+  chg = compUUID(prevUuid, hUiManager->uiState.uuid) == 0;
   /* restore state */
   if (chg) persistenceRestore(hUiManager);
 
@@ -1507,6 +1676,36 @@ UI_MANAGER_ERROR UI_Manager_GetInteractivityStatus(HANDLE_UI_MANAGER hUiManager,
   }
 
   update(hUiManager);
+
+  /* verify current status is valid */
+  {
+    int valid = 1;
+
+    /* check if an active group is not available */
+    for (grp = 0; grp < hUiManager->asi.numGroups; grp++) {
+      if (hUiManager->uiState.groups[grp].onOff && !hUiManager->uiState.groups[grp].isAvailable) {
+        valid = 0;
+        break;
+      }
+    }
+
+    /* check if no preset is active */
+    if (hUiManager->asi.numGroupPresets > 0 && hUiManager->uiState.activePresetIndex == INVALID_IDX)
+      valid = 0;
+
+    /* reset if not valid */
+    if (!valid) {
+      UI_MANAGER_ERROR err;
+
+      /* reset */
+      reset(hUiManager, 0);
+
+      if (hUiManager->asi.numGroupPresets > 0) {
+        err = applyPreset(hUiManager, PRESET_ID_AUTO);
+        if (err) return err;
+      }
+    }
+  }
 
   if (hUiManager->uiState.activePresetIndex == INVALID_IDX) {
     pUiStatus->interactionMode = 0;

@@ -89,6 +89,8 @@ amm-info@iis.fraunhofer.de
 *******************************************************************************/
 
 #include "fft_rad2.h"
+#include "fft.h"
+
 #include "FDK_tools_rom.h"
 
 #define W_PiFOURTH STC(0x5a82799a)
@@ -154,8 +156,6 @@ amm-info@iis.fraunhofer.de
 #define SCALEFACTOR768 (SCALEFACTOR12 + SCALEFACTOR64 + 2)
 #define SCALEFACTOR960 (SCALEFACTOR15 + SCALEFACTOR64 + 2)
 
-#include "fft.h"
-
 #define C31 (STC(0x91261468)) /* FL2FXCONST_DBL(-0.86602540) = -sqrt(3)/2  */
 
 /*
@@ -182,6 +182,7 @@ amm-info@iis.fraunhofer.de
  *
  */
 
+#ifndef FUNCTION_fft
 void fft(int length, FIXP_DBL* pInput, INT* pScalefactor) {
   /* Ensure, that the io-ptr is always (at least 8-byte) aligned */
   C_ALLOC_ALIGNED_CHECK(pInput);
@@ -211,6 +212,9 @@ void fft(int length, FIXP_DBL* pInput, INT* pScalefactor) {
   }
 }
 
+#endif
+
+#ifndef FUNCTION_ifft
 void ifft(int length, FIXP_DBL* pInput, INT* scalefactor) {
   switch (length) {
     default:
@@ -218,3 +222,4 @@ void ifft(int length, FIXP_DBL* pInput, INT* scalefactor) {
       break;
   }
 }
+#endif

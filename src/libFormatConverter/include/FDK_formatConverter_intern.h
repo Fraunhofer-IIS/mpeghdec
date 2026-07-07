@@ -427,6 +427,7 @@ typedef struct {
   UINT erb_is4GVH_L;
   UINT erb_is4GVH_H;
 
+  int openSuccess;
 } IIS_FORMATCONVERTER_INTERNAL, *IIS_FORMATCONVERTER_INTERNAL_HANDLE;
 
 #define MAX_CHANNELS 33

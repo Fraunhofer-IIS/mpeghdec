@@ -162,7 +162,7 @@ typedef struct s_selection_process_output {
   UCHAR activeDownmixId;
   UCHAR baseChannelCount;
   UCHAR targetChannelCount;
-  SCHAR targetLayout;
+  SHORT targetLayout;
   UCHAR downmixMatrixPresent;
 
   FIXP_SGL boost;    /* e = 1 */

@@ -146,8 +146,9 @@ void CChannelElement_Decode(
             GetScaleFactorBandOffsets(&pAacDecoderChannelInfo[L]->icsInfo, pSamplingRateInfo),
             GetWindowGroupLengthTable(&pAacDecoderChannelInfo[L]->icsInfo),
             GetWindowGroups(&pAacDecoderChannelInfo[L]->icsInfo), max_sfb_ste, maxSfBandsL,
-            maxSfBandsR, pAacDecoderChannelInfo[L]->pComData->pJointStereoData->store_dmx_re_prev,
-            &(pAacDecoderChannelInfo[L]->pComData->pJointStereoData->store_dmx_re_prev_e), 1);
+            maxSfBandsR,
+            pAacDecoderChannelInfo[L]->pComStaticData->pJointStereoData->store_dmx_re_prev,
+            &(pAacDecoderChannelInfo[L]->pComStaticData->pJointStereoData->store_dmx_re_prev_e), 1);
 
         if ((elFlags & AC_EL_ENHANCED_NOISE) && (elFlags & AC_EL_IGF_USE_ENF)) {
           /* Performs joint-stereo/MS for the IGF tiles (up to 4) */
@@ -173,7 +174,7 @@ void CChannelElement_Decode(
       }
       int CP_active = 0;
       if (elFlags & AC_EL_USAC_CP_POSSIBLE) {
-        CP_active = pAacDecoderChannelInfo[ch]->pComData->pJointStereoData->cplx_pred_flag;
+        CP_active = pAacDecoderChannelInfo[ch]->pComStaticData->pJointStereoData->cplx_pred_flag;
       }
 
       /* Omit writing of pAacDecoderChannelInfo[ch]->specScale for complex stereo prediction
@@ -221,8 +222,9 @@ void CChannelElement_Decode(
             GetWindowGroupLengthTable(&pAacDecoderChannelInfo[L]->icsInfo),
             &(pAacDecoderStaticChannelInfo[L]->nfRandomSeed),
             &(pAacDecoderStaticChannelInfo[R]->nfRandomSeed),
-            pAacDecoderChannelInfo[L]->pComData->pJointStereoData->MsUsed, TNF_maskL, TNF_maskR,
-            (UCHAR)(elFlags & AC_EL_IGF_USE_ENF ? 1 : 0), IGF_FRAME_DIVISION_AAC_OR_TCX_LONG);
+            pAacDecoderChannelInfo[L]->pComStaticData->pJointStereoData->MsUsed, TNF_maskL,
+            TNF_maskR, (UCHAR)(elFlags & AC_EL_IGF_USE_ENF ? 1 : 0),
+            IGF_FRAME_DIVISION_AAC_OR_TCX_LONG);
 
         int igfStartSfb;
 
@@ -232,7 +234,8 @@ void CChannelElement_Decode(
           igfStartSfb = pAacDecoderStaticChannelInfo[L]->IGF_StaticData.igfStartSfbSB;
         }
 
-        if (pAacDecoderChannelInfo[L]->pComData->pJointStereoData->IGF_MsMaskPresent != (UCHAR)3) {
+        if (pAacDecoderChannelInfo[L]->pComStaticData->pJointStereoData->IGF_MsMaskPresent !=
+            (UCHAR)3) {
           Clean_Complex_Prediction_coefficients(
               &pAacDecoderStaticChannelInfo[L]->pCpeStaticData->jointStereoPersistentData,
               GetWindowGroups(&pAacDecoderChannelInfo[L]->icsInfo), igfStartSfb, 64);
@@ -326,8 +329,9 @@ void CChannelElement_Decode(
             GetWindowGroupLengthTable(&pAacDecoderChannelInfo[L]->icsInfo),
             &(pAacDecoderStaticChannelInfo[L]->nfRandomSeed),
             &(pAacDecoderStaticChannelInfo[R]->nfRandomSeed),
-            pAacDecoderChannelInfo[L]->pComData->pJointStereoData->MsUsed, TNF_maskL, TNF_maskR,
-            (UCHAR)(elFlags & AC_EL_IGF_USE_ENF ? 1 : 0), IGF_FRAME_DIVISION_AAC_OR_TCX_LONG);
+            pAacDecoderChannelInfo[L]->pComStaticData->pJointStereoData->MsUsed, TNF_maskL,
+            TNF_maskR, (UCHAR)(elFlags & AC_EL_IGF_USE_ENF ? 1 : 0),
+            IGF_FRAME_DIVISION_AAC_OR_TCX_LONG);
 
         int igfStartSfb;
 
@@ -337,7 +341,8 @@ void CChannelElement_Decode(
           igfStartSfb = pAacDecoderStaticChannelInfo[L]->IGF_StaticData.igfStartSfbSB;
         }
 
-        if (pAacDecoderChannelInfo[L]->pComData->pJointStereoData->IGF_MsMaskPresent != (UCHAR)3) {
+        if (pAacDecoderChannelInfo[L]->pComStaticData->pJointStereoData->IGF_MsMaskPresent !=
+            (UCHAR)3) {
           Clean_Complex_Prediction_coefficients(
               &pAacDecoderStaticChannelInfo[L]->pCpeStaticData->jointStereoPersistentData,
               GetWindowGroups(&pAacDecoderChannelInfo[L]->icsInfo), igfStartSfb, 64);
@@ -490,7 +495,7 @@ AAC_DECODER_ERROR CChannelElement_Read(HANDLE_FDK_BITSTREAM hBs,
   cplxPred = 0;
   if (pAacDecoderStaticChannelInfo != NULL) {
     if (elFlags & AC_EL_USAC_CP_POSSIBLE) {
-      pAacDecoderChannelInfo[0]->pComData->pJointStereoData->cplx_pred_flag = 0;
+      pAacDecoderChannelInfo[0]->pComStaticData->pJointStereoData->cplx_pred_flag = 0;
       cplxPred = 1;
     }
   }
@@ -613,7 +618,7 @@ AAC_DECODER_ERROR CChannelElement_Read(HANDLE_FDK_BITSTREAM hBs,
         }
 
         if (CJointStereo_Read(
-                hBs, pAacDecoderChannelInfo[0]->pComData->pJointStereoData,
+                hBs, pAacDecoderChannelInfo[0]->pComStaticData->pJointStereoData,
                 GetWindowGroups(&pAacDecoderChannelInfo[0]->icsInfo), max_sfb_ste,
                 max_sfb_ste_clear,
                 /* jointStereoPersistentData and cplxPredictionData are only available/allocated if
@@ -631,7 +636,7 @@ AAC_DECODER_ERROR CChannelElement_Read(HANDLE_FDK_BITSTREAM hBs,
 
         if (igfUseEnhancesNoise) {
           if (CJointStereo_ReadIGF(
-                  hBs, pAacDecoderChannelInfo[0]->pComData->pJointStereoData,
+                  hBs, pAacDecoderChannelInfo[0]->pComStaticData->pJointStereoData,
                   GetWindowGroups(&pAacDecoderChannelInfo[0]->icsInfo), igfStartSfb, igfStopSfb,
                   pAacDecoderStaticChannelInfo[ch]->IGF_StaticData.useHighRes,
                   &pAacDecoderStaticChannelInfo[0]->pCpeStaticData->jointStereoPersistentData,

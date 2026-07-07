@@ -236,13 +236,12 @@ CWorkBufferCore1;
 
 /* Common data referenced by all channels */
 typedef struct {
-  CJointStereoData* pJointStereoData; /* One for one element */
-
 } CAacDecoderCommonData;
 
 typedef struct {
   CWorkBufferCore1* pWorkBufferCore1;
   CCplxPredictionData* cplxPredictionData;
+  CJointStereoData* pJointStereoData; /* One for one element */
 } CAacDecoderCommonStaticData;
 
 /*

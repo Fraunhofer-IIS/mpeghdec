@@ -142,6 +142,8 @@ typedef enum {
 
   UI_MANAGER_COMMAND_PRESET_SELECTED_NO_UUID = 95,
 
+  UI_MANAGER_COMMAND_FORCE_SCENESTATE_UPDATE = 100,
+
   UI_MANAGER_COMMAND_INVALID = 255
 } UI_MANAGER_COMMAND;
 
@@ -230,7 +232,7 @@ typedef struct {
   UCHAR presentFlags;
 } UI_MANAGER_ACTION;
 
-int getMinPresetID(UI_MANAGER* hUiManager);
+int getMinPresetID(UI_MANAGER* hUiManager, int checkAvailability);
 void simulatePreset(UI_MANAGER* hUiManager, UCHAR presetID, UI_STATE* pUiState);
 
 #endif

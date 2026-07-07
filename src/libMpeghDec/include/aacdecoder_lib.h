@@ -972,6 +972,10 @@ typedef enum {
                  data block. This is required to calculate the decode start up (see also
                    ::AAC_TPDEC_PARAM_IGNORE_BUFFERFULLNESS) and the amount of lost frames in case of
                  bit stream errors. Set to 0 if data rate is continuous. */
+  AAC_TPDEC_PARAM_CHECK_TWO_SYNCS =
+      0x0606, /*!< Enhance synchronization robustness by requiring two valid sync words in expected
+                 positions for bitstreams, reducing false positives caused by accidental sync word
+                 matches. Turned off by default. */
 
   AAC_USAC_LP_FLAGS = 0x0800, /*!<  Special non-standard conform USAC low power mode (bit field).
                                  This mode is not recommended if not absolutely required.\n 0x01 SBR
@@ -1001,18 +1005,20 @@ typedef enum {
  *        All fields are read-only.
  */
 typedef struct {
-  /* These nine members are the only really relevant ones for the user. */
-  INT sampleRate;  /*!< The sample rate in Hz of the decoded PCM audio signal.  */
-  INT frameSize;   /*!< The frame size of the decoded PCM audio signal. \n
-                        Typically this is: \n
-                        1024 or 960 for AAC-LC \n
-                        2048 or 1920 for HE-AAC (v2) \n
-                        512 or 480 for AAC-LD and AAC-ELD \n
-                        768, 1024, 2048 or 4096 for USAC \n
-                        1024, 1536, 2048 or 3072 for MPEG-H \n
-                        Other values are possible if an decoder internal resampling is performed or \n
-                        if only a fraction of a frame is available (e.g. possible for MPEG-H
-                      decoding).       */
+  /* These members are the only really relevant ones for the user. */
+  INT sampleRate; /*!< The sample rate in Hz of the decoded PCM audio signal (incl. potential
+                     resampling).  */
+  INT sampleRateBeforeRs; /*!< The sample rate in Hz of the output PCM audio signal. */
+  INT frameSize;          /*!< The frame size of the decoded PCM audio signal. \n
+                               Typically this is: \n
+                               1024 or 960 for AAC-LC \n
+                               2048 or 1920 for HE-AAC (v2) \n
+                               512 or 480 for AAC-LD and AAC-ELD \n
+                               768, 1024, 2048 or 4096 for USAC \n
+                               1024, 1536, 2048 or 3072 for MPEG-H \n
+                               Other values are possible if an decoder internal resampling is performed or \n
+                               if only a fraction of a frame is available (e.g. possible for MPEG-H
+                             decoding).       */
   INT mpeghAUSize; /*!< The full frame size in samples of the last decoded MPEG-H access unit. This
                       is typically 1024, 1536, 2048 or 3072 depending on the core sampling rate.
                       Other shorter sizes occur if the frame has been cut by an audio truncation
@@ -1020,8 +1026,9 @@ typedef struct {
                       current access unit is completed with samples from a subsequent call to
                       aacDecoder_DecodeFrame(). -1 means undefined (e.g. if the decoder returned
                       with AAC_DEC_NOT_ENOUGH_BITS). */
-  INT numChannels; /*!< The number of output audio channels before the rendering module, i.e. the
-                      original channel configuration. */
+  INT numChannels; /*!< The number of output audio channels. */
+  INT numChannelsBeforeMix; /*!< The number of output audio channels before the up-/downmix, i.e.
+                               the original channel configuration. */
   AUDIO_CHANNEL_TYPE* pChannelType; /*!< Audio channel type of each output audio channel. */
   UCHAR* pChannelIndices;           /*!< Audio channel index for each output audio channel.
                                           See ISO/IEC 13818-7:2005(E), 8.5.3.2 Explicit channel mapping using

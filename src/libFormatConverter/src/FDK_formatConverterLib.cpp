@@ -288,6 +288,11 @@ int IIS_FormatConverter_GetDelay(IIS_FORMATCONVERTER_HANDLE self, UINT* delay) {
   *delay = _p->stftFrameSize;
   return 0;
 }
+
+int IIS_FormatConverter_IsOpen(IIS_FORMATCONVERTER_HANDLE self) {
+  return ((IIS_FORMATCONVERTER_INTERNAL*)self->member)->openSuccess;
+}
+
 /**********************************************/
 /*                                            */
 /*      Start of data processing methods      */
@@ -461,6 +466,8 @@ int IIS_FormatConverter_Open(IIS_FORMATCONVERTER_HANDLE self, INT* p_buffer, UIN
     }
   }
 
+  _p->openSuccess = 1;
+
 FC_OPEN_CLEANUP_AND_RETURN:
 
   if (err == 0) {
@@ -486,6 +493,7 @@ static int IIS_FormatConverter_Process_STFT(IIS_FORMATCONVERTER_HANDLE self,
     int STFT_headroom = 31;
     int STFT_headroom_prescaling = 0;
     for (ch = 0; ch < _p->numTotalInputChannels; ch++) {
+      if (deinBuffer[ch] == NULL) continue;
       STFT_headroom = fMin(STFT_headroom, getScalefactor(&(deinBuffer[ch][i * _p->stftFrameSize]),
                                                          (_p->stftFrameSize)));
     }
@@ -508,6 +516,10 @@ static int IIS_FormatConverter_Process_STFT(IIS_FORMATCONVERTER_HANDLE self,
 
     /* Transform into frequency domain*/
     for (ch = 0; ch < _p->numTotalInputChannels; ch++) {
+      if (deinBuffer[ch] == NULL) {
+        FDKmemclear(_p->inputBufferStft[ch], _p->stftLength * sizeof(FIXP_DBL));
+        continue;
+      }
       StftFilterbank_Process(&(deinBuffer[ch][i * _p->stftFrameSize]), _p->inputBufferStft[ch],
                              _p->stftFilterbankAnalysis[ch], _p->STFT_headroom_prescaling);
     }
@@ -534,7 +546,7 @@ static int IIS_FormatConverter_Process_STFT(IIS_FORMATCONVERTER_HANDLE self,
 }
 
 INT IIS_FormatConverter_Process(IIS_FORMATCONVERTER_HANDLE self, HANDLE_DRC_DECODER hDrcDec,
-                                FIXP_DBL* inBuffer, FIXP_DBL* outBuffer,
+                                FIXP_DBL** deinBuffer, FIXP_DBL* outBuffer,
                                 const int inputBufferChannelOffset) {
   IIS_FORMATCONVERTER_INTERNAL* _p;
   INT error = 0;
@@ -544,32 +556,36 @@ INT IIS_FormatConverter_Process(IIS_FORMATCONVERTER_HANDLE self, HANDLE_DRC_DECO
   if (_p->numTotalInputChannels == 0) {
     return 0;
   }
+  if (_p->fcParams == NULL) {
+    /* fails if IIS_FormatConverter_Open() was not called before */
+    return 0;
+  }
+
+  FIXP_DBL* deoutBuffer[FDK_FORMAT_CONVERTER_MAX_OUTPUT_CHANNELS];
+
+  UINT frameSize = _p->frameSize;
+
+  UINT i;
+
+#if defined(FDK_ASSERT_ENABLE)
+  activeDownmixer* h = (activeDownmixer*)_p->fcState->handleActiveDmxStft;
+  if (h != NULL) {
+    FDK_ASSERT(h->numInChans == _p->numTotalInputChannels);
+    FDK_ASSERT(h->numOutChans == _p->numOutputChannels);
+  }
+#endif
+
+  deoutBuffer[0] = outBuffer;
+  for (i = 1; i < _p->numOutputChannels; i++) {
+    deoutBuffer[i] = &deoutBuffer[i - 1][frameSize];
+  }
 
   switch (_p->mode) {
-    case IIS_FORMATCONVERTER_MODE_CUSTOM_FREQ_DOMAIN_STFT: {
-      activeDownmixer* h = (activeDownmixer*)_p->fcState->handleActiveDmxStft;
-      FIXP_DBL* deinBuffer[FDK_FORMAT_CONVERTER_MAX_INPUT_CHANNELS];
-      FIXP_DBL* deoutBuffer[FDK_FORMAT_CONVERTER_MAX_OUTPUT_CHANNELS];
-
-      UINT frameSize = _p->frameSize;
-
-      UINT i;
-
-      deinBuffer[0] = inBuffer;
-      for (i = 1; i < h->numInChans; i++) {
-        deinBuffer[i] = &deinBuffer[i - 1][inputBufferChannelOffset];
-      }
-
-      deoutBuffer[0] = outBuffer;
-      for (i = 1; i < h->numOutChans; i++) {
-        deoutBuffer[i] = &deoutBuffer[i - 1][frameSize];
-      }
-
+    case IIS_FORMATCONVERTER_MODE_CUSTOM_FREQ_DOMAIN_STFT:
       error = IIS_FormatConverter_Process_STFT(self, hDrcDec, deinBuffer, deoutBuffer);
-    } break;
+      break;
     case IIS_FORMATCONVERTER_MODE_PASSIVE_TIME_DOMAIN:
-      formatConverterProcess_passive_timeDomain_frameLength(inBuffer, outBuffer, _p,
-                                                            inputBufferChannelOffset);
+      formatConverterProcess_passive_timeDomain_frameLength(deinBuffer, deoutBuffer, _p);
       break;
     default:
       error = -1;

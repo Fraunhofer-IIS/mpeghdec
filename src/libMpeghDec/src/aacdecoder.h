@@ -349,7 +349,7 @@ struct AAC_DECODER_INSTANCE {
                              zero, the integrated UI manager is selected automatically according to
                              MHAS UI input. */
   UCHAR uiManagerActive;  /* Flag indicating if the integrated UI manager is currently active. */
-  UCHAR uiStatusValid, drcStatusValid; /* Flags indicating if UI or DRC loudness UI Data for
+  SCHAR uiStatusValid, drcStatusValid; /* Flags indicating if UI or DRC loudness UI Data for
                                           uiManagerEnabled=0 case are valid. */
   UCHAR uiSignalChanged;    /* Flag indicating that the next scheduled UI status uiStatusNext
                                has a different signal setup and needs to be delayed until the
@@ -442,7 +442,8 @@ LINKSPEC_H AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, con
                                                      const int timeDataChannelOffset);
 
 /* Free config dependent AAC memory */
-LINKSPEC_H AAC_DECODER_ERROR CAacDecoder_FreeMem(HANDLE_AACDECODER self, const int subStreamIndex);
+LINKSPEC_H AAC_DECODER_ERROR CAacDecoder_FreeMem(HANDLE_AACDECODER self, const int subStreamIndex,
+                                                 const UCHAR configMode);
 
 /* Prepare crossfade for USAC DASH IPF config change */
 LINKSPEC_H AAC_DECODER_ERROR CAacDecoder_PrepareCrossFade(const PCM_DEC* pTimeData,

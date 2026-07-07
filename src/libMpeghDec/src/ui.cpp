@@ -1025,12 +1025,25 @@ int updateUiStatus(HANDLE_AACDECODER self) {
     if (self->uiManagerEnabled > 0) {
       self->uiManagerActive = 1;
     } else {
-      if (self->pUsacConfig[0]) {
+      if (self->pUsacConfig[0] && self->pUsacConfig[0]->uiManagerActive >= 0) {
         self->uiManagerActive = self->pUsacConfig[0]->uiManagerActive;
       }
     }
   } else {
     self->uiManagerActive = 0;
+  }
+
+  if (!self->uiManagerActive && self->uiStatusValid != 0) {
+    /* check availability */
+    AUDIO_SCENE_INFO* pASI = UI_Manager_GetAsiPointer(self->hUiManager);
+    for (int grpIdx = 0; grpIdx < self->uiStatusNext.numGroups; grpIdx++) {
+      if (self->uiStatusNext.groupData[grpIdx].onOff && !pASI->groups[grpIdx].isAvailable) {
+        self->uiStatusValid = -1;
+        if (self->uiManagerEnabled != 0) self->uiManagerActive = 1;
+        valid = -1;
+        break;
+      }
+    }
   }
 
   UI_Manager_SetIsActive(self->hUiManager, self->uiManagerActive);
@@ -1039,11 +1052,15 @@ int updateUiStatus(HANDLE_AACDECODER self) {
     if (UI_Manager_GetInteractivityStatus(self->hUiManager, &self->uiStatusNext,
                                           &self->uiSignalChanged) == UI_MANAGER_OK) {
       valid = 1;
+    } else {
+      valid = -1;
     }
   }
-  if (self->uiStatusValid) {
+  if (self->uiStatusValid > 0) {
     valid = 1;
   }
+
+  if (valid < 0) return -1;
 
   if (!valid) {
     return 1;
@@ -1222,8 +1239,13 @@ AAC_DECODER_ERROR applyUserInteractivity(HANDLE_AACDECODER self, PCM_DEC* pTimeD
     return AAC_DEC_UNSUPPORTED_CHANNELCONFIG;
   }
 
-  if (updateUiStatus(self) == 0) {
+  int result = updateUiStatus(self);
+
+  if (result == 0) {
     valid = 1;
+  } else if (result < 0) {
+    AUDIO_SCENE_INFO* pASI = UI_Manager_GetAsiPointer(self->hUiManager);
+    if (pASI->numGroups > 0) return AAC_DEC_DECODE_FRAME_ERROR;
   }
 
   if (self->useElementSkipping && self->uiSignalChanged) {
@@ -1440,14 +1462,14 @@ AAC_DECODER_ERROR applyUserInteractivity(HANDLE_AACDECODER self, PCM_DEC* pTimeD
     }
 
     if (drcStatus.boost != -1) {
-      drcErr =
-          FDK_drcDec_SetParam(self->hUniDrcDecoder, DRC_DEC_BOOST, FX_SGL2FX_DBL(drcStatus.boost));
+      drcErr = FDK_drcDec_SetParam(self->hUniDrcDecoder, DRC_DEC_BOOST,
+                                   FX_SGL2FX_DBL((FIXP_SGL)drcStatus.boost));
       if (drcErr) return AAC_DEC_SET_PARAM_FAIL;
     }
 
     if (drcStatus.compress != -1) {
       drcErr = FDK_drcDec_SetParam(self->hUniDrcDecoder, DRC_DEC_COMPRESS,
-                                   FX_SGL2FX_DBL(drcStatus.compress));
+                                   FX_SGL2FX_DBL((FIXP_SGL)drcStatus.compress));
       if (drcErr) return AAC_DEC_SET_PARAM_FAIL;
     }
 

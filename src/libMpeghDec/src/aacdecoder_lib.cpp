@@ -149,7 +149,7 @@ static LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_Config(HANDLE_AACDECODER self,
 
   if (self->flags[0] & AC_MPEGH3DA) {
     /* Assimilate new UI status with changed signals */
-    if ((configMode == AC_CM_ALLOC_MEM) && (updateUiStatus(self) == 0)) {
+    if ((configMode & AC_CM_ALLOC_MEM) && (updateUiStatus(self) == 0)) {
       if (self->uiSignalChanged) {
         self->uiStatus = self->uiStatusNext;
         self->uiSignalChanged = 0;
@@ -232,7 +232,7 @@ static INT aacDecoder_ConfigCallback(void* handle, const CSAudioSpecificConfig* 
     }
   }
 
-  if (*configChanged && configMode == AC_CM_DET_CFG_CHANGE) {
+  if (*configChanged && (configMode & AC_CM_DET_CFG_CHANGE)) {
     AUDIO_SCENE_INFO* asi = UI_Manager_GetAsiPointer(self->hUiManager);
     asi->activeDmxId = self->downmixId;
   }
@@ -266,7 +266,7 @@ static INT aacDecoder_FreeMemCallback(void* handle, const CSAudioSpecificConfig*
 
   FDK_ASSERT(self != NULL);
 
-  if (CAacDecoder_FreeMem(self, subStreamIndex) != AAC_DEC_OK) {
+  if (CAacDecoder_FreeMem(self, subStreamIndex, pAscStruct->configMode) != AAC_DEC_OK) {
     errTp = TRANSPORTDEC_UNKOWN_ERROR;
   }
 
@@ -863,13 +863,13 @@ aacDecoder_SetParam(const HANDLE_AACDECODER self, /*!< Handle of the decoder ins
       break;
 
     case AAC_TPDEC_PARAM_MINIMIZE_DELAY:
-      errTp = transportDec_SetParam(hTpDec, TPDEC_PARAM_MINIMIZE_DELAY, (int)value);
+      errTp = transportDec_SetParam(hTpDec, TPDEC_PARAM_MINIMIZE_DELAY, (INT)value);
       break;
     case AAC_TPDEC_PARAM_IGNORE_BUFFERFULLNESS:
-      errTp = transportDec_SetParam(hTpDec, TPDEC_PARAM_IGNORE_BUFFERFULLNESS, (int)value);
+      errTp = transportDec_SetParam(hTpDec, TPDEC_PARAM_IGNORE_BUFFERFULLNESS, (INT)value);
       break;
     case AAC_TPDEC_PARAM_EARLY_CONFIG:
-      errTp = transportDec_SetParam(hTpDec, TPDEC_PARAM_EARLY_CONFIG, (int)value);
+      errTp = transportDec_SetParam(hTpDec, TPDEC_PARAM_EARLY_CONFIG, (INT)value);
       break;
     case AAC_TPDEC_CLEAR_BUFFER:
       errTp = transportDec_SetParam(hTpDec, TPDEC_PARAM_RESET, 1);
@@ -879,10 +879,13 @@ aacDecoder_SetParam(const HANDLE_AACDECODER self, /*!< Handle of the decoder ins
       /* aacDecoder_SignalInterruption(self); */
       break;
     case AAC_TPDEC_PARAM_SET_BITRATE:
-      errTp = transportDec_SetParam(hTpDec, TPDEC_PARAM_SET_BITRATE, (int)value);
+      errTp = transportDec_SetParam(hTpDec, TPDEC_PARAM_SET_BITRATE, (INT)value);
       break;
     case AAC_TPDEC_PARAM_SET_BURSTPERIOD:
-      errTp = transportDec_SetParam(hTpDec, TPDEC_PARAM_BURST_PERIOD, (int)value);
+      errTp = transportDec_SetParam(hTpDec, TPDEC_PARAM_BURST_PERIOD, (INT)value);
+      break;
+    case AAC_TPDEC_PARAM_CHECK_TWO_SYNCS:
+      errTp = transportDec_SetParam(hTpDec, TPDEC_PARAM_CHECK_TWO_SYNCS, (INT)value);
       break;
     case AAC_CONCEAL_METHOD:
       /* Changing the concealment method can introduce additional bitstream delay. And
@@ -1352,6 +1355,9 @@ LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_DecodeFrame(HANDLE_AACDECODER self, IN
     timeData2Size = self->timeData2Size / sizeof(PCM_DEC);
     pTimeData3 = (PCM_AAC*)self->pTimeData2;
 
+    /* conceal if UI status invalid */
+    if (updateUiStatus(self) < 0) self->frameOK = 0;
+
     ErrorStatus = CAacDecoder_DecodeFrame(
         self,
         flags | (fTpConceal ? AACDEC_CONCEAL : 0) |
@@ -1401,13 +1407,14 @@ LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_DecodeFrame(HANDLE_AACDECODER self, IN
 
         if (ErrorUI != AAC_DEC_OK) {
           ErrorStatus = ErrorUI;
-          goto bail;
+          if (!IS_OUTPUT_VALID(ErrorStatus)) goto bail;
         }
       }
 
+      int signalsPrevStreams = 0;
       /* Apply DRC 1 (before downmix/rendering) */
       int drcNumChannels = 0, drcStartChannel = 0, drcTotalChannels = 0;
-      int signalsPrevStreams = 0;
+
       FDK_drcDec_Preprocess(self->hUniDrcDecoder);
 
       for (streamIndex = 0; streamIndex < TPDEC_MAX_TRACKS; streamIndex++) {
@@ -1525,19 +1532,19 @@ LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_DecodeFrame(HANDLE_AACDECODER self, IN
 
           /* Compensate STFT delay in object and HOA signal path in case of time domain DRC. */
           if (processTimeDomainDrc) {
-            for (int ch = 0; ch < transportNumChannels; ch++) {
+            for (int ch = 0; ch < transportNumChannels2; ch++) {
               FDKmemcpy(
-                  pTimeData2 + (transportStartChannel + ch) * (self->streamInfo.frameSize + 256),
-                  self->delayBuffer[transportStartChannel + ch], sizeof(PCM_DEC) * 256);
-              FDKmemcpy(self->delayBuffer[transportStartChannel + ch],
+                  pTimeData2 + (transportStartChannel2 + ch) * (self->streamInfo.frameSize + 256),
+                  self->delayBuffer[transportStartChannel2 + ch], sizeof(PCM_DEC) * 256);
+              FDKmemcpy(self->delayBuffer[transportStartChannel2 + ch],
                         pTimeData2 +
-                            (transportStartChannel + ch) * (self->streamInfo.frameSize + 256) +
+                            (transportStartChannel2 + ch) * (self->streamInfo.frameSize + 256) +
                             self->streamInfo.frameSize,
                         sizeof(PCM_DEC) * 256);
             }
           }
         }
-        signalsPrevStreams += self->ascChannels[streamIndex];
+        signalsPrevStreams += self->pUsacConfig[streamIndex]->m_nUsacChannels;
       }
       streamIndex = 0;
 
@@ -1554,45 +1561,69 @@ LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_DecodeFrame(HANDLE_AACDECODER self, IN
                                                (self->streamInfo.frameSize) * sizeof(FIXP_DBL));
       }
 
+      int numObjGroup = 0;
+      int fcDone = 0; /* flag for running format converter only once */
+      PCM_DEC* pFormatConvIn[FORMAT_CONVERTER_MAX_CHANNELS] = {0};
+
       {
-        signalsPrevStreams = 0;
+        PCM_DEC* p = pTimeData_in + 256;
+        int n = 0, sig = 0;
+
         for (streamIndex = 0; streamIndex < TPDEC_MAX_TRACKS; streamIndex++) {
           if (self->pUsacConfig[streamIndex] == NULL) break;
-          /* Apply format converter if there is at least one channel signal group (always first). */
-          if (self->pUsacConfig[streamIndex]->m_signalGroupType[0].type == 0) {
-            int err;
 
-            err = IIS_FormatConverter_Process(
-                self->pFormatConverter[streamIndex],
-                self->multibandDrcPresent ? self->hUniDrcDecoder : NULL,
-                pTimeData_in + 256 + signalsPrevStreams * (self->streamInfo.frameSize + 256),
-                (PCM_DEC*)self->workBufferCore2, self->streamInfo.aacSamplesPerFrame + 256);
+          for (grp = 0; grp < self->pUsacConfig[streamIndex]->bsNumSignalGroups; grp++) {
+            int on = getOnOffFlag(self, sig);
+            sig += self->pUsacConfig[streamIndex]->m_signalGroupType[grp].count;
+            if (!on) continue;
 
-            if (err != 0) {
-              ErrorStatus = AAC_DEC_UNKNOWN;
-              goto bail;
+            for (int i = 0; i < self->pUsacConfig[streamIndex]->m_signalGroupType[grp].count; i++) {
+              if (self->pUsacConfig[streamIndex]->m_signalGroupType[grp].type == 0)
+                pFormatConvIn[n++] = p;
+              p += self->streamInfo.aacSamplesPerFrame + 256;
             }
           }
-
-          signalsPrevStreams += self->ascChannels[streamIndex];
         }
-        streamIndex = 0;
       }
 
-      int numObjGroup = 0;
       /* DMX processing IN: pTimeData_tmp (working buffer) OUT: pTimeData_tmp2 ( working buffer for
        * deinterleaving / ouput buffer for interleaving )*/
       signalsPrevStreams = 0;
       for (streamIndex = 0; streamIndex < TPDEC_MAX_TRACKS; streamIndex++) {
-        if (self->pUsacConfig[streamIndex] == NULL) break;
-        for (grp = 0; grp < self->pUsacConfig[streamIndex]->bsNumSignalGroups; grp++) {
-          int signalOffset = self->multibandDrcPresent ? 256 : 0;
+        int signalsStream = 0;
 
+        if (self->pUsacConfig[streamIndex] == NULL) break;
+
+        for (grp = 0; grp < self->pUsacConfig[streamIndex]->bsNumSignalGroups; grp++) {
+          /* Skip inactive signal groups. */
           if (!getOnOffFlag(self,
                             self->pUsacConfig[streamIndex]->m_signalGroupType[grp].firstSigIdx +
                                 signalsPrevStreams)) {
+            signalsStream += self->pUsacConfig[streamIndex]->m_signalGroupType[grp].count;
             continue;
           }
+
+          {
+            /* Apply format converter if there is at least one channel signal group (always first).
+             */
+            if (self->pUsacConfig[streamIndex]->m_signalGroupType[grp].type == 0 && fcDone == 0) {
+              int err;
+
+              fcDone = 1;
+
+              err = IIS_FormatConverter_Process(
+                  self->pFormatConverter[0],
+                  self->multibandDrcPresent ? self->hUniDrcDecoder : NULL, pFormatConvIn,
+                  (PCM_DEC*)self->workBufferCore2, self->streamInfo.aacSamplesPerFrame + 256);
+
+              if (err != 0) {
+                ErrorStatus = AAC_DEC_UNKNOWN;
+                goto bail;
+              }
+            }
+          }
+
+          int signalOffset = self->multibandDrcPresent ? 256 : 0;
 
           /* Apply object rendering on the object signal group */
           if (self->pUsacConfig[streamIndex]->m_signalGroupType[grp].type == 1 &&
@@ -1602,12 +1633,17 @@ LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_DecodeFrame(HANDLE_AACDECODER self, IN
                                            self->streamInfo.frameSize + 256);
             numObjGroup++;
           }
-
+          /* Increment for active signals */
           pTimeData_in += self->pUsacConfig[streamIndex]->m_signalGroupType[grp].count *
                           (self->streamInfo.frameSize + 256);
+
+          /* Count all signals */
+          signalsStream += self->pUsacConfig[streamIndex]->m_signalGroupType[grp].count;
         }
-        signalsPrevStreams += self->ascChannels[streamIndex];
+
+        signalsPrevStreams += signalsStream;
       }
+
       streamIndex = 0;
 
       /* Apply DRC 2/3 (after downmix/rendering) */
@@ -1898,6 +1934,8 @@ LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_DecodeFrame(HANDLE_AACDECODER self, IN
 
     /* SBR decoder for Unified Stereo Config (stereoConfigIndex == 3) */
 
+    self->streamInfo.sampleRateBeforeRs = self->streamInfo.sampleRate;
+
     if (!((self->flags[0] & AC_MPEGH3DA) && (self->targetLayout_config >= 0) &&
           (self->streamInfo.numChannels > 0))) {
       if ((INT)PCM_OUT_HEADROOM != timeDataHeadroom) {
@@ -1935,6 +1973,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR aacDecoder_DecodeFrame(HANDLE_AACDECODER self, IN
       }
     }
 
+    self->streamInfo.numChannelsBeforeMix = self->streamInfo.numChannels;
     if (self->streamInfo.extAot != AOT_AAC_SLS) {
     }
 
@@ -2098,6 +2137,7 @@ LINKSPEC_CPP void aacDecoder_Close(HANDLE_AACDECODER self) {
 
   if (self->hInput != NULL) {
     transportDec_Close(&self->hInput);
+    FDKmemclear(self->pUsacConfig, sizeof(self->pUsacConfig));
   }
 
   CAacDecoder_Close(self);

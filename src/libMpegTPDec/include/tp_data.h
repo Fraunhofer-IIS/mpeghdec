@@ -100,7 +100,7 @@ amm-info@iis.fraunhofer.de
  */
 
 #define TPDEC_MAX_PROGRAMS 1
-#define TPDEC_MAX_LAYERS 1
+#define TPDEC_MAX_LAYERS 4
 #define TPDEC_MAX_TRACKS (TPDEC_MAX_PROGRAMS * TPDEC_MAX_LAYERS)
 
 #define TP_MPEGH3DA_MAX_LEVEL (5)
@@ -299,7 +299,7 @@ typedef struct {
   UCHAR downmixIdCount;
   UCHAR subStreamIndex;
   INT targetLayout;
-  UCHAR uiManagerActive;
+  SCHAR uiManagerActive;
   UCHAR numAudioChannels;
   UCHAR m_usacConfigExtensionPresent;
   UCHAR elementLengthPresent;
@@ -593,7 +593,7 @@ typedef struct {
   char prefDescrLanguages[ASI_MAX_PREF_DESCR_LANGUAGES][3];
   UCHAR activeDmxId;
 
-  USHORT crcForUid;
+  USHORT crcForUid, crcForCompare;
 } AUDIO_SCENE_INFO;
 
 int asiGroupID2idx(const AUDIO_SCENE_INFO* asi, const int groupID);

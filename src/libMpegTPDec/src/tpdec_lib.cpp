@@ -104,12 +104,20 @@ typedef union {
     INT bufferFullness;
     UINT endOfFrame;
     UINT mhasLabels[TPDEC_MAX_TRACKS];
+    UINT substreamState[TPDEC_MAX_TRACKS];
     UINT flags[TPDEC_MAX_TRACKS];
   } mhas;
 } transportdec_parser_t;
 
 #define MHAS_CONFIG_PRESENT 0x001
 #define MHAS_UI_PRESENT 0x002
+
+#define SUBSTREAM_STATE_NOT_PRESENT 0
+#define SUBSTREAM_STATE_PRESENT 1
+#define SUBSTREAM_STATE_CFG_CHG 2
+#define SUBSTREAM_STATE_REPLACE 3
+#define SUBSTREAM_STATE_ADD 4
+#define SUBSTREAM_STATE_REMOVE 5
 
 struct TRANSPORTDEC {
   TRANSPORT_TYPE transportFmt; /*!< MPEG4 transportDec type. */
@@ -155,6 +163,7 @@ struct TRANSPORTDEC {
 #define TPDEC_LOST_FRAMES_PENDING 16
 #define TPDEC_CONFIG_FOUND 32
 #define TPDEC_USE_ELEM_SKIPPING 64
+#define TPDEC_CHECK_TWO_SYNCS 128
 
 /* force config/content change */
 #define TPDEC_FORCE_CONFIG_CHANGE 1
@@ -430,9 +439,10 @@ TRANSPORTDEC_ERROR transportDec_InBandConfig(HANDLE_TRANSPORTDEC hTp, UCHAR* new
                                        hTp->targetLayout, 0, hTp->pLoudnessInfoSetPosition);
             if (err == TRANSPORTDEC_OK) {
               hTp->asc[layer] = hTp->asc[TPDEC_MAX_TRACKS];
-              errC = hTp->callbacks.cbUpdateConfig(hTp->callbacks.cbUpdateConfigData,
-                                                   &hTp->asc[layer], hTp->asc[layer].configMode,
-                                                   &hTp->asc[layer].AacConfigChanged);
+              errC =
+                  hTp->callbacks.cbUpdateConfig(hTp->callbacks.cbUpdateConfigData, &hTp->asc[layer],
+                                                hTp->asc[layer].configMode | AC_CM_LAST_SUBSTREAM,
+                                                &hTp->asc[layer].AacConfigChanged);
               if (errC != 0) {
                 err = TRANSPORTDEC_PARSE_ERROR;
               }
@@ -715,6 +725,56 @@ static void disregardLoudnessChange(HANDLE_TRANSPORTDEC hTp, HANDLE_FDK_BITSTREA
   FDKpushBack(hBs, startPos - FDKgetValidBits(hBs));
 }
 
+static int mpeghPrepareDecode(HANDLE_TRANSPORTDEC hTp, HANDLE_FDK_BITSTREAM hBs,
+                              HANDLE_FDK_BITSTREAM bsMainStream, TRANSPORT_TYPE tt,
+                              int mainStreamPresent, int* syncLayerFrameBits,
+                              int* rawDataBlockLength, int auBitPosBuildUp, int mhasSubstream,
+                              int MHASPacketLength, int nbits, UCHAR* mhasLabelPresent) {
+  if (tt == TT_MHAS) {
+    /* The following code is present twice. */
+    if (hTp->ctrlCFGChange[0].buildUpStatus == TPDEC_MPEGH_BUILD_UP_ON) {
+      if (auBitPosBuildUp != -1) {
+        FDKpushBack(hBs, auBitPosBuildUp - FDKgetValidBits(hBs));
+        return -1;
+      } else {
+        /* Something went wrong during build up, reset. */
+        for (int i = 0; i < TPDEC_MAX_TRACKS; i++) {
+          hTp->ctrlCFGChange[i].buildUpStatus = TPDEC_MPEGH_BUILD_UP_IDLE;
+        }
+      }
+    }
+    if (mainStreamPresent) {
+      /* Restore bit stream state to main stream */
+      *hBs = *bsMainStream;
+      *syncLayerFrameBits = *rawDataBlockLength = hTp->auLength[0];
+    }
+    /* The preceding code is present twice. */
+  } else {
+    /* The following code is present twice. */
+    if (hTp->ctrlCFGChange[0].buildUpStatus == TPDEC_MPEGH_BUILD_UP_ON) {
+      if (auBitPosBuildUp != -1) {
+        FDKpushBack(hBs, auBitPosBuildUp - FDKgetValidBits(hBs));
+        return -1;
+      } else {
+        /* Something went wrong during build up, reset. */
+        for (int i = 0; i < TPDEC_MAX_TRACKS; i++) {
+          hTp->ctrlCFGChange[i].buildUpStatus = TPDEC_MPEGH_BUILD_UP_IDLE;
+        }
+      }
+    } else {
+      /* Restore bit stream state to main stream */
+      if (mainStreamPresent) {
+        *hBs = *bsMainStream;
+        hTp->parser.mhas.endOfFrame = nbits - MHASPacketLength * 8;
+        *syncLayerFrameBits = *rawDataBlockLength = hTp->auLength[0];
+        return 1;
+      }
+    }
+    /* The preceding code is present twice. */
+  }
+  return 0;
+}
+
 static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDLE_FDK_BITSTREAM hBs,
                                                   int syncLength, int ignoreBufferFullness,
                                                   int* pRawDataBlockLength,
@@ -740,28 +800,175 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
       FDK_BITSTREAM bsMainStream;
       EarconConfig earcon_config = {};
       int nbits3DAcfg = 0;
+      int nbitsMhasMain = 0;
       int auBitPosBuildUp = -1;
+      UCHAR mhasLabelPresent[TPDEC_MAX_TRACKS];
+      int startUp = 0;
+      int forceCfgChange = 0;
+      int lastSubstreamIndex = 0;
+      int gotoBail = 0;
 
       for (int i = 0; i < TPDEC_MAX_TRACKS; i++) {
         /* Invalidate all streams */
         hTp->auLength[i] = 0;
+        mhasLabelPresent[i] = 0;
       }
       /* Reset secondary streams */
       for (int i = 1; i < TPDEC_MAX_TRACKS; i++) {
         FDKresetBitbuffer(&hTp->bitStream[i]);
       }
 
+      /* force config change if a side-stream starts or ends */
+      {
+        nbits = FDKgetValidBits(hBs);
+        int configFound = 0, frameFound = 0;
+        UINT labels[TPDEC_MAX_TRACKS] = {0};
+        int framePresent[TPDEC_MAX_TRACKS] = {0};
+        int i = 0;
+
+        while (FDKgetValidBits(hBs) > 0) {
+          UINT MHASPacketLabel;
+          int MHASPacketLength;
+
+          MHASPacketType = (mha_pactyp_t)escapedValue(hBs, 3, 8, 8);
+          MHASPacketLabel = escapedValue(hBs, 2, 8, 32);
+          MHASPacketLength = escapedValue(hBs, 11, 24, 24);
+
+          if (frameFound && MHASPacketLabel <= 16) break;
+
+          if (MHASPacketType == MHA_PACTYP_MPEGH3DACFG) {
+            /* check packet label is valid and main stream is first */
+            if (MHASPacketLabel == 0 || (i == 0 && MHASPacketLabel > 16)) {
+              err = TRANSPORTDEC_SYNC_ERROR;
+              goto bail;
+            }
+
+            /* check for multiple labels within same sub-stream */
+            for (int j = 0; j < i; j++) {
+              if (((MHASPacketLabel - 1) >> 4) == ((labels[j] - 1) >> 4)) {
+                err = TRANSPORTDEC_SYNC_ERROR;
+                goto bail;
+              }
+            }
+
+            if (i < TPDEC_MAX_TRACKS) {
+              configFound = 1;
+              labels[i] = MHASPacketLabel;
+              i++;
+            }
+          } else if (MHASPacketType == MHA_PACTYP_MPEGH3DAFRAME) {
+            frameFound = 1;
+            for (int j = 0; j < TPDEC_MAX_TRACKS; j++) {
+              if (configFound) {
+                if (MHASPacketLabel == labels[j]) {
+                  framePresent[j] = 1;
+                  lastSubstreamIndex = j;
+                  break;
+                }
+              } else {
+                if (MHASPacketLabel == hTp->parser.mhas.mhasLabels[j]) {
+                  framePresent[j] = 1;
+                  lastSubstreamIndex = j;
+                  break;
+                }
+              }
+            }
+          }
+
+          FDKpushFor(hBs, MHASPacketLength * 8);
+        }
+
+        if (configFound) {
+          /* check for substream changes */
+          for (i = TPDEC_MAX_TRACKS - 1; i >= 0; i--) {
+            if (hTp->parser.mhas.mhasLabels[i] == 0 && labels[i] != 0) {
+              hTp->parser.mhas.substreamState[i] = SUBSTREAM_STATE_ADD;
+            } else if (hTp->parser.mhas.mhasLabels[i] != 0 && labels[i] == 0) {
+              hTp->parser.mhas.substreamState[i] = SUBSTREAM_STATE_REMOVE;
+            } else if (hTp->parser.mhas.mhasLabels[i] != labels[i]) {
+              if (((hTp->parser.mhas.mhasLabels[i] - 1) >> 4) == ((labels[i] - 1) >> 4)) {
+                hTp->parser.mhas.substreamState[i] = SUBSTREAM_STATE_CFG_CHG;
+              } else {
+                hTp->parser.mhas.substreamState[i] = SUBSTREAM_STATE_REPLACE;
+              }
+            }
+
+            hTp->parser.mhas.mhasLabels[i] = labels[i];
+          }
+
+          /* force config change in case of new/lost substreams */
+          if (hTp->ctrlCFGChange[0].flushStatus == TPDEC_FLUSH_OFF &&
+              hTp->ctrlCFGChange[0].buildUpStatus == TPDEC_BUILD_UP_OFF) {
+            for (i = 0; i < TPDEC_MAX_TRACKS; i++) {
+              if (hTp->parser.mhas.substreamState[i] > SUBSTREAM_STATE_PRESENT) {
+                forceCfgChange = 1;
+                if (hTp->parser.mhas.substreamState[i] != SUBSTREAM_STATE_REMOVE)
+                  hTp->parser.mhas.substreamState[i] = SUBSTREAM_STATE_PRESENT;
+              }
+            }
+          }
+          /* remove lost substreams */
+          else if (hTp->ctrlCFGChange[0].buildUpStatus == TPDEC_MPEGH_BUILD_UP_IDLE) {
+            for (i = TPDEC_MAX_TRACKS - 1; i >= 0; i--) {
+              if (hTp->parser.mhas.substreamState[i] == SUBSTREAM_STATE_REMOVE) {
+                hTp->parser.mhas.substreamState[i] = SUBSTREAM_STATE_NOT_PRESENT;
+              }
+            }
+          }
+        }
+
+        /* check for side-streams lost between RAPs */
+        for (i = 1; i < TPDEC_MAX_TRACKS; i++) {
+          if (hTp->parser.mhas.mhasLabels[i] != 0 && framePresent[i] == 0) {
+            /* remove lost side-stream; all subsequent side-streams are also removed (added again at
+             * next RAP; keeping them would need defrag code with lots of memmoves to close the gap)
+             */
+            for (int j = TPDEC_MAX_TRACKS - 1; j >= i; j--) {
+              if (hTp->parser.mhas.substreamState[j] == SUBSTREAM_STATE_PRESENT) {
+                hTp->asc[j].configMode |= 0x08;
+                int errC = hTp->callbacks.cbFreeMem(hTp->callbacks.cbFreeMemData, &hTp->asc[j]);
+                hTp->asc[j].configMode &= ~0x08;
+
+                if (errC != 0) {
+                  err = TRANSPORTDEC_UNKOWN_ERROR;
+                }
+
+                hTp->parser.mhas.mhasLabels[j] = 0;
+                hTp->parser.mhas.substreamState[j] = SUBSTREAM_STATE_NOT_PRESENT;
+              }
+            }
+          }
+        }
+
+        if (forceCfgChange) {
+          for (i = 0; i < TPDEC_MAX_TRACKS; i++) {
+            if (hTp->parser.mhas.mhasLabels[i] > 0)
+              hTp->ctrlCFGChange[i].forceCfgChange = TPDEC_FORCE_CONTENT_CHANGE;
+          }
+        } else {
+          if (hTp->ctrlCFGChange[0].forceCfgChange) {
+            for (i = 1; i < TPDEC_MAX_TRACKS; i++) {
+              if (hTp->parser.mhas.mhasLabels[i] > 0)
+                hTp->ctrlCFGChange[i].forceCfgChange = hTp->ctrlCFGChange[0].forceCfgChange;
+            }
+          }
+        }
+
+        FDKpushBack(hBs, nbits - FDKgetValidBits(hBs));
+        MHASPacketType = MHA_PACTYP_NONE;
+      }
+
       while (1 /* && MHASPacketType != MHA_PACTYP_MPEGH3DAFRAME */) {
         UINT MHASPacketLabel;
-        int MHASPacketLength, nbitsMhas, mhasSubstream = 0;
+        int MHASPacketLength, nbitsMhasCurrent, mhasSubstream = 0;
 
-        nbitsMhas = FDKgetValidBits(hBs);
-        if (nbitsMhas <= 0) {
+        nbitsMhasCurrent = FDKgetValidBits(hBs);
+        if (nbitsMhasCurrent <= 0) {
           hTp->parser.mhas.endOfFrame = 0;
           err = TRANSPORTDEC_NOT_ENOUGH_BITS;
           break;
         }
-        hTp->parser.mhas.endOfFrame = nbitsMhas;
+        hTp->parser.mhas.endOfFrame = nbitsMhasCurrent;
 
         MHASPacketTypePrev = MHASPacketType;
         MHASPacketType = (mha_pactyp_t)escapedValue(hBs, 3, 8, 8);
@@ -769,6 +976,12 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
         MHASPacketLength = escapedValue(hBs, 11, 24, 24);
 
         nbits = (INT)FDKgetValidBits(hBs);
+
+        if (gotoBail && MHASPacketType != MHA_PACTYP_MPEGH3DACFG &&
+            MHASPacketType != MHA_PACTYP_CRC16 && MHASPacketType != MHA_PACTYP_CRC32) {
+          FDKpushBack(hBs, nbitsMhasMain - FDKgetValidBits(hBs));
+          goto bail;
+        }
 
         /* sanity check if read too many bits */
         if (nbits < 0) {
@@ -814,42 +1027,47 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
 
         /* Count MHA_PACTYP_MPEGH3DACFG of secondary streams */
         if (MHASPacketLabel > 16 && MHASPacketLabel != 0) {
-          /* Skip secondary streams without altering the execution path */
-          MHASPacketType = MHA_PACTYP_NONE;
-          MHASPacketLabel = 0;
+          /* Lookup mhas sub stream index or find empty sub stream entry */
+          mhasSubstream = -1;
+          for (int i = TPDEC_MAX_TRACKS - 1; i > 0; i--) {
+            if (hTp->parser.mhas.mhasLabels[i] == MHASPacketLabel) {
+              mhasSubstream = i;
+              break;
+            }
+            if (hTp->parser.mhas.mhasLabels[i] == 0) {
+              mhasSubstream = i;
+            }
+          }
+
+          if (mhasSubstream >= TPDEC_MAX_TRACKS || mhasSubstream < 0) {
+            MHASPacketType = MHA_PACTYP_NONE;
+            MHASPacketLabel = 0;
+            mhasSubstream = 0;
+          }
         } else {
           mhasSubstream = 0;
+          if (MHASPacketType != MHA_PACTYP_CRC16 && MHASPacketType != MHA_PACTYP_CRC32)
+            nbitsMhasMain = nbitsMhasCurrent;
         }
 
         /* At the end of a series of MHA_PACTYP_MPEGH3DAFRAME break to start decoding */
         if (hTp->transportFmt == TT_MHAS && MHASPacketTypePrev == MHA_PACTYP_MPEGH3DAFRAME &&
             MHASPacketLabel <= 16) {
-          {
+          for (int i = 0; i < TPDEC_MAX_TRACKS; i++) {
             /* skip all MHAS packets belonging to a MHA_PACTYP_MPEGH3DACFG except itself after an AU
              * that is right truncated */
             if (hTp->ctrlCFGChange[mhasSubstream].truncationPresent)
               hTp->parser.mhas.mhasLabels[mhasSubstream] = 0;
           }
 
-          /* The following code is present twice. */
-          if (hTp->ctrlCFGChange[0].buildUpStatus == TPDEC_MPEGH_BUILD_UP_ON) {
-            if (auBitPosBuildUp != -1) {
-              FDKpushBack(hBs, auBitPosBuildUp - FDKgetValidBits(hBs));
-              goto bail;
-            } else {
-              /* Something went wrong during build up, reset. */
-              for (int i = 0; i < TPDEC_MAX_TRACKS; i++) {
-                hTp->ctrlCFGChange[i].buildUpStatus = TPDEC_MPEGH_BUILD_UP_IDLE;
-              }
-            }
-          }
-          if (mainStreamPresent) {
-            /* Restore bit stream state to main stream */
-            *hBs = bsMainStream;
-            syncLayerFrameBits = rawDataBlockLength = hTp->auLength[0];
-            break;
-          }
-          /* The preceding code is present twice. */
+          int result;
+          result = mpeghPrepareDecode(hTp, hBs, &bsMainStream, hTp->transportFmt, mainStreamPresent,
+                                      &syncLayerFrameBits, &rawDataBlockLength, auBitPosBuildUp,
+                                      mhasSubstream, MHASPacketLength, nbits, mhasLabelPresent);
+          if (result == -1) goto bail;
+          if (result == 1) break;
+
+          break;
         }
 
         /* Process MHAS packet according to its type */
@@ -863,12 +1081,12 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
           } break;
           case MHA_PACTYP_MPEGH3DACFG:
             if (MHASPacketLabel != 0) {
-              nbits3DAcfg = nbitsMhas;
-              if (hTp->ctrlCFGChange[mhasSubstream].flushStatus == TPDEC_FLUSH_OFF) {
-                UCHAR startUp;
+              nbits3DAcfg = nbitsMhasMain;
+              if (hTp->ctrlCFGChange[0].flushStatus == TPDEC_FLUSH_OFF) {
                 UCHAR Mpeg3daCfgChanged;
 
-                startUp = (hTp->ctrlCFGChange[mhasSubstream].Mpegh3daConfigLen == 0) ? 1 : 0;
+                if (mhasSubstream == 0)
+                  startUp = (hTp->ctrlCFGChange[mhasSubstream].Mpegh3daConfigLen == 0) ? 1 : 0;
 
                 /* Check if config buffer is large enough */
                 if (MHASPacketLength > TP_MPEGH3DA_MAX_CONFIG_LEN) {
@@ -907,7 +1125,7 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
                   }
                 }
 
-                if ((hTp->parser.mhas.mhasLabels[mhasSubstream] != MHASPacketLabel) && (!startUp)) {
+                if ((hTp->parser.mhas.mhasLabels[mhasSubstream] != MHASPacketLabel)) {
                   Mpeg3daCfgChanged = 1;
                   hTp->ctrlCFGChange[mhasSubstream].cfgChanged = 1;
                   hTp->parser.mhas.mhasLabels[mhasSubstream] = MHASPacketLabel;
@@ -945,9 +1163,11 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
                 }
 
                 if ((Mpeg3daCfgChanged == 1) && (startUp == 0)) {
-                  hTp->ctrlCFGChange[mhasSubstream].flushCnt = 0;
-                  hTp->ctrlCFGChange[mhasSubstream].flushStatus =
-                      TPDEC_MPEGH_CFG_CHANGE_ATSC_FLUSH_ON;
+                  if (mhasSubstream == 0) {
+                    hTp->ctrlCFGChange[mhasSubstream].flushCnt = 0;
+                    hTp->ctrlCFGChange[mhasSubstream].flushStatus =
+                        TPDEC_MPEGH_CFG_CHANGE_ATSC_FLUSH_ON;
+                  }
 
                   if (!hTp->ctrlCFGChange[mhasSubstream].truncationPresent) {
                     if (hTp->callbacks.cbTruncationMsg && mhasSubstream == 0) {
@@ -959,14 +1179,27 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
                   UCHAR configChanged = 0;
                   UCHAR configMode = AC_CM_DET_CFG_CHANGE;
 
-                  err = Mpegh3daConfig_Parse(&hTp->asc[TPDEC_MAX_TRACKS], hTp->pASI, hBs, 0,
+                  hTp->asc[TPDEC_MAX_TRACKS] =
+                      hTp->asc[mhasSubstream]; /* save current ASC struct */
+                  err = Mpegh3daConfig_Parse(&hTp->asc[mhasSubstream], hTp->pASI, hBs, 0,
                                              &hTp->callbacks, configMode, configChanged,
                                              hTp->targetLayout, mhasSubstream,
                                              hTp->pLoudnessInfoSetPosition);
-                  earcon_config.sampling_frequency = hTp->asc[TPDEC_MAX_TRACKS].m_samplingFrequency;
+                  earcon_config.sampling_frequency = hTp->asc[mhasSubstream].m_samplingFrequency;
                   if (err == TRANSPORTDEC_OK) {
+                    if (hTp->asc[mhasSubstream].m_samplingFrequency !=
+                        hTp->asc[0].m_samplingFrequency) {
+                      hTp->parser.mhas.mhasLabels[mhasSubstream] = 0;
+                      hTp->ctrlCFGChange[mhasSubstream].Mpegh3daConfigLen = 0;
+                      if (mhasSubstream == lastSubstreamIndex) {
+                        for (lastSubstreamIndex = mhasSubstream - 1; lastSubstreamIndex > 0;
+                             lastSubstreamIndex--) {
+                          if (hTp->parser.mhas.mhasLabels[lastSubstreamIndex] > 0) break;
+                        }
+                      }
+                      break;
+                    }
                     hTp->parser.mhas.mhasLabels[mhasSubstream] = MHASPacketLabel;
-                    hTp->asc[mhasSubstream] = hTp->asc[TPDEC_MAX_TRACKS];
                     int errC = hTp->callbacks.cbUpdateConfig(hTp->callbacks.cbUpdateConfigData,
                                                              &hTp->asc[mhasSubstream], configMode,
                                                              &configChanged);
@@ -977,6 +1210,8 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
                       fConfigFound = 1;
                     }
                   } else {
+                    hTp->asc[mhasSubstream] =
+                        hTp->asc[TPDEC_MAX_TRACKS]; /* restore previous ASC struct */
                     err = TRANSPORTDEC_SYNC_ERROR;
                     goto bail;
                   }
@@ -995,12 +1230,17 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
                       if (errC != 0) {
                         err = TRANSPORTDEC_SYNC_ERROR;
                       }
-                      if (startUp != 0) {
+                      if (mhasSubstream == 0 && startUp != 0) {
                         hTp->ctrlCFGChange[mhasSubstream].flushStatus = TPDEC_FLUSH_OFF;
                         hTp->ctrlCFGChange[mhasSubstream].flushCnt = 0;
                         hTp->ctrlCFGChange[mhasSubstream].buildUpStatus = TPDEC_MPEGH_BUILD_UP_IDLE;
                         hTp->ctrlCFGChange[mhasSubstream].buildUpCnt =
                             TPDEC_MPEGH_NUM_CONFIG_CHANGE_FRAMES - 1;
+                      } else if (mhasSubstream > 0) {
+                        if (!hTp->ctrlCFGChange[0].cfgChanged) {
+                          err = TRANSPORTDEC_SYNC_ERROR;
+                          goto bail;
+                        }
                       }
                     } else {
                       hTp->parser.mhas.flags[mhasSubstream] |= MHAS_CONFIG_PRESENT;
@@ -1013,9 +1253,9 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
                 }
               }
 
-              if (hTp->ctrlCFGChange[mhasSubstream].flushStatus ==
-                  TPDEC_MPEGH_CFG_CHANGE_ATSC_FLUSH_ON) {
-                FDKpushBack(hBs, nbitsMhas - FDKgetValidBits(hBs));
+              if (mhasSubstream == 0 && hTp->ctrlCFGChange[mhasSubstream].flushStatus ==
+                                            TPDEC_MPEGH_CFG_CHANGE_ATSC_FLUSH_ON) {
+                FDKpushBack(hBs, nbitsMhasMain - FDKgetValidBits(hBs));
                 /* Activate flush mode in core */
                 if (hTp->callbacks.cbCtrlCFGChange(hTp->callbacks.cbCtrlCFGChangeData,
                                                    &hTp->ctrlCFGChange[mhasSubstream]) != 0) {
@@ -1040,7 +1280,7 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
                   hTp->ctrlCFGChange[mhasSubstream].forceCfgChange = 0;
                   hTp->ctrlCFGChange[mhasSubstream].truncationPresent = 0;
                 }
-                goto bail;
+                gotoBail = 1;
               }
               hTp->parser.mhas.flags[mhasSubstream] |= MHAS_CONFIG_PRESENT;
               hTp->parser.mhas.flags[mhasSubstream] &= ~MHAS_UI_PRESENT;
@@ -1054,6 +1294,9 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
               if (hTp->parser.mhas.flags[mhasSubstream] & MHAS_CONFIG_PRESENT) {
                 hTp->asc[mhasSubstream].m_sc.m_usacConfig.uiManagerActive =
                     !(hTp->parser.mhas.flags[mhasSubstream] & MHAS_UI_PRESENT);
+              } else {
+                hTp->asc[mhasSubstream].m_sc.m_usacConfig.uiManagerActive =
+                    (hTp->parser.mhas.flags[mhasSubstream] & MHAS_UI_PRESENT) ? 0 : -1;
               }
               hTp->parser.mhas.flags[mhasSubstream] &= ~(MHAS_CONFIG_PRESENT | MHAS_UI_PRESENT);
 
@@ -1063,8 +1306,10 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
               if (hTp->ctrlCFGChange[mhasSubstream].cfgChanged) {
                 hTp->ctrlCFGChange[mhasSubstream].cfgChanged = 0;
                 UCHAR configChanged = 1;
+                UCHAR configMode = AC_CM_ALLOC_MEM;
+                if (mhasSubstream == lastSubstreamIndex) configMode |= AC_CM_LAST_SUBSTREAM;
                 int errC = hTp->callbacks.cbUpdateConfig(hTp->callbacks.cbUpdateConfigData,
-                                                         &hTp->asc[mhasSubstream], AC_CM_ALLOC_MEM,
+                                                         &hTp->asc[mhasSubstream], configMode,
                                                          &configChanged);
                 if (errC != 0) {
                   err = TRANSPORTDEC_SYNC_ERROR;
@@ -1074,16 +1319,20 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
                 }
               }
 
-              if (hTp->ctrlCFGChange[mhasSubstream].buildUpStatus == TPDEC_MPEGH_BUILD_UP_IDLE) {
+              /* Flag MHAS label to be present. */
+              mhasLabelPresent[mhasSubstream] = 1;
+
+              if (mhasSubstream == 0 &&
+                  hTp->ctrlCFGChange[mhasSubstream].buildUpStatus == TPDEC_MPEGH_BUILD_UP_IDLE) {
                 /* Activate build up mode in core */
                 if (hTp->callbacks.cbCtrlCFGChange(hTp->callbacks.cbCtrlCFGChangeData,
                                                    &hTp->ctrlCFGChange[mhasSubstream]) != 0) {
                   err = TRANSPORTDEC_SYNC_ERROR;
                 }
                 hTp->ctrlCFGChange[mhasSubstream].buildUpStatus = TPDEC_MPEGH_BUILD_UP_ON;
-                // FDKpushBack(hBs, nbitsMhas - FDKgetValidBits(hBs));
+                // FDKpushBack(hBs, nbitsMhasMain - FDKgetValidBits(hBs));
                 if (auBitPosBuildUp == -1) {
-                  auBitPosBuildUp = nbitsMhas;
+                  auBitPosBuildUp = nbitsMhasMain;
                 }
                 if (err == TRANSPORTDEC_OK && hTp->transportFmt == TT_MHAS_PACKETIZED) {
                   /* don't reset buffer after idle process */
@@ -1092,7 +1341,8 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
                 break;
               }
 
-              if (hTp->ctrlCFGChange[mhasSubstream].buildUpStatus == TPDEC_MPEGH_BUILD_UP_ON) {
+              if (mhasSubstream == 0 &&
+                  hTp->ctrlCFGChange[mhasSubstream].buildUpStatus == TPDEC_MPEGH_BUILD_UP_ON) {
                 /* Activate build up mode in core */
                 if (hTp->callbacks.cbCtrlCFGChange(hTp->callbacks.cbCtrlCFGChangeData,
                                                    &hTp->ctrlCFGChange[mhasSubstream]) != 0) {
@@ -1101,17 +1351,25 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
                 hTp->ctrlCFGChange[mhasSubstream].buildUpStatus = TPDEC_BUILD_UP_OFF;
               }
 
-              { hTp->auLength[mhasSubstream] = MHASPacketLength * 8; }
-              {
+              if (hTp->parser.mhas.mhasLabels[mhasSubstream] != 0) {
+                hTp->auLength[mhasSubstream] = MHASPacketLength * 8;
+              }
+              if (mhasSubstream > 0) {
+                hTp->bitStream[mhasSubstream] = *hBs;
+              } else {
                 mainStreamPresent = 1;
                 bsMainStream = *hBs;
               }
             } else {
-              err = TRANSPORTDEC_SYNC_ERROR;
+              if (MHASPacketLabel <= 16) {
+                err = TRANSPORTDEC_SYNC_ERROR;
+              } else {
+                FDKpushFor(hBs, MHASPacketLength * 8);
+              }
             }
 
-            if (hTp->ctrlCFGChange[mhasSubstream].buildUpStatus == TPDEC_BUILD_UP_OFF) {
-              if (hTp->callbacks.cbEarconBSData != NULL) {
+            if (hTp->ctrlCFGChange[0].buildUpStatus == TPDEC_BUILD_UP_OFF) {
+              if (hTp->callbacks.cbEarconBSData != NULL && mhasSubstream == 0) {
                 hTp->callbacks.cbEarconBS(hTp->callbacks.cbEarconBSData, hBs);
               }
             }
@@ -1125,7 +1383,8 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
                 } else {
                   if (checkASI(hTp->pASI,
                                hTp->asc[mhasSubstream].m_sc.m_usacConfig.bsNumSignalGroups,
-                               hTp->asc[mhasSubstream].m_sc.m_usacConfig.m_signalGroupType) != 0) {
+                               hTp->asc[mhasSubstream].m_sc.m_usacConfig.m_signalGroupType,
+                               mhasSubstream) != 0) {
                     asiReset(hTp->pASI);
                     err = TRANSPORTDEC_SYNC_ERROR;
                   }
@@ -1133,7 +1392,8 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
 
                 if ((hTp->pASI->diffFlags & ASI_DIFF_NEEDS_RESET) &&
                     (hTp->flags & TPDEC_USE_ELEM_SKIPPING) && nbits3DAcfg &&
-                    (hTp->ctrlCFGChange[mhasSubstream].buildUpStatus == TPDEC_BUILD_UP_OFF)) {
+                    (hTp->ctrlCFGChange[mhasSubstream].buildUpStatus == TPDEC_BUILD_UP_OFF) &&
+                    (mhasSubstream == 0)) {
                   if (hTp->ctrlCFGChange[mhasSubstream].Mpegh3daConfigLen != 0) {
                     hTp->ctrlCFGChange[mhasSubstream].cfgChanged = 1;
                     hTp->ctrlCFGChange[mhasSubstream].forceCfgChange = 0;
@@ -1179,7 +1439,8 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
                 }
               }
             } else {
-              err = TRANSPORTDEC_SYNC_ERROR;
+              if ((MHASPacketLabel == 0) || (hTp->parser.mhas.mhasLabels[mhasSubstream] != 0))
+                err = TRANSPORTDEC_SYNC_ERROR;
             }
             break;
           case MHA_PACTYP_MARKER:
@@ -1224,7 +1485,7 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
             /* Audio TruncationInfo */
           case MHA_PACTYP_AUDIOTRUNCATION:
             /* audioTruncationInfo(); */
-            if ((MHASPacketLabel != 0) &&
+            if (MHA_IS_MAIN_STREAM(MHASPacketLabel) &&
                 (hTp->parser.mhas.mhasLabels[mhasSubstream] == MHASPacketLabel)) {
               int isActive, truncFromBegin, nTruncSamples;
 
@@ -1254,8 +1515,8 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
               }
               if (isActive && !truncFromBegin) {
                 hTp->ctrlCFGChange[mhasSubstream].truncationPresent = 1;
-                if ((hTp->ctrlCFGChange[mhasSubstream].flushStatus == TPDEC_FLUSH_OFF) &&
-                    (hTp->ctrlCFGChange[mhasSubstream].buildUpStatus == TPDEC_BUILD_UP_OFF)) {
+                if ((hTp->ctrlCFGChange[0].flushStatus == TPDEC_FLUSH_OFF) &&
+                    (hTp->ctrlCFGChange[0].buildUpStatus == TPDEC_BUILD_UP_OFF)) {
                   hTp->ctrlCFGChange[mhasSubstream].forceCfgChange = TPDEC_FORCE_CONTENT_CHANGE;
                 }
               }
@@ -1339,31 +1600,12 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(HANDLE_TRANSPORTDEC hTp, HANDL
             (MHASPacketType == MHA_PACTYP_MPEGH3DAFRAME ||
              (MHASPacketType == MHA_PACTYP_NONE && MHASPacketLabel == 0)) &&
             (nbits <= MHASPacketLength * 8)) {
-          /* The following code is present twice. */
-          if (hTp->ctrlCFGChange[0].buildUpStatus == TPDEC_MPEGH_BUILD_UP_ON) {
-            if (auBitPosBuildUp != -1) {
-              FDKpushBack(hBs, auBitPosBuildUp - FDKgetValidBits(hBs));
-              goto bail;
-            } else {
-              /* Something went wrong during build up, reset. */
-              for (int i = 0; i < TPDEC_MAX_TRACKS; i++) {
-                hTp->ctrlCFGChange[i].buildUpStatus = TPDEC_MPEGH_BUILD_UP_IDLE;
-              }
-            }
-          } else {
-            /* Restore bit stream state to main stream */
-            if (mainStreamPresent) {
-              *hBs = bsMainStream;
-              hTp->parser.mhas.endOfFrame = nbits - MHASPacketLength * 8;
-              syncLayerFrameBits = rawDataBlockLength = hTp->auLength[0];
-              /* skip all MHAS packets belonging to a MHA_PACTYP_MPEGH3DACFG except itself after an
-               * AU that is right truncated */
-              if (hTp->ctrlCFGChange[0].truncationPresent)
-                hTp->parser.mhas.mhasLabels[mhasSubstream] = 0;
-              break;
-            }
-          }
-          /* The preceding code is present twice. */
+          int result;
+          result = mpeghPrepareDecode(hTp, hBs, &bsMainStream, hTp->transportFmt, mainStreamPresent,
+                                      &syncLayerFrameBits, &rawDataBlockLength, auBitPosBuildUp,
+                                      mhasSubstream, MHASPacketLength, nbits, mhasLabelPresent);
+          if (result == -1) goto bail;
+          if (result == 1) break;
         }
 
         /* Check amount of parsed bits. If too many bits were read assume parse error */
@@ -1559,6 +1801,9 @@ static TRANSPORTDEC_ERROR synchronization(HANDLE_TRANSPORTDEC hTp, INT* pHeaderB
     bitsAvail -= headerBits;
 
     checkLengthBits = syncLayerFrameBits;
+    if (hTp->flags & TPDEC_CHECK_TWO_SYNCS) {
+      checkLengthBits += syncLength;
+    }
 
     /* Check if the whole frame would fit the bitstream buffer */
     if (err == TRANSPORTDEC_OK) {
@@ -1576,6 +1821,25 @@ static TRANSPORTDEC_ERROR synchronization(HANDLE_TRANSPORTDEC hTp, INT* pHeaderB
 
     if (err == TRANSPORTDEC_NOT_ENOUGH_BITS) {
       break;
+    }
+
+    if (hTp->flags & TPDEC_CHECK_TWO_SYNCS) {
+      if (err == TRANSPORTDEC_OK && hTp->numberOfRawDataBlocks == 0 && syncLayerFrameBits > 0) {
+        UINT nextSynch = 0;
+
+        /* Forward to next sync word */
+        FDKpushFor(hBs, syncLayerFrameBits);
+
+        /* Read next synchword */
+        nextSynch = FDKreadBits(hBs, syncLength);
+
+        if (nextSynch != syncWord) {
+          err = TRANSPORTDEC_SYNC_ERROR;
+        }
+
+        /* Rewind to the payload position */
+        FDKpushBack(hBs, syncLayerFrameBits + syncLength);
+      }
     }
 
     if (err == TRANSPORTDEC_SYNC_ERROR) {
@@ -1873,6 +2137,13 @@ TRANSPORTDEC_ERROR transportDec_SetParam(const HANDLE_TRANSPORTDEC hTp, const TP
         hTp->flags |= TPDEC_USE_ELEM_SKIPPING;
       } else {
         hTp->flags &= ~TPDEC_USE_ELEM_SKIPPING;
+      }
+      break;
+    case TPDEC_PARAM_CHECK_TWO_SYNCS:
+      if (value) {
+        hTp->flags |= TPDEC_CHECK_TWO_SYNCS;
+      } else {
+        hTp->flags &= ~TPDEC_CHECK_TWO_SYNCS;
       }
       break;
   }

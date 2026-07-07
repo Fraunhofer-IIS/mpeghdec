@@ -106,12 +106,7 @@ struct MPEGH_UI_MANAGER {
   HANDLE_UI_MANAGER hUiManager;
   UCHAR isActive;
   UCHAR configFound;
-  UCHAR secondaryConfigFound[MAX_NUMBER_SECONDARY_STREAMS];
-  UINT mainStreamLabel;
-  UINT secondaryStreamLabel[MAX_NUMBER_SECONDARY_STREAMS];
-  UCHAR numberfOfSecondaryStreams;
-  UCHAR numberOfSecondaryASI;
-  UCHAR numberOfMPEGH3DA;
+  UINT substreamLabel[MAX_NUMBER_SUBSTREAMS];
   UINT insertOffset;
 #ifdef SAFE_BUFFER_READ
   UCHAR bs_buffer[64 * 1024]; /* 64 KiB for Level 4 and 32 KiB for Level 3 */
@@ -136,8 +131,10 @@ LINKSPEC_H HANDLE_MPEGH_UI_MANAGER mpegh_UI_Manager_Open(void) {
       return NULL;
     }
 
-    self->isActive = 1;
+    self->isActive = 0;
     self->insertOffset = -1;
+
+    UI_Manager_SetIsActive(self->hUiManager, self->isActive);
   }
 
   return self;
@@ -170,8 +167,6 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_ApplyXmlAction(HANDLE_MPEGH_UI_MANAGER self, 
     return MPEGH_UI_INVALID_PARAM;
   }
 
-  if (!self->isActive) return MPEGH_UI_NOT_ALLOWED;
-
   return (MPEGH_UI_ERROR)UI_Manager_ApplyXmlAction(self->hUiManager, xmlIn, xmlInSize, flagsOut);
 }
 
@@ -181,7 +176,13 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_FeedMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR*
   FDK_BITSTREAM bs;
   HANDLE_FDK_BITSTREAM hBs = &bs;
   INT nBitsIns = 0;
-  UCHAR frameFound = 0, uiPacketFound = 0;
+  mha_pactyp_t prevPacketType = MHA_PACTYP_NONE;
+  UCHAR frameFound = 0, uiPacketFound = 0, markerFound = 0;
+  UINT labels[MAX_NUMBER_SUBSTREAMS] = {0};
+  INT prevXmlChanged = 0;
+  UCHAR uuid[16], prevUuid[16] = {0};
+  USHORT prevAsiCrc = 0;
+  int substrSwitch = 0;
 
 #ifdef SAFE_BUFFER_READ
   const UINT buf_size = sizeof(self->bs_buffer);
@@ -197,11 +198,6 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_FeedMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR*
   nBitsIns = FDKgetValidBits(hBs);
 
   self->configFound = 0;
-  for (int i = 0; i < MAX_NUMBER_SECONDARY_STREAMS; i++) {
-    self->secondaryConfigFound[i] = 0;
-  }
-  self->numberOfSecondaryASI = 0;
-  self->numberOfMPEGH3DA = 0;
   self->insertOffset = -1;
 
   while (FDKgetValidBits(hBs)) {
@@ -209,6 +205,7 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_FeedMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR*
     UINT packetLabel, packetLength;
     INT nBits;
     UCHAR isMainStream = 0;
+    INT substreamIndex = -1;
 
     /* parse MHAS packet header */
     packetType = (mha_pactyp_t)escapedValue(hBs, 3, 8, 8);
@@ -218,6 +215,50 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_FeedMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR*
     nBits = (INT)FDKgetValidBits(hBs);
     if (nBits < 8 * (INT)packetLength) return MPEGH_UI_PARSE_ERROR;
 
+    if (prevPacketType == MHA_PACTYP_MPEGH3DACFG && packetType != MHA_PACTYP_MPEGH3DACFG &&
+        packetType != MHA_PACTYP_CRC16 && packetType != MHA_PACTYP_CRC32) {
+      int configChange = 0;
+
+      if (labels[0] == 0 || labels[0] > 16) return MPEGH_UI_PARSE_ERROR;
+
+      /* check config change and substream switching */
+      for (int i = 0; i < MAX_NUMBER_SUBSTREAMS; i++) {
+        if (labels[i] != self->substreamLabel[i]) {
+          if (i == 0 || ((labels[i] - 1) >> 4) == ((self->substreamLabel[i] - 1) >> 4))
+            configChange = 1;
+          else
+            substrSwitch = 1;
+        }
+        self->substreamLabel[i] = labels[i];
+      }
+
+      /* save previous XML changed flag and UUID */
+      prevXmlChanged = UI_Manager_GetXmlChanged(self->hUiManager);
+      UI_Manager_GetUUID(self->hUiManager, prevUuid);
+      prevAsiCrc = UI_Manager_GetAsiPointer(self->hUiManager)->crcForCompare;
+
+      if (configChange) {
+        AUDIO_SCENE_INFO* pASI = UI_Manager_GetAsiPointer(self->hUiManager);
+
+        /* clear ASI (to prevent keeping old ASI or parts of old ASI) */
+        asiReset(pASI);
+      } else if (substrSwitch) {
+        AUDIO_SCENE_INFO* pASI = UI_Manager_GetAsiPointer(self->hUiManager);
+
+        /* reset availability states */
+        asiResetAvailability(pASI);
+      }
+    }
+
+    if (packetLabel > 0) {
+      for (int i = 0; i < MAX_NUMBER_SUBSTREAMS; i++) {
+        if (packetLabel == self->substreamLabel[i]) {
+          substreamIndex = i;
+          break;
+        }
+      }
+    }
+
     /* check if main stream packet */
     if (packetLabel <= 0x10) isMainStream = 1;
 
@@ -226,66 +267,33 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_FeedMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR*
         if (packetLabel == 0) return MPEGH_UI_PARSE_ERROR;
 
         if (isMainStream) {
-          if (self->configFound == 1) return MPEGH_UI_PARSE_ERROR;
+          if (self->configFound) return MPEGH_UI_PARSE_ERROR;
 
           self->configFound = 1;
-
-          /* check for config change */
-          if (packetLabel != self->mainStreamLabel) {
-            AUDIO_SCENE_INFO* pASI = UI_Manager_GetAsiPointer(self->hUiManager);
-
-            /* clear ASI */
-            asiReset(pASI);
-
-            /* save new packet label */
-            self->mainStreamLabel = packetLabel;
-          }
-          self->numberfOfSecondaryStreams = 0;
+          substreamIndex = 0;
         } else {
-          if (self->secondaryConfigFound[self->numberfOfSecondaryStreams] == 1)
-            return MPEGH_UI_PARSE_ERROR;
+          if (!self->configFound) return MPEGH_UI_PARSE_ERROR;
 
-          self->secondaryConfigFound[self->numberfOfSecondaryStreams] = 1;
-
-          /* check for config change */
-          if (packetLabel != self->secondaryStreamLabel[self->numberfOfSecondaryStreams]) {
-            /* save new packet label */
-            self->secondaryStreamLabel[self->numberfOfSecondaryStreams] = packetLabel;
-            self->numberfOfSecondaryStreams += 1;
+          for (substreamIndex = 1; substreamIndex < MAX_NUMBER_SUBSTREAMS; substreamIndex++) {
+            if (((packetLabel - 1) >> 4) == ((labels[substreamIndex] - 1) >> 4))
+              return MPEGH_UI_PARSE_ERROR;
+            if (labels[substreamIndex] == 0) break;
           }
+          if (substreamIndex == MAX_NUMBER_SUBSTREAMS) break;
         }
+
+        labels[substreamIndex] = packetLabel;
 
         break;
 
       case MHA_PACTYP_AUDIOSCENEINFO:
-        if (packetLabel == 0) return MPEGH_UI_PARSE_ERROR;
+        if (packetLabel == 0 || substreamIndex < 0) return MPEGH_UI_PARSE_ERROR;
 
-        if (isMainStream) {
+        {
           AUDIO_SCENE_INFO* pASI = UI_Manager_GetAsiPointer(self->hUiManager);
 
-          /* check packet label */
-          if (packetLabel != self->mainStreamLabel) return MPEGH_UI_PARSE_ERROR;
-
           /* parse ASI */
-          if (mae_AudioSceneInfo(pASI, hBs, (2 * 28), 0) != TRANSPORTDEC_OK) {
-            return MPEGH_UI_PARSE_ERROR;
-          }
-
-        } else {
-          AUDIO_SCENE_INFO* pASI = UI_Manager_GetAsiPointer(self->hUiManager);
-
-          if (self->numberOfSecondaryASI > self->numberfOfSecondaryStreams)
-            return MPEGH_UI_PARSE_ERROR;
-
-          /* check packet label */
-          if (packetLabel != self->secondaryStreamLabel[self->numberOfSecondaryASI])
-            return MPEGH_UI_PARSE_ERROR;
-
-          self->numberOfSecondaryASI += 1;
-
-          /* parse ASI */
-          if (mae_AudioSceneInfo(pASI, hBs, (2 * 28), self->numberOfSecondaryASI) !=
-              TRANSPORTDEC_OK) {
+          if (mae_AudioSceneInfo(pASI, hBs, (2 * 28), substreamIndex) != TRANSPORTDEC_OK) {
             return MPEGH_UI_PARSE_ERROR;
           }
         }
@@ -297,7 +305,6 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_FeedMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR*
             (isMainStream)) {
           UINT i;
           UINT idBytes = packetLength - 2;
-          UCHAR uuid[16];
 
           if (idBytes > 16) idBytes = 16;
 
@@ -309,9 +316,7 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_FeedMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR*
             }
           }
 
-          if (self->isActive) {
-            UI_Manager_SetUUID(self->hUiManager, uuid, 1);
-          }
+          markerFound = 1;
         }
 
         break;
@@ -325,25 +330,9 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_FeedMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR*
         break;
 
       case MHA_PACTYP_MPEGH3DAFRAME:
-        if (packetLabel == 0) return MPEGH_UI_PARSE_ERROR;
+        if (packetLabel == 0 || substreamIndex < 0) return MPEGH_UI_PARSE_ERROR;
 
-        if (isMainStream) {
-          /* check packet label */
-          if (packetLabel != self->mainStreamLabel) return MPEGH_UI_PARSE_ERROR;
-        } else {
-          if (self->numberOfMPEGH3DA > self->numberfOfSecondaryStreams) return MPEGH_UI_PARSE_ERROR;
-
-          /* check packet label */
-          if (packetLabel != self->secondaryStreamLabel[self->numberOfMPEGH3DA])
-            return MPEGH_UI_PARSE_ERROR;
-
-          self->numberOfMPEGH3DA += 1;
-        }
-
-        if (self->numberOfMPEGH3DA >= self->numberfOfSecondaryStreams) { /* frame found */
-          frameFound = 1;
-          break;
-        }
+        frameFound = 1;
         break;
 
       default:
@@ -360,6 +349,9 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_FeedMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR*
 
     if (frameFound) break;
 
+    if (packetType != MHA_PACTYP_CRC16 && packetType != MHA_PACTYP_CRC32)
+      prevPacketType = packetType;
+
     /* update position to insert UI/DRC packets */
     if ((packetType != MHA_PACTYP_MPEGH3DAFRAME) && (packetType != MHA_PACTYP_AUDIOTRUNCATION) &&
         (packetType != MHA_PACTYP_CRC16) && (packetType != MHA_PACTYP_CRC32) &&
@@ -367,6 +359,23 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_FeedMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR*
         (packetType != MHA_PACTYPE_PCMDATA)) {
       nBitsIns = FDKgetValidBits(hBs);
     }
+  }
+
+  /* if UUID did not change, reset XML state changed flag to previous state (to prevent new XML
+   * output when nothing changed) */
+  if (UI_Manager_GetXmlChanged(self->hUiManager) && !prevXmlChanged && !substrSwitch) {
+    UCHAR curUuid[16] = {0};
+    int uuidChg = 0, crcChg;
+
+    UI_Manager_GetUUID(self->hUiManager, curUuid);
+
+    for (int i = 0; i < 16; i++) {
+      if (curUuid[i] != prevUuid[i]) uuidChg = 1;
+    }
+
+    crcChg = UI_Manager_GetAsiPointer(self->hUiManager)->crcForCompare != prevAsiCrc;
+
+    if (!uuidChg && !crcChg) UI_Manager_ResetXmlChanged(self->hUiManager);
   }
 
   /* check if a frame was found */
@@ -379,6 +388,10 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_FeedMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHAR*
   } else if (!self->isActive && !uiPacketFound && self->configFound) {
     self->isActive = 1;
     UI_Manager_SetIsActive(self->hUiManager, 1);
+  }
+
+  if (markerFound && self->isActive) {
+    UI_Manager_SetUUID(self->hUiManager, uuid, 1);
   }
 
   /* compute byte offset to insert UI/DRC packets */
@@ -590,7 +603,7 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_UpdateMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHA
     nBytes += uiPacketLength;
 
     /* get header length*/
-    nBytes += writePacketHeader(NULL, (UINT)MHA_PACTYP_USERINTERACTION, self->mainStreamLabel,
+    nBytes += writePacketHeader(NULL, (UINT)MHA_PACTYP_USERINTERACTION, self->substreamLabel[0],
                                 uiPacketLength);
   }
 
@@ -604,7 +617,7 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_UpdateMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHA
     nBytes += drcPacketLength;
 
     /* get header length */
-    nBytes += writePacketHeader(NULL, (UINT)MHA_PACTYP_LOUDNESS_DRC, self->mainStreamLabel,
+    nBytes += writePacketHeader(NULL, (UINT)MHA_PACTYP_LOUDNESS_DRC, self->substreamLabel[0],
                                 drcPacketLength);
   }
 
@@ -620,13 +633,14 @@ LINKSPEC_H MPEGH_UI_ERROR mpegh_UI_UpdateMHAS(HANDLE_MPEGH_UI_MANAGER self, UCHA
 
   if (insertUiPacket) {
     /* insert UI packet */
-    writePacketHeader(hBs, (UINT)MHA_PACTYP_USERINTERACTION, self->mainStreamLabel, uiPacketLength);
+    writePacketHeader(hBs, (UINT)MHA_PACTYP_USERINTERACTION, self->substreamLabel[0],
+                      uiPacketLength);
     writeUiPacket(hBs, &uiStatus);
   }
 
   if (insertDrcPacket) {
     /* insert DRC packet */
-    writePacketHeader(hBs, (UINT)MHA_PACTYP_LOUDNESS_DRC, self->mainStreamLabel, drcPacketLength);
+    writePacketHeader(hBs, (UINT)MHA_PACTYP_LOUDNESS_DRC, self->substreamLabel[0], drcPacketLength);
     writeDrcPacket(hBs, &drcStatus);
   }
 

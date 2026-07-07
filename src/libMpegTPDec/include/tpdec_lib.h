@@ -145,7 +145,10 @@ typedef enum {
   TPDEC_PARAM_BURST_PERIOD,        /** Set data reception burst period in mili seconds. */
   TPDEC_PARAM_TARGETLAYOUT,        /** Set CICP target layout */
   TPDEC_PARAM_FORCE_CONFIG_CHANGE, /** Force config change for next received config */
-  TPDEC_PARAM_USE_ELEM_SKIPPING
+  TPDEC_PARAM_USE_ELEM_SKIPPING,
+  TPDEC_PARAM_CHECK_TWO_SYNCS /** Enhance synchronization robustness by requiring two valid sync
+                                 words in expected positions for bitstreams, reducing false
+                                 positives caused by accidental sync word matches. Default: off.*/
 } TPDEC_PARAM;
 
 /*!
@@ -590,8 +593,9 @@ TRANSPORTDEC_ERROR mae_AudioSceneInfo(AUDIO_SCENE_INFO* asi, HANDLE_FDK_BITSTREA
                                       int numMaxElementIDs, const int streamIndex);
 
 void asiReset(AUDIO_SCENE_INFO* asi);
+void asiResetAvailability(AUDIO_SCENE_INFO* asi);
 
 TRANSPORTDEC_ERROR checkASI(const AUDIO_SCENE_INFO* asi, int numSignalGroups,
-                            const CSSignalGroup* signalGroups);
+                            const CSSignalGroup* signalGroups, int streamIndex);
 
 #endif /* #ifndef TPDEC_LIB_H */

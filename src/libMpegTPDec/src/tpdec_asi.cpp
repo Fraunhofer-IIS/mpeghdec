@@ -198,7 +198,7 @@ void asiReset(AUDIO_SCENE_INFO* asi) {
   for (i = 0; i < ASI_MAX_PREF_DESCR_LANGUAGES; i++) {
     FDKstrncpy(asi->prefDescrLanguages[i], prefDescrLanguages_old[i], 3);
   }
-  for (i = 0; i < TPDEC_MAX_TRACKS; i++) {
+  for (i = 0; i < 16; i++) {
     asi->metaDataElementIDmaxAvail[i] = -1;
   }
   asi->diffFlags = ASI_DIFF_NEEDS_RESET;
@@ -298,7 +298,7 @@ static TRANSPORTDEC_ERROR mae_GroupAvailabilityCheck(AUDIO_SCENE_INFO* asi) {
     ASI_GROUP* group = &(asi->groups[grp]);
 
     int group_detected = 0;
-    for (int streamIndex = 0; streamIndex < TPDEC_MAX_TRACKS; streamIndex++) {
+    for (int streamIndex = 0; streamIndex < 16; streamIndex++) {
       if (asi->metaDataElementIDmaxAvail[streamIndex] >=
           asi->metaDataElementIDoffset[streamIndex]) {
         for (obj = 0; obj < group->numMembers; obj++) {
@@ -323,6 +323,13 @@ static TRANSPORTDEC_ERROR mae_GroupAvailabilityCheck(AUDIO_SCENE_INFO* asi) {
   }
 
   return TRANSPORTDEC_OK;
+}
+
+void asiResetAvailability(AUDIO_SCENE_INFO* asi) {
+  int i;
+
+  for (i = 0; i < 16; i++) asi->metaDataElementIDmaxAvail[i] = -1;
+  for (i = 0; i < asi->numGroups; i++) asi->groups[i].isAvailable = 0;
 }
 
 static TRANSPORTDEC_ERROR mae_DrcUserInterfaceInfo(AUDIO_SCENE_INFO* asi, HANDLE_FDK_BITSTREAM bs) {
@@ -954,7 +961,7 @@ static TRANSPORTDEC_ERROR mae_LoudnessCompensationData(AUDIO_SCENE_INFO* asi,
 }
 
 static TRANSPORTDEC_ERROR mae_Data(AUDIO_SCENE_INFO* asi, HANDLE_FDK_BITSTREAM bs,
-                                   HANDLE_FDK_CRCINFO hCrcInfo) {
+                                   FDK_CRCINFO crcInfo[2]) {
   TRANSPORTDEC_ERROR err = TRANSPORTDEC_OK;
   int numDataSets, dscr;
 
@@ -967,14 +974,18 @@ static TRANSPORTDEC_ERROR mae_Data(AUDIO_SCENE_INFO* asi, HANDLE_FDK_BITSTREAM b
   numDataSets = FDKreadBits(bs, 4);
   for (dscr = 0; dscr < numDataSets; dscr++) {
     int dataType, dataLength, i;
-    INT crcReg = 0;
+    INT crcReg[2] = {0};
 
     dataType = FDKreadBits(bs, 4);
     dataLength = FDKreadBits(bs, 16);
 
     i = (INT)FDKgetValidBits(bs);
 
-    if (dataType == ID_MAE_GROUP_CONTENT) crcReg = FDKcrcStartReg(hCrcInfo, bs, 0);
+    if (dataType == ID_MAE_GROUP_CONTENT) crcReg[0] = FDKcrcStartReg(&crcInfo[0], bs, 0);
+    if (dataType == ID_MAE_GROUP_DESCRIPTION || dataType == ID_MAE_SWITCHGROUP_DESCRIPTION ||
+        dataType == ID_MAE_GROUPPRESET_DESCRIPTION || dataType == ID_MAE_GROUP_CONTENT ||
+        dataType == ID_MAE_DRC_UI_INFO || dataType == ID_MAE_GROUP_PRESET_EXTENSION)
+      crcReg[1] = FDKcrcStartReg(&crcInfo[1], bs, 0);
 
     switch (dataType) {
       case ID_MAE_GROUP_DESCRIPTION:
@@ -1017,7 +1028,11 @@ static TRANSPORTDEC_ERROR mae_Data(AUDIO_SCENE_INFO* asi, HANDLE_FDK_BITSTREAM b
       return TRANSPORTDEC_PARSE_ERROR;
     }
 
-    if (dataType == ID_MAE_GROUP_CONTENT) FDKcrcEndReg(hCrcInfo, bs, crcReg);
+    if (dataType == ID_MAE_GROUP_CONTENT) FDKcrcEndReg(&crcInfo[0], bs, crcReg[0]);
+    if (dataType == ID_MAE_GROUP_DESCRIPTION || dataType == ID_MAE_SWITCHGROUP_DESCRIPTION ||
+        dataType == ID_MAE_GROUPPRESET_DESCRIPTION || dataType == ID_MAE_GROUP_CONTENT ||
+        dataType == ID_MAE_DRC_UI_INFO || dataType == ID_MAE_GROUP_PRESET_EXTENSION)
+      FDKcrcEndReg(&crcInfo[1], bs, crcReg[1]);
 
     if (err != TRANSPORTDEC_OK) {
       return err;
@@ -1138,15 +1153,19 @@ static TRANSPORTDEC_ERROR mae_Data(AUDIO_SCENE_INFO* asi, HANDLE_FDK_BITSTREAM b
 TRANSPORTDEC_ERROR mae_AudioSceneInfo(AUDIO_SCENE_INFO* asi, HANDLE_FDK_BITSTREAM bs,
                                       int numMaxElementIDs, const int streamIndex) {
   TRANSPORTDEC_ERROR err = TRANSPORTDEC_OK;
-  asi->diffFlags = 0;
-  FDK_CRCINFO crcInfo;
-  HANDLE_FDK_CRCINFO hCrcInfo = &crcInfo;
-  INT crcReg;
+  FDK_CRCINFO crcInfo[2];
+  INT crcReg[2];
+  INT isMainStream;
 
-  FDKcrcInit(hCrcInfo, 0x8021, 0, 16);
-  crcReg = FDKcrcStartReg(hCrcInfo, bs, 0);
+  FDKcrcInit(&crcInfo[0], 0x8021, 0, 16);
+  FDKcrcInit(&crcInfo[1], 0x8021, 0, 16);
 
-  if (compAssign(&asi->isMainStream[streamIndex], FDKreadBit(bs)))
+  crcReg[0] = FDKcrcStartReg(&crcInfo[0], bs, 0);
+  crcReg[1] = FDKcrcStartReg(&crcInfo[1], bs, 0);
+
+  isMainStream = FDKreadBit(bs);
+  if (isMainStream) asi->diffFlags = 0;
+  if (compAssign(&asi->isMainStream[streamIndex], isMainStream))
     asi->diffFlags |= ASI_DIFF_NEEDS_RESET;
 
   if (asi->isMainStream[streamIndex]) {
@@ -1191,9 +1210,10 @@ TRANSPORTDEC_ERROR mae_AudioSceneInfo(AUDIO_SCENE_INFO* asi, HANDLE_FDK_BITSTREA
       return err;
     }
 
-    FDKcrcEndReg(hCrcInfo, bs, crcReg);
+    FDKcrcEndReg(&crcInfo[0], bs, crcReg[0]);
+    FDKcrcEndReg(&crcInfo[1], bs, crcReg[1]);
 
-    err = mae_Data(asi, bs, hCrcInfo);
+    err = mae_Data(asi, bs, crcInfo);
     if (err != TRANSPORTDEC_OK) {
       asiReset(asi);
       return err;
@@ -1201,11 +1221,11 @@ TRANSPORTDEC_ERROR mae_AudioSceneInfo(AUDIO_SCENE_INFO* asi, HANDLE_FDK_BITSTREA
     asi->metaDataElementIDoffset[streamIndex] = 0;
   } else {
     if (compAssign(&asi->metaDataElementIDoffset[streamIndex], FDKreadBits(bs, 7) + 1))
-      asi->diffFlags |= ASI_DIFF_NEEDS_RESET;
+      asi->diffFlags |= ASI_DIFF_AVAILABILITY;
   }
 
   if (compAssign(&asi->metaDataElementIDmaxAvail[streamIndex], FDKreadBits(bs, 7)))
-    asi->diffFlags |= ASI_DIFF_NEEDS_RESET;
+    asi->diffFlags |= ASI_DIFF_AVAILABILITY;
 
   err = mae_GroupAvailabilityCheck(asi);
   if (err != TRANSPORTDEC_OK) {
@@ -1214,20 +1234,15 @@ TRANSPORTDEC_ERROR mae_AudioSceneInfo(AUDIO_SCENE_INFO* asi, HANDLE_FDK_BITSTREA
   }
 
   if (asi->isMainStream[streamIndex]) {
-    asi->crcForUid = FDKcrcGetCRC(hCrcInfo);
-  }
-
-  if (streamIndex > 0) {
-    if (asi->diffFlags & ASI_DIFF_NEEDS_RESET) {
-      asi->diffFlags = ASI_DIFF_AVAILABILITY;
-    }
+    asi->crcForUid = FDKcrcGetCRC(&crcInfo[0]);
+    asi->crcForCompare = FDKcrcGetCRC(&crcInfo[1]);
   }
 
   return TRANSPORTDEC_OK;
 }
 
 TRANSPORTDEC_ERROR checkASI(const AUDIO_SCENE_INFO* asi, int numSignalGroups,
-                            const CSSignalGroup* signalGroups) {
+                            const CSSignalGroup* signalGroups, int streamIndex) {
   UCHAR maeID, maeID2grpIdx[(2 * 28)];
   int i, j;
 
@@ -1248,7 +1263,7 @@ TRANSPORTDEC_ERROR checkASI(const AUDIO_SCENE_INFO* asi, int numSignalGroups,
   }
 
   /* check if switch group members are always complete signal groups */
-  maeID = 0;
+  maeID = asi->metaDataElementIDoffset[streamIndex];
   for (i = 0; i < numSignalGroups; i++) {
     if (signalGroups[i].type == 3) {
       /* HOA signal group (has single MAE ID for whole signal group) */
@@ -1256,6 +1271,8 @@ TRANSPORTDEC_ERROR checkASI(const AUDIO_SCENE_INFO* asi, int numSignalGroups,
     } else {
       /* other signal group types (have MAE IDs for individual signals) */
       for (j = 1; j < signalGroups[i].count; j++) {
+        if (maeID + j >= (2 * 28)) return TRANSPORTDEC_PARSE_ERROR;
+
         /* check if all signal group members are in same ASI group */
         if (maeID2grpIdx[maeID + j] != maeID2grpIdx[maeID]) {
           /* if not, check if one of them is in a switch group */

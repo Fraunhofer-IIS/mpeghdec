@@ -1087,9 +1087,12 @@ static DRC_ERROR _mergeSubstreamDrcInstructions(DRC_INSTRUCTIONS_UNI_DRC* pInstS
 
   /* insert the gainSetIndex elements of this substream, starting from startIndexChannel */
   for (c = 0; c < pInstSubstream->drcChannelCount; c++) {
+    int gsi = pInstSubstream->gainSetIndex[c];
     if ((startIndexChannel + c) >= 2 * 28) continue;
-    *pDiff |= _compAssign(&pInst->gainSetIndex[startIndexChannel + c],
-                          pInstSubstream->gainSetIndex[c] + startIndexGainSet);
+    if (gsi >= 0) { /* keep gainSetIndex -1 untouched */
+      gsi += startIndexGainSet;
+    }
+    *pDiff |= _compAssign(&pInst->gainSetIndex[startIndexChannel + c], gsi);
   }
 
   /* insert the gainSetIndexForChannelGroup elements of this substream, starting from

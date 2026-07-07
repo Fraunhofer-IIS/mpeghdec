@@ -513,9 +513,11 @@ void persistenceManagerSaveCommand(HANDLE_UI_PERSISTENCE_MANAGER hPersistence,
       if ((uiAction->paramText[0] != hPersistence->preferredLanguage[0]) ||
           (uiAction->paramText[1] != hPersistence->preferredLanguage[1]) ||
           (uiAction->paramText[2] != hPersistence->preferredLanguage[2])) {
-        hPersistence->preferredLanguage[0] = uiAction->paramText[0];
-        hPersistence->preferredLanguage[1] = uiAction->paramText[1];
-        hPersistence->preferredLanguage[2] = uiAction->paramText[2];
+        if (uiAction->paramInt == 0) {
+          hPersistence->preferredLanguage[0] = uiAction->paramText[0];
+          hPersistence->preferredLanguage[1] = uiAction->paramText[1];
+          hPersistence->preferredLanguage[2] = uiAction->paramText[2];
+        }
         addCommandFlag(hPersistence, FLAG_BEFORE_LANGUAGE_CHANGE);
       }
       return;

@@ -450,7 +450,7 @@ FDK_INLINE INT fMax(INT a, INT b) {
 FDK_INLINE INT fMin(INT a, INT b) {
   return fixmin_I(a, b);
 }
-#if !defined(_MSC_VER) && defined(__x86_64__)
+#if !defined(_MSC_VER) && !defined(__MINGW32__) && defined(__x86_64__)
 FDK_INLINE SHORT fMax(SHORT a, SHORT b) {
   return fixmax_S(a, b);
 }

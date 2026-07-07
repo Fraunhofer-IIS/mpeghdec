@@ -129,8 +129,7 @@ void formatConverterProcess_passive_timeDomain(const DMXH_PCM* RESTRICT inputBuf
                                                IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt);
 
 void formatConverterProcess_passive_timeDomain_frameLength(
-    const DMXH_PCM* RESTRICT pIn, DMXH_PCM* RESTRICT pOut,
-    IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, const int inputBufferChannelOffset);
+    const DMXH_PCM* const* pIn, DMXH_PCM* const* pOut, IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt);
 
 /**********************************************************************************************************************************/
 void formatConverter_process_STFT(IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt);

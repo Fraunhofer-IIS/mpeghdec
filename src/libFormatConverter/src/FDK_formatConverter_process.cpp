@@ -136,8 +136,7 @@ amm-info@iis.fraunhofer.de
  *
  */
 void formatConverterProcess_passive_timeDomain_frameLength(
-    const DMXH_PCM* RESTRICT pIn, DMXH_PCM* RESTRICT pOut,
-    IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt, const int inputBufferChannelOffset) {
+    const DMXH_PCM* const* pIn, DMXH_PCM* const* pOut, IIS_FORMATCONVERTER_INTERNAL_HANDLE fcInt) {
   /* Buffer definitions:
 
   Input buffer (pIn):
@@ -154,20 +153,19 @@ void formatConverterProcess_passive_timeDomain_frameLength(
   UINT frameLength = fcInt->frameSize;
   FIXP_DMX_H* dmx_mtx = fcInt->fcParams->dmxMtx_sorted;
 
-  DMXH_PCM* start_pOut = pOut;
   for (UINT inCh = 0; inCh < numInChannels; inCh += 1) {
+    if (pIn[inCh] == NULL) continue;
+
     /* Reset output buffer pointer */
-    pOut = start_pOut;
     for (UINT outCh = 0; outCh < numOutChannels; outCh += 1) {
       FIXP_DMX_H dmx_coef = *dmx_mtx++;
       if (dmx_coef != (FIXP_DMX_H)0) {
         for (UINT sample = 0; sample < frameLength; sample++) {
-          pOut[sample] += (DMXH_PCM)FX_DBL2FX_DMXH(fMult((DMXH_PCMF)pIn[sample], dmx_coef));
+          pOut[outCh][sample] +=
+              (DMXH_PCM)FX_DBL2FX_DMXH(fMult((DMXH_PCMF)pIn[inCh][sample], dmx_coef));
         }
       }
-      pOut += frameLength;
     }
-    pIn += inputBufferChannelOffset;
   }
 }
 

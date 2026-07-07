@@ -293,6 +293,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_PreRollExtensionPayloadParse(HANDLE_A
   UINT useDefaultLengthFlag;
   UINT configLength = 0;
   UINT preRollPossible = 1;
+  INT minNumPrerollAU = -1;
   UINT i;
   int subStreamIndex = 0;
   UCHAR configChanged = 0;
@@ -300,140 +301,153 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_PreRollExtensionPayloadParse(HANDLE_A
 
   ErrorStatus = AAC_DEC_OK;
 
-  /* Copy BS context */
-  bs = *transportDec_GetBitstream(self->hInput, subStreamIndex);
-  hBs = &bs;
-
-  auStartAnchor = (INT)FDKgetValidBits(hBs);
-  if (auStartAnchor <= 0) {
-    ErrorStatus = AAC_DEC_NOT_ENOUGH_BITS;
-    goto bail;
-  }
-
-  /* Independency flag */
-  FDKreadBit(hBs);
-
-  /* Payload present flag of extension ID_EXT_ELE_AUDIOPREROLL must be one */
-  extPayloadPresentFlag = FDKreadBit(hBs);
-  if (!extPayloadPresentFlag) {
-    preRollPossible = 0;
-  }
-
-  /* Default length flag of extension ID_EXT_ELE_AUDIOPREROLL must be zero */
-  useDefaultLengthFlag = FDKreadBit(hBs);
-  if (useDefaultLengthFlag) {
-    preRollPossible = 0;
-  }
-
-  if (preRollPossible) { /* extPayloadPresentFlag && !useDefaultLengthFlag */
-    /* Read overall ext payload length, useDefaultLengthFlag must be zero.  */
-    escapedValue(hBs, 8, 16, 0);
-
-    /* Read MPEG-H Config size */
-    configLength = escapedValue(hBs, 4, 4, 8);
-
-    /* Avoid decoding pre roll frames if there was no config change and no config is included in the
-     * pre roll ext payload. */
-    if ((self->flags[0] & AC_MPEGH3DA) && (configLength == 0)) {
-      /* self->streamInfo.numChannels is checked additionally because for the first frame
-       * buildUpStatus is not set. */
-      if (self->buildUpStatus == AACDEC_BUILD_UP_OFF && self->streamInfo.numChannels != 0) {
-        preRollPossible = 0;
-      }
+  for (subStreamIndex = 0; subStreamIndex < TPDEC_MAX_LAYERS; subStreamIndex++) {
+    if (self->numUsacElements[subStreamIndex] <= 0) {
+      break;
     }
-  }
 
-  /* If pre roll not possible then exit. */
-  if (preRollPossible == 0) {
-    /* Sanity check: if flushing is switched on, preRollPossible must be 1 */
-    if (self->flushStatus != AACDEC_FLUSH_OFF) {
-      /* Mismatch of current payload and flushing status */
-      self->flushStatus = AACDEC_FLUSH_OFF;
-      ErrorStatus = AAC_DEC_PARSE_ERROR;
-    }
-    goto bail;
-  }
+    /* Copy BS context */
+    bs = *transportDec_GetBitstream(self->hInput, subStreamIndex);
+    hBs = &bs;
 
-  if (self->flags[0] & AC_MPEGH3DA) {
-    if (configLength > 0) {
-      /* DASH IPF ATSC Config Change: Read new config and compare with current config. Apply
-       * reconfiguration if config's are different. */
-      for (i = 0; i < configLength; i++) {
-        config[i] = FDKreadBits(hBs, 8);
-      }
-      TRANSPORTDEC_ERROR terr;
-      terr = transportDec_InBandConfig(self->hInput, config, configLength, self->buildUpStatus,
-                                       &configChanged, 0);
-      if (terr != TRANSPORTDEC_OK) {
-        ErrorStatus = AAC_DEC_PARSE_ERROR;
-        goto bail;
-      }
-    }
-  }
-
-  /* For the first frame buildUpStatus is not set and no flushing is performed but preroll AU's
-   * should processed. */
-  /* buildUpStatus is checked additionally because if explicit cfg != implicit cfg -> idle state is
-   * forced. */
-  if ((self->streamInfo.numChannels == 0) && (self->flags[0] & AC_MPEGH3DA) &&
-      self->buildUpStatus == AACDEC_BUILD_UP_OFF) {
-    self->buildUpStatus = AACDEC_MPEGH_BUILD_UP_ON;
-    /* sanity check: if buildUp status on -> flushing must be off */
-    if (self->flushStatus != AACDEC_FLUSH_OFF) {
-      self->flushStatus = AACDEC_FLUSH_OFF;
-      ErrorStatus = AAC_DEC_PARSE_ERROR;
+    auStartAnchor = (INT)FDKgetValidBits(hBs);
+    if (auStartAnchor <= 0) {
+      ErrorStatus = AAC_DEC_NOT_ENOUGH_BITS;
       goto bail;
     }
-  }
 
-  if (self->flags[0] & AC_MPEGH3DA) {
-    /* We are interested in preroll AUs if an explicit or an implicit config change is signalized in
-     * other words if the build up status is set. */
-    if ((self->buildUpStatus == AACDEC_MPEGH_BUILD_UP_ON) ||
-        (self->buildUpStatus == AACDEC_MPEGH_BUILD_UP_ON_IN_BAND)) {
-      UCHAR applyCrossfade = FDKreadBit(hBs);
-      if (applyCrossfade) {
-        self->applyCrossfade |= AACDEC_CROSSFADE_BITMASK_PREROLL;
+    /* Independency flag */
+    FDKreadBit(hBs);
+
+    /* Payload present flag of extension ID_EXT_ELE_AUDIOPREROLL must be one */
+    extPayloadPresentFlag = FDKreadBit(hBs);
+    if (!extPayloadPresentFlag) {
+      preRollPossible = 0;
+    }
+
+    /* Default length flag of extension ID_EXT_ELE_AUDIOPREROLL must be zero */
+    useDefaultLengthFlag = FDKreadBit(hBs);
+    if (useDefaultLengthFlag) {
+      preRollPossible = 0;
+    }
+
+    if (preRollPossible) { /* extPayloadPresentFlag && !useDefaultLengthFlag */
+      /* Read overall ext payload length, useDefaultLengthFlag must be zero.  */
+      escapedValue(hBs, 8, 16, 0);
+
+      /* Read MPEG-H Config size */
+      configLength = escapedValue(hBs, 4, 4, 8);
+
+      /* Avoid decoding pre roll frames if there was no config change and no config is included in
+       * the pre roll ext payload. */
+      if ((self->flags[0] & AC_MPEGH3DA) && (configLength == 0)) {
+        /* self->streamInfo.numChannels is checked additionally because for the first frame
+         * buildUpStatus is not set. */
+        if (self->buildUpStatus == AACDEC_BUILD_UP_OFF && self->streamInfo.numChannels != 0) {
+          preRollPossible = 0;
+        }
+      }
+    }
+
+    /* If pre roll not possible then exit. */
+    if (preRollPossible == 0) {
+      /* Sanity check: if flushing is switched on, preRollPossible must be 1 */
+      if (self->flushStatus != AACDEC_FLUSH_OFF) {
+        /* Mismatch of current payload and flushing status */
+        self->flushStatus = AACDEC_FLUSH_OFF;
+        ErrorStatus = AAC_DEC_PARSE_ERROR;
       } else {
-        self->applyCrossfade &= ~AACDEC_CROSSFADE_BITMASK_PREROLL;
+        continue;
       }
-      FDKreadBit(hBs); /* reserved */
-      /* Read num preroll AU's */
-      *numPrerollAU = escapedValue(hBs, 2, 4, 0);
-      /* check limits for MPEG-H LC profile */
-      if (*numPrerollAU > AACDEC_MAX_NUM_PREROLL_AU_MPEGH) {
-        *numPrerollAU = 0;
-        ErrorStatus = AAC_DEC_PARSE_ERROR;
-        goto bail;
-      }
-    }
-  }
-
-  /* Implementation is limited to either one substream or one preroll frame but not both greater
-   * than 1. */
-  FDK_ASSERT(!(*numPrerollAU > 1 && subStreamIndex > 1));
-
-  for (i = 0; i < *numPrerollAU; i++) {
-    /* For every AU get length and offset in the bitstream */
-    int prerollAULength = escapedValue(hBs, 16, 16, 0);
-    if (prerollAULength > 0) {
-      prerollAUOffset[i + subStreamIndex] = auStartAnchor - FDKgetValidBits(hBs);
-      independencyFlag = FDKreadBit(hBs);
-      if (i == 0 && !independencyFlag) {
-        *numPrerollAU = 0;
-        ErrorStatus = AAC_DEC_PARSE_ERROR;
-        goto bail;
-      }
-      if (subStreamIndex == 0) {
-        FDKpushFor(hBs, prerollAULength * 8 - 1);
-        self->prerollAULength[i] = (prerollAULength * 8) + prerollAUOffset[i];
-      }
-    } else {
-      *numPrerollAU = 0;
-      ErrorStatus = AAC_DEC_PARSE_ERROR; /* Something is wrong */
       goto bail;
     }
+
+    if (self->flags[0] & AC_MPEGH3DA) {
+      if (configLength > 0) {
+        /* DASH IPF ATSC Config Change: Read new config and compare with current config. Apply
+         * reconfiguration if config's are different. */
+        for (i = 0; i < configLength; i++) {
+          config[i] = FDKreadBits(hBs, 8);
+        }
+        TRANSPORTDEC_ERROR terr;
+        terr = transportDec_InBandConfig(self->hInput, config, configLength, self->buildUpStatus,
+                                         &configChanged, 0);
+        if (terr != TRANSPORTDEC_OK) {
+          ErrorStatus = AAC_DEC_PARSE_ERROR;
+          goto bail;
+        }
+      }
+    }
+
+    /* For the first frame buildUpStatus is not set and no flushing is performed but preroll AU's
+     * should processed. */
+    /* buildUpStatus is checked additionally because if explicit cfg != implicit cfg -> idle state
+     * is forced. */
+    if ((self->streamInfo.numChannels == 0) && (self->flags[0] & AC_MPEGH3DA) &&
+        self->buildUpStatus == AACDEC_BUILD_UP_OFF) {
+      self->buildUpStatus = AACDEC_MPEGH_BUILD_UP_ON;
+      /* sanity check: if buildUp status on -> flushing must be off */
+      if (self->flushStatus != AACDEC_FLUSH_OFF) {
+        self->flushStatus = AACDEC_FLUSH_OFF;
+        ErrorStatus = AAC_DEC_PARSE_ERROR;
+        goto bail;
+      }
+    }
+
+    if (self->flags[0] & AC_MPEGH3DA) {
+      /* We are interested in preroll AUs if an explicit or an implicit config change is signalized
+       * in other words if the build up status is set. */
+      if ((self->buildUpStatus == AACDEC_MPEGH_BUILD_UP_ON) ||
+          (self->buildUpStatus == AACDEC_MPEGH_BUILD_UP_ON_IN_BAND)) {
+        UCHAR applyCrossfade = FDKreadBit(hBs);
+        if (applyCrossfade) {
+          self->applyCrossfade |= AACDEC_CROSSFADE_BITMASK_PREROLL;
+        } else {
+          self->applyCrossfade &= ~AACDEC_CROSSFADE_BITMASK_PREROLL;
+        }
+        FDKreadBit(hBs); /* reserved */
+        /* Read num preroll AU's */
+        *numPrerollAU = escapedValue(hBs, 2, 4, 0);
+        /* check limits for MPEG-H LC profile */
+        if (*numPrerollAU > AACDEC_MAX_NUM_PREROLL_AU_MPEGH) {
+          *numPrerollAU = 0;
+          ErrorStatus = AAC_DEC_PARSE_ERROR;
+          goto bail;
+        }
+      }
+    }
+
+    /* Implementation is limited to either one substream or one preroll frame but not both greater
+     * than 1. */
+    FDK_ASSERT(!(*numPrerollAU > 1 && subStreamIndex > 1));
+
+    for (i = 0; i < *numPrerollAU; i++) {
+      /* For every AU get length and offset in the bitstream */
+      int prerollAULength = escapedValue(hBs, 16, 16, 0);
+      if (prerollAULength > 0) {
+        prerollAUOffset[i + subStreamIndex] = auStartAnchor - FDKgetValidBits(hBs);
+        independencyFlag = FDKreadBit(hBs);
+        if (i == 0 && !independencyFlag) {
+          *numPrerollAU = 0;
+          ErrorStatus = AAC_DEC_PARSE_ERROR;
+          goto bail;
+        }
+        if (subStreamIndex == 0) {
+          FDKpushFor(hBs, prerollAULength * 8 - 1);
+          self->prerollAULength[i] = (prerollAULength * 8) + prerollAUOffset[i];
+        }
+      } else {
+        *numPrerollAU = 0;
+        ErrorStatus = AAC_DEC_PARSE_ERROR; /* Something is wrong */
+        goto bail;
+      }
+    }
+
+    if (minNumPrerollAU < 0 || (INT)*numPrerollAU < minNumPrerollAU)
+      minNumPrerollAU = *numPrerollAU;
   }
+
+  *numPrerollAU = (minNumPrerollAU < 0) ? 0 : minNumPrerollAU;
 
 bail:
 
@@ -463,7 +477,9 @@ static void CStreamInfoInit(CStreamInfo* pStreamInfo) {
   pStreamInfo->epConfig = -1; /* default: no ER */
 
   pStreamInfo->numChannels = 0;
+  pStreamInfo->numChannelsBeforeMix = 0;
   pStreamInfo->sampleRate = 0;
+  pStreamInfo->sampleRateBeforeRs = 0;
   pStreamInfo->frameSize = 0;
 
   pStreamInfo->outputDelay = 0;
@@ -543,23 +559,57 @@ bail:
 
 /* Revert CAacDecoder_InitRender() */
 static void CAacDecoder_DeInitRenderer(HANDLE_AACDECODER self, const int subStreamIndex) {
-  if (self->pFormatConverter[subStreamIndex] != NULL) {
-    IIS_FormatConverter_Close(&(self->pFormatConverter[subStreamIndex]));
+  if (subStreamIndex == 0) {
+    if (self->pFormatConverter[0] != NULL) IIS_FormatConverter_Close(&(self->pFormatConverter[0]));
   }
 
   {
-    int i, objSigGrpOffset = 0;
-    for (i = 0; i < subStreamIndex; i++) {
-      objSigGrpOffset += self->numObjSignalGroups[i];
-    }
-    for (i = 0; i < self->numObjSignalGroups[subStreamIndex]; i++) {
-      if (self->hgVBAPRenderer[objSigGrpOffset + i]) {
-        gVBAPRenderer_Close(self->hgVBAPRenderer[objSigGrpOffset + i]);
-        self->hgVBAPRenderer[objSigGrpOffset + i] = NULL;
+    int i;
+
+    int objSigGrpOffset = 0, prevSignals = 0;
+
+    if (subStreamIndex == 0) {
+      for (i = 0; i < TP_MPEGH_MAX_SIGNAL_GROUPS; i++) {
+        if (self->hgVBAPRenderer[i]) {
+          gVBAPRenderer_Close(self->hgVBAPRenderer[i]);
+          self->hgVBAPRenderer[i] = NULL;
+        }
       }
+    } else {
+      for (i = 0; i < subStreamIndex; i++) {
+        for (int objectGroup_count = 0;
+             objectGroup_count < (int)self->pUsacConfig[i]->objNumSignalGroups;
+             objectGroup_count++) {
+          int grpIdx = self->pUsacConfig[i]->objSignalGroupsIndices[objectGroup_count];
+
+          if (!getOnOffFlag(self, self->pUsacConfig[i]->m_signalGroupType[grpIdx].firstSigIdx +
+                                      prevSignals)) {
+            continue;
+          }
+          objSigGrpOffset++;
+        }
+        prevSignals = self->pUsacConfig[i]->m_nUsacChannels;
+      }
+
+      for (i = 0; i < self->numObjSignalGroups[subStreamIndex]; i++) {
+        int grpIdx = self->pUsacConfig[i]->objSignalGroupsIndices[i];
+
+        if (!getOnOffFlag(self,
+                          self->pUsacConfig[subStreamIndex]->m_signalGroupType[grpIdx].firstSigIdx +
+                              prevSignals)) {
+          continue;
+        }
+        if (self->hgVBAPRenderer[objSigGrpOffset] != NULL) {
+          gVBAPRenderer_Close(self->hgVBAPRenderer[objSigGrpOffset]);
+        }
+        FDKmemmove(
+            self->hgVBAPRenderer + objSigGrpOffset, self->hgVBAPRenderer + objSigGrpOffset + 1,
+            sizeof(*self->hgVBAPRenderer) * (TP_MPEGH_MAX_SIGNAL_GROUPS - 1 - objSigGrpOffset));
+        self->hgVBAPRenderer[TP_MPEGH_MAX_SIGNAL_GROUPS - 1] = NULL;
+      }
+      /* Do not clear numObjSignalGroups, required for next substream close. */
+      /* self->numObjSignalGroups[subStreamIndex] = 0; */
     }
-    /* Do not clear numObjSignalGroups, required for next substream close. */
-    /* self->numObjSignalGroups[subStreamIndex] = 0; */
   }
 
   if (subStreamIndex == 0) {
@@ -570,7 +620,8 @@ static void CAacDecoder_DeInitRenderer(HANDLE_AACDECODER self, const int subStre
 static AAC_DECODER_ERROR applyDownmixMatrixPerSignalGroup(IIS_FORMATCONVERTER_INTERNAL_HANDLE _p,
                                                           HANDLE_AACDECODER self,
                                                           const CSUsacConfig* pUsacConfig,
-                                                          FIXP_DBL* p_buffer) {
+                                                          FIXP_DBL* p_buffer,
+                                                          int aacChannelOffsetIdx) {
   int error = 0;
 
   if (_p->numTotalInputChannels == 0) {
@@ -581,7 +632,8 @@ static AAC_DECODER_ERROR applyDownmixMatrixPerSignalGroup(IIS_FORMATCONVERTER_IN
   INT* eqIndexVec_sorted = _p->fcParams->eqIndexVec_sorted;
   for (INT grp = 0; grp < (INT)pUsacConfig->bsNumSignalGroups; grp++) {
     /* Skip signal groups that are not active. */
-    if (!getOnOffFlag(self, pUsacConfig->m_signalGroupType[grp].firstSigIdx)) {
+    if (!getOnOffFlag(self,
+                      pUsacConfig->m_signalGroupType[grp].firstSigIdx + aacChannelOffsetIdx)) {
       continue;
     }
 
@@ -663,7 +715,9 @@ static AAC_DECODER_ERROR applyDownmixMatrixPerSignalGroup(IIS_FORMATCONVERTER_IN
 static AAC_DECODER_ERROR CAacDecoder_InitRenderer(HANDLE_AACDECODER self, const CSUsacConfig* pUsc,
                                                   const int samplingFrequency,
                                                   const int samplesPerFrame,
-                                                  const int elementOffset, FIXP_DBL* p_buffer) {
+                                                  const int elementOffset, FIXP_DBL* p_buffer,
+                                                  const int aacChannelOffsetIdx,
+                                                  const int isLastSubstream) {
   AAC_DECODER_ERROR err = AAC_DEC_OK;
   int streamIndex = pUsc->subStreamIndex;
 
@@ -732,9 +786,9 @@ static AAC_DECODER_ERROR CAacDecoder_InitRenderer(HANDLE_AACDECODER self, const 
       }
 
       /* create FormatConverter */
-      FDK_ASSERT(self->pFormatConverter[streamIndex] == NULL);
-      {
-        fcErr = IIS_FormatConverter_Create(&(self->pFormatConverter[streamIndex]), mode, outGeo,
+      if (streamIndex == 0) {
+        FDK_ASSERT(self->pFormatConverter[0] == NULL);
+        fcErr = IIS_FormatConverter_Create(&(self->pFormatConverter[0]), mode, outGeo,
                                            noOutChannels, samplingFrequency, samplesPerFrame);
         if (fcErr) {
           err = AAC_DEC_UNSUPPORTED_CHANNELCONFIG;
@@ -757,8 +811,8 @@ static AAC_DECODER_ERROR CAacDecoder_InitRenderer(HANDLE_AACDECODER self, const 
 
       /* Set immersive flag */
       if (pUsc->immersiveDownmixFlag != 0) {
-        IIS_FormatConverter_Config_SetImmersiveDownmixFlag((self->pFormatConverter[streamIndex]),
-                                                           1);
+        if (streamIndex == 0)
+          IIS_FormatConverter_Config_SetImmersiveDownmixFlag((self->pFormatConverter[0]), 1);
       }
 
       for (INT grp = 0; grp < (INT)self->pUsacConfig[streamIndex]->bsNumSignalGroups; grp++) {
@@ -766,15 +820,19 @@ static AAC_DECODER_ERROR CAacDecoder_InitRenderer(HANDLE_AACDECODER self, const 
         if ((self->pUsacConfig[streamIndex]->m_signalGroupType[grp].type == 0)) {
           /* Skip signal groups that are not active. */
           if (!getOnOffFlag(self,
-                            self->pUsacConfig[streamIndex]->m_signalGroupType[grp].firstSigIdx)) {
+                            self->pUsacConfig[streamIndex]->m_signalGroupType[grp].firstSigIdx +
+                                aacChannelOffsetIdx)) {
             continue;
           }
 
+          if (IIS_FormatConverter_IsOpen(self->pFormatConverter[0])) {
+            err = AAC_DEC_PARSE_ERROR;
+            goto bail;
+          }
           noInChannels = self->pUsacConfig[streamIndex]->m_signalGroupType[grp].count;
-          self->pFormatConverter[streamIndex]->numSignalsTotal += noInChannels;
+          self->pFormatConverter[0]->numSignalsTotal += noInChannels;
 
-          if (self->pFormatConverter[streamIndex]->numSignalsTotal >
-              FORMAT_CONVERTER_MAX_CHANNELS) {
+          if (self->pFormatConverter[0]->numSignalsTotal > FORMAT_CONVERTER_MAX_CHANNELS) {
             AUDIO_SCENE_INFO* pASI = UI_Manager_GetAsiPointer(self->hUiManager);
             err = AAC_DEC_UNSUPPORTED_CHANNELCONFIG;
             if (pASI != NULL && pASI->isMainStream[streamIndex] == 0) {
@@ -802,7 +860,7 @@ static AAC_DECODER_ERROR CAacDecoder_InitRenderer(HANDLE_AACDECODER self, const 
 
           /* config input setup */
           fcErr = IIS_FormatConverter_Config_AddInputSetup(
-              self->pFormatConverter[streamIndex], inGeo, noInChannels,
+              self->pFormatConverter[0], inGeo, noInChannels,
               0,  /* Signal offset, only needed for multiple channel groups */
               0); /* Channel group id - needed in MPEG-H context */
           if (fcErr) {
@@ -813,31 +871,34 @@ static AAC_DECODER_ERROR CAacDecoder_InitRenderer(HANDLE_AACDECODER self, const 
       }
 
       /* Sanity check for the current implementation of the FormatConverter: Input channels */
-      if (self->pFormatConverter[streamIndex]->numSignalsTotal >
-          FDK_FORMAT_CONVERTER_MAX_INPUT_CHANNELS) {
+      if (self->pFormatConverter[0]->numSignalsTotal > FDK_FORMAT_CONVERTER_MAX_INPUT_CHANNELS) {
         err = AAC_DEC_UNSUPPORTED_CHANNELCONFIG;
         goto bail;
       }
 
-      IIS_FormatConverter_Config_SetAES(self->pFormatConverter[streamIndex], aes);
-      IIS_FormatConverter_Config_SetPAS(self->pFormatConverter[streamIndex], pas);
+      if (streamIndex == 0) {
+        IIS_FormatConverter_Config_SetAES(self->pFormatConverter[0], aes);
+        IIS_FormatConverter_Config_SetPAS(self->pFormatConverter[0], pas);
+      }
 
       INT error;
       /* Open Format converter: This will generate the downmix matrix, EQs ... */
-      error = IIS_FormatConverter_Open(self->pFormatConverter[streamIndex], (INT*)p_buffer,
-                                       sizeof(INT) * (24) * (1024 * 3));
-      if (error) {
-        err = AAC_DEC_OUT_OF_MEMORY;
-        goto bail;
-      }
+      if (isLastSubstream) {
+        error = IIS_FormatConverter_Open(self->pFormatConverter[0], (INT*)p_buffer,
+                                         sizeof(INT) * (24) * (1024 * 3));
+        if (error) {
+          err = AAC_DEC_OUT_OF_MEMORY;
+          goto bail;
+        }
 
-      /* Applying the decoded downmix matrix and EQs for each signal group */
-      error = applyDownmixMatrixPerSignalGroup(
-          (IIS_FORMATCONVERTER_INTERNAL_HANDLE)(self->pFormatConverter[streamIndex])->member, self,
-          self->pUsacConfig[streamIndex], p_buffer);
-      if (error) {
-        err = AAC_DEC_OUT_OF_MEMORY;
-        goto bail;
+        /* Applying the decoded downmix matrix and EQs for each signal group */
+        error = applyDownmixMatrixPerSignalGroup(
+            (IIS_FORMATCONVERTER_INTERNAL_HANDLE)(self->pFormatConverter[0])->member, self,
+            self->pUsacConfig[streamIndex], p_buffer, aacChannelOffsetIdx);
+        if (error) {
+          err = AAC_DEC_OUT_OF_MEMORY;
+          goto bail;
+        }
       }
     }
 
@@ -932,7 +993,17 @@ static AAC_DECODER_ERROR CAacDecoder_InitRenderer(HANDLE_AACDECODER self, const 
 
       /* Account signal groups of previous substreams */
       for (int i = 0; i < streamIndex; i++) {
-        objGrpCntOffset += self->numObjSignalGroups[i];
+        for (int objectGroup_count = 0;
+             objectGroup_count < (int)self->pUsacConfig[i]->objNumSignalGroups;
+             objectGroup_count++) {
+          int grpIdx = self->pUsacConfig[i]->objSignalGroupsIndices[objectGroup_count];
+
+          if (!getOnOffFlag(
+                  self, self->pUsacConfig[i]->m_signalGroupType[grpIdx].firstSigIdx + signalsIdx)) {
+            continue;
+          }
+          objGrpCntOffset++;
+        }
         signalsIdx += self->pUsacConfig[i]->m_nUsacChannels;
       }
 
@@ -944,6 +1015,9 @@ static AAC_DECODER_ERROR CAacDecoder_InitRenderer(HANDLE_AACDECODER self, const 
 
           /* Skip signal groups that are not active. */
           if (!getOnOffFlag(self, signalsIdx)) {
+            if (IS_CHANNEL_ELEMENT(self->elements[el])) {
+              signalsIdx += (self->elements[el] == ID_USAC_CPE) ? 2 : 1;
+            }
             continue;
           }
 
@@ -995,120 +1069,145 @@ bail:
 }
 
 /* Revert CAacDecoder_Init() */
-static void CAacDecoder_DeInit(HANDLE_AACDECODER self, const int subStreamIndex) {
+static void CAacDecoder_DeInit(HANDLE_AACDECODER self, const int subStreamIndex,
+                               const UCHAR configMode) {
   int ch;
-  int aacChannelOffset = 0, aacChannels = (28);
-  int numElements = (3 * ((28) * 2) + (((28) * 2)) / 2 + 4 * (1) + 1), elementOffset = 0;
 
   if (self == NULL) return;
 
+#if TPDEC_MAX_TRACKS == 1
   {
     self->ascChannels[0] = 0;
     self->numUsacElements[0] = 0;
     self->elements[0] = ID_END;
   }
+#endif
 
-  for (ch = aacChannelOffset; ch < aacChannelOffset + aacChannels; ch++) {
-    if (self->pAacDecoderChannelInfo[ch] != NULL) {
-      if (self->pAacDecoderChannelInfo[ch]->pDynData != NULL) {
-        FDKfree(self->pAacDecoderChannelInfo[ch]->pDynData);
-      }
-      if (self->pAacDecoderChannelInfo[ch]->pComStaticData != NULL) {
-        if (self->pAacDecoderChannelInfo[ch]->pComStaticData->pWorkBufferCore1 != NULL) {
-          if (ch == aacChannelOffset) {
-            FreeWorkBufferCore1(
-                &self->pAacDecoderChannelInfo[ch]->pComStaticData->pWorkBufferCore1);
+  if (subStreamIndex == 0) {
+    for (ch = 0; ch < (28); ch++) {
+      if (self->pAacDecoderChannelInfo[ch] != NULL) {
+        if (self->pAacDecoderChannelInfo[ch]->pDynData != NULL) {
+          FDKfree(self->pAacDecoderChannelInfo[ch]->pDynData);
+        }
+        if (self->pAacDecoderChannelInfo[ch]->pComStaticData != NULL) {
+          if (self->pAacDecoderChannelInfo[ch]->pComStaticData->pWorkBufferCore1 != NULL) {
+            if (ch == 0) {
+              FreeWorkBufferCore1(
+                  &self->pAacDecoderChannelInfo[ch]->pComStaticData->pWorkBufferCore1);
+            }
           }
-        }
-        if (self->pAacDecoderChannelInfo[ch]->pComStaticData->cplxPredictionData != NULL) {
-          FreeCplxPredictionData(
-              &self->pAacDecoderChannelInfo[ch]->pComStaticData->cplxPredictionData);
-        }
-        /* Avoid double free of linked pComStaticData in case of CPE by settings pointer to NULL. */
-        if (ch < (28) - 1) {
-          if ((self->pAacDecoderChannelInfo[ch + 1] != NULL) &&
-              (self->pAacDecoderChannelInfo[ch + 1]->pComStaticData ==
-               self->pAacDecoderChannelInfo[ch]->pComStaticData)) {
-            self->pAacDecoderChannelInfo[ch + 1]->pComStaticData = NULL;
+          if (self->pAacDecoderChannelInfo[ch]->pComStaticData->cplxPredictionData != NULL) {
+            FreeCplxPredictionData(
+                &self->pAacDecoderChannelInfo[ch]->pComStaticData->cplxPredictionData);
           }
-        }
-        FDKfree(self->pAacDecoderChannelInfo[ch]->pComStaticData);
-        self->pAacDecoderChannelInfo[ch]->pComStaticData = NULL;
-      }
-      if (self->pAacDecoderChannelInfo[ch]->pComData != NULL) {
-        if (self->pAacDecoderChannelInfo[ch]->pComData->pJointStereoData != NULL) {
-          FDKfree(self->pAacDecoderChannelInfo[ch]->pComData->pJointStereoData);
-        }
-        /* Avoid double free of linked pComData in case of CPE by settings pointer to NULL. */
-        if (ch < (28) - 1) {
-          if ((self->pAacDecoderChannelInfo[ch + 1] != NULL) &&
-              (self->pAacDecoderChannelInfo[ch + 1]->pComData ==
-               self->pAacDecoderChannelInfo[ch]->pComData)) {
-            self->pAacDecoderChannelInfo[ch + 1]->pComData = NULL;
+          /* Avoid double free of linked pComStaticData in case of CPE by settings pointer to NULL.
+           */
+          if (ch < (28) - 1) {
+            if ((self->pAacDecoderChannelInfo[ch + 1] != NULL) &&
+                (self->pAacDecoderChannelInfo[ch + 1]->pComStaticData ==
+                 self->pAacDecoderChannelInfo[ch]->pComStaticData)) {
+              self->pAacDecoderChannelInfo[ch + 1]->pComStaticData = NULL;
+            }
           }
+          if (self->pAacDecoderChannelInfo[ch]->pComStaticData->pJointStereoData != NULL) {
+            FDKfree(self->pAacDecoderChannelInfo[ch]->pComStaticData->pJointStereoData);
+          }
+          FDKfree(self->pAacDecoderChannelInfo[ch]->pComStaticData);
+          self->pAacDecoderChannelInfo[ch]->pComStaticData = NULL;
         }
-        if (ch == aacChannelOffset) {
-          FreeWorkBufferCore6((FIXP_DBL**)&self->pAacDecoderChannelInfo[ch]->pComData);
-        } else {
-          FDKafree(self->pAacDecoderChannelInfo[ch]->pComData);
+        if (self->pAacDecoderChannelInfo[ch]->pComData != NULL) {
+          /* Avoid double free of linked pComData in case of CPE by settings pointer to NULL. */
+          if (ch < (28) - 1) {
+            if ((self->pAacDecoderChannelInfo[ch + 1] != NULL) &&
+                (self->pAacDecoderChannelInfo[ch + 1]->pComData ==
+                 self->pAacDecoderChannelInfo[ch]->pComData)) {
+              self->pAacDecoderChannelInfo[ch + 1]->pComData = NULL;
+            }
+          }
+          if (ch == 0) {
+            FreeWorkBufferCore6((FIXP_DBL**)&self->pAacDecoderChannelInfo[ch]->pComData);
+          } else {
+            FDKafree(self->pAacDecoderChannelInfo[ch]->pComData);
+          }
+          self->pAacDecoderChannelInfo[ch]->pComData = NULL;
         }
-        self->pAacDecoderChannelInfo[ch]->pComData = NULL;
+      }
+      if (self->pAacDecoderStaticChannelInfo[ch] != NULL) {
+        if (self->pAacDecoderStaticChannelInfo[ch]->concealmentInfo.spectralCoefficient != NULL) {
+          FreeConcealmentSpecBuffer(
+              &self->pAacDecoderStaticChannelInfo[ch]->concealmentInfo.spectralCoefficient);
+        }
+        if (self->pAacDecoderStaticChannelInfo[ch]->pOverlapBuffer != NULL) {
+          FreeOverlapBuffer(&self->pAacDecoderStaticChannelInfo[ch]->pOverlapBuffer);
+        }
+        if (self->pAacDecoderStaticChannelInfo[ch]->hArCo != NULL) {
+          CArco_Destroy(self->pAacDecoderStaticChannelInfo[ch]->hArCo);
+        }
+        FreeAacDecoderStaticChannelInfo(&self->pAacDecoderStaticChannelInfo[ch]);
+      }
+      if (self->pAacDecoderChannelInfo[ch] != NULL) {
+        FreeAacDecoderChannelInfo(&self->pAacDecoderChannelInfo[ch]);
       }
     }
-    if (self->pAacDecoderStaticChannelInfo[ch] != NULL) {
-      if (self->pAacDecoderStaticChannelInfo[ch]->concealmentInfo.spectralCoefficient != NULL) {
-        FreeConcealmentSpecBuffer(
-            &self->pAacDecoderStaticChannelInfo[ch]->concealmentInfo.spectralCoefficient);
-      }
-      if (self->pAacDecoderStaticChannelInfo[ch]->pOverlapBuffer != NULL) {
-        FreeOverlapBuffer(&self->pAacDecoderStaticChannelInfo[ch]->pOverlapBuffer);
-      }
-      if (self->pAacDecoderStaticChannelInfo[ch]->hArCo != NULL) {
-        CArco_Destroy(self->pAacDecoderStaticChannelInfo[ch]->hArCo);
-      }
-      FreeAacDecoderStaticChannelInfo(&self->pAacDecoderStaticChannelInfo[ch]);
-    }
-    if (self->pAacDecoderChannelInfo[ch] != NULL) {
-      FreeAacDecoderChannelInfo(&self->pAacDecoderChannelInfo[ch]);
-    }
-  }
 
-  {
-    int el;
-    for (el = elementOffset; el < elementOffset + numElements; el++) {
-      if (self->cpeStaticData[el] != NULL) {
-        FreeCpePersistentData(&self->cpeStaticData[el]);
+    {
+      int el;
+      for (el = 0; el < (3 * ((28) * 2) + (((28) * 2)) / 2 + 4 * (1) + 1); el++) {
+        if (self->cpeStaticData[el] != NULL) {
+          FreeCpePersistentData(&self->cpeStaticData[el]);
+        }
       }
     }
-  }
 
-  if (self->flags[subStreamIndex] & AC_MPEGH3DA) {
-    for (int grp = 0; grp < TP_MPEGH_MAX_SIGNAL_GROUPS; grp++) {
-      if (self->pMCTdec[grp]) {
-        CMct_Destroy(self->pMCTdec[grp]);
-        self->pMCTdec[grp] = NULL;
+    if (self->flags[subStreamIndex] & AC_MPEGH3DA) {
+      for (int grp = 0; grp < TP_MPEGH_MAX_SIGNAL_GROUPS; grp++) {
+        if (self->pMCTdec[grp]) {
+          CMct_Destroy(self->pMCTdec[grp]);
+          self->pMCTdec[grp] = NULL;
+        }
       }
     }
-  }
 
-  if (self->multibandDrcPresent) {
     for (ch = 0; ch < ((28) * 2); ch++) {
       StftFilterbank_Close(&(self->stftFilterbankAnalysis[ch]));
-    }
-    for (ch = 0; ch < ((28) * 2); ch++) {
       StftFilterbank_Close(&(self->stftFilterbankSynthesis[ch]));
     }
+
+    if (self->flags[subStreamIndex] & AC_MPEGH3DA) {
+      CAacDecoder_DeInitRenderer(self, subStreamIndex);
+    }
   }
 
-  if (self->flags[subStreamIndex] & AC_MPEGH3DA) {
-    CAacDecoder_DeInitRenderer(self, subStreamIndex);
-  }
+  if (subStreamIndex == 0) {
+    self->aacChannels = 0;
+    self->streamInfo.aacSampleRate = 0;
+    self->streamInfo.sampleRate = 0;
+    self->streamInfo.sampleRateBeforeRs = 0;
+    /* This samplerate value is checked for configuration change, not the others above. */
+    self->samplingRateInfo[subStreamIndex].samplingRate = 0;
 
-  self->aacChannels = 0;
-  self->streamInfo.aacSampleRate = 0;
-  self->streamInfo.sampleRate = 0;
-  /* This samplerate value is checked for configuration change, not the others above. */
-  self->samplingRateInfo[subStreamIndex].samplingRate = 0;
+    for (int i = 1; i < TPDEC_MAX_TRACKS; i++) {
+      self->numUsacElements[i] = 0;
+      self->allocChannels[i] = 0;
+      self->flags[i] = 0;
+      self->pUsacConfig[i] = NULL;
+    }
+  } else {
+    self->aacChannels -= self->allocChannels[subStreamIndex];
+
+    if (configMode & 0x08) {
+      self->numUsacElements[subStreamIndex] = 0;
+      self->allocChannels[subStreamIndex] = 0;
+      self->flags[subStreamIndex] = 0;
+      self->pUsacConfig[subStreamIndex] = NULL;
+
+      int elementOffset = 0;
+      for (int i = 0; i < subStreamIndex; i++) {
+        elementOffset += self->numUsacElements[i];
+      }
+      self->elements[elementOffset] = ID_END;
+    }
+  }
 }
 
 /*!
@@ -1169,11 +1268,11 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_CtrlCFGChange(HANDLE_AACDECODER self,
  *
  * \return error
  */
-LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_FreeMem(HANDLE_AACDECODER self,
-                                                   const int subStreamIndex) {
+LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_FreeMem(HANDLE_AACDECODER self, const int subStreamIndex,
+                                                   const UCHAR configMode) {
   AAC_DECODER_ERROR err = AAC_DEC_OK;
 
-  CAacDecoder_DeInit(self, subStreamIndex);
+  CAacDecoder_DeInit(self, subStreamIndex, configMode);
 
   return (err);
 }
@@ -1182,9 +1281,8 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_FreeMem(HANDLE_AACDECODER self,
 LINKSPEC_CPP void CAacDecoder_Close(HANDLE_AACDECODER self) {
   if (self == NULL) return;
 
-  for (int i = 0; i < TPDEC_MAX_TRACKS; i++) {
-    CAacDecoder_DeInit(self, i);
-  }
+  /* Substream 0 needs to be the last. */
+  CAacDecoder_DeInit(self, 0, 0);
 
   /* Free WorkBufferCore2 */
   if (self->workBufferCore2 != NULL) {
@@ -1294,7 +1392,8 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
   if (asc->m_aot == AOT_MPEGH3DA) {
     updateOnOffFlags(self);
     for (int i = 0; i < streamIndex; i++) {
-      if (self->pUsacConfig[i] == NULL) {
+      if (self->pUsacConfig[i] == NULL ||
+          (self->allocChannels[i] == 0 && (configMode & AC_CM_ALLOC_MEM))) {
         /* Its not possible to allocate sub streams before a main stream has been allocated. */
         return AAC_DEC_UNSUPPORTED_FORMAT;
       }
@@ -1320,7 +1419,9 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
       /* Check max signal count for channels and objects. */
       int n_other = 0, n_obj = 0;
 
-      for (int sb = 0; sb < streamIndex - 1; sb++) {
+      for (int sb = 0; sb < TPDEC_MAX_TRACKS; sb++) {
+        if (!self->pUsacConfig[sb]) continue;
+
         for (int sg = 0; sg < self->pUsacConfig[sb]->bsNumSignalGroups; sg++) {
           int n_sig;
 
@@ -1332,16 +1433,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
           }
         }
       }
-      for (int sg = 0; sg < asc->m_sc.m_usacConfig.bsNumSignalGroups; sg++) {
-        int n_sig;
 
-        n_sig = asc->m_sc.m_usacConfig.m_signalGroupType[sg].count;
-        if (asc->m_sc.m_usacConfig.m_signalGroupType[sg].type == 1) {
-          n_obj += n_sig;
-        } else {
-          n_other += n_sig;
-        }
-      }
       if ((n_other == 0 && n_obj > 24) || ((n_other > 0) && ((n_obj + n_other) > 16))) {
         if (n_obj + n_other > ((28) * 2)) {
           return AAC_DEC_UNSUPPORTED_CHANNELCONFIG;
@@ -1420,7 +1512,11 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
             asc->m_sc.m_usacConfig.element[0].extElement.usacExtElementHasAudioPreRoll;
       }
       if (configMode & AC_CM_ALLOC_MEM) {
-        self->elements[elementOffset + self->pUsacConfig[streamIndex]->m_usacNumElements] = ID_END;
+        int numElements = 0;
+        for (int i = 0; i < TPDEC_MAX_TRACKS; i++) {
+          numElements += self->numUsacElements[i];
+        }
+        self->elements[numElements] = ID_END;
       }
     }
 
@@ -1428,10 +1524,8 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
       const CSUsacConfig* usc = &(asc->m_sc.m_usacConfig);
       int i = aacChannelsOffsetIdx, j, shift;
 
-      if (streamIndex == 0) {
-        for (int ch = 0; ch < ((28) * 2); ch++) {
-          self->chMapping[ch] = 255;
-        }
+      for (int ch = 0; ch < usc->m_nUsacChannels; ch++) {
+        self->chMapping[aacChannelsOffsetIdx + ch] = 255;
       }
 
       for (int _el = 0; _el < (INT)usc->m_usacNumElements; _el++) {
@@ -1485,7 +1579,12 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
     }
   }
 
-  self->streamInfo.channelConfig = asc->m_channelConfiguration;
+  if (self->streamInfo.channelConfig != asc->m_channelConfiguration) {
+    if (configMode & AC_CM_ALLOC_MEM) {
+      self->streamInfo.channelConfig = asc->m_channelConfiguration;
+    }
+    ascChanged = 1;
+  }
 
   if (self->streamInfo.aot != asc->m_aot) {
     if (configMode & AC_CM_ALLOC_MEM) {
@@ -1643,7 +1742,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
               if (self->pAacDecoderChannelInfo[ch]->pComStaticData == NULL) {
                 goto bail;
               }
-              if (ch == aacChannelsOffset) {
+              if (ch == 0) {
                 self->pAacDecoderChannelInfo[ch]->pComData =
                     (CAacDecoderCommonData*)GetWorkBufferCore6();
                 self->pAacDecoderChannelInfo[ch]->pComStaticData->pWorkBufferCore1 =
@@ -1652,21 +1751,21 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
                 self->pAacDecoderChannelInfo[ch]->pComData = (CAacDecoderCommonData*)FDKaalloc(
                     sizeof(CAacDecoderCommonData), ALIGNMENT_DEFAULT);
                 self->pAacDecoderChannelInfo[ch]->pComStaticData->pWorkBufferCore1 =
-                    self->pAacDecoderChannelInfo[aacChannelsOffset]
-                        ->pComStaticData->pWorkBufferCore1;
+                    self->pAacDecoderChannelInfo[0]->pComStaticData->pWorkBufferCore1;
               }
               if ((self->pAacDecoderChannelInfo[ch]->pComData == NULL) ||
                   (self->pAacDecoderChannelInfo[ch]->pComStaticData->pWorkBufferCore1 == NULL)) {
                 goto bail;
               }
               if (el_channels == 2) {
-                self->pAacDecoderChannelInfo[ch]->pComData->pJointStereoData =
+                self->pAacDecoderChannelInfo[ch]->pComStaticData->pJointStereoData =
                     (CJointStereoData*)FDKmalloc(sizeof(CJointStereoData));
-                if (self->pAacDecoderChannelInfo[ch]->pComData->pJointStereoData == NULL) {
+                if (self->pAacDecoderChannelInfo[ch]->pComStaticData->pJointStereoData == NULL) {
                   goto bail;
                 }
               } else { /* memory required only for CPEs */
-                FDK_ASSERT(self->pAacDecoderChannelInfo[ch]->pComData->pJointStereoData == NULL);
+                FDK_ASSERT(self->pAacDecoderChannelInfo[ch]->pComStaticData->pJointStereoData ==
+                           NULL);
               }
 
               self->pAacDecoderChannelInfo[ch]->pSpectralCoefficient =
@@ -1695,22 +1794,28 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
             break;
 
           case ID_USAC_EXT:
-            if (self->pUsacConfig[streamIndex]->element[el].extElement.usacExtElementType ==
+            if (self->pUsacConfig[streamIndex]->element[_el].extElement.usacExtElementType ==
                 ID_EXT_ELE_MCT) {
               if (getOnOffFlag(self, chIdx)) {
-                int grp = self->pUsacConfig[streamIndex]->sigIdx2GrpIdx[chIdx];
+                int grp =
+                    self->pUsacConfig[streamIndex]->sigIdx2GrpIdx[chIdx - aacChannelsOffsetIdx];
                 int mctErr = 0;
                 int firstSigIdx = 0;
                 int signalsInGroup = self->pUsacConfig[streamIndex]->m_signalGroupType[grp].count;
+                int prevSignalGroups = 0;
 
                 for (int i = 0;
                      i < self->pUsacConfig[streamIndex]->m_signalGroupType[grp].firstSigIdx; i++) {
                   if (getOnOffFlag(self, i)) firstSigIdx++;
                 }
 
-                mctErr = CMct_Initialize(&self->pMCTdec[grp],
+                for (int s = 0; s < streamIndex; s++) {
+                  prevSignalGroups += self->pUsacConfig[s]->bsNumSignalGroups;
+                }
+
+                mctErr = CMct_Initialize(&self->pMCTdec[grp + prevSignalGroups],
                                          self->pUsacConfig[streamIndex]
-                                             ->element[el]
+                                             ->element[_el]
                                              .extElement.extConfig.mct.mctChanMask,
                                          firstSigIdx, signalsInGroup);
                 if (mctErr != 0) {
@@ -1857,7 +1962,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
       }
 
       /* Make allocated channel count persistent in decoder context. */
-      self->aacChannels = ch;
+      self->aacChannels = fMax(ch, self->aacChannels);
       self->allocChannels[streamIndex] = ch - aacChannelsOffset;
     }
 
@@ -1867,6 +1972,10 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
        accesses in the error concealment module and the allocated channel structures in this
        function. */
     self->aacChannelsPrev = 0;
+    /* Init channel element list with escape value. */
+    for (UINT i = 0; i < sizeof(self->channel_elements) / sizeof(*self->channel_elements); i++) {
+      self->channel_elements[i] = ID_END;
+    }
   }
 
   self->truncateFrameSize = (1024 * 48000) / self->samplingRateInfo[0].samplingRate;
@@ -1939,10 +2048,16 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
     stftFilterbankConfigSynthesis.frameSize = self->stftFrameSize;
     stftFilterbankConfigSynthesis.fftSize = 2 * self->stftFrameSize;
     stftFilterbankConfigSynthesis.stftFilterbankMode = STFT_FILTERBANK_MODE_FREQ_TO_TIME;
+    int transportPrevChannel = 0, grpPrev = 0;
+
+    for (int s = 0; s < streamIndex; s++) {
+      transportPrevChannel += self->pUsacConfig[s]->m_nUsacChannels;
+      grpPrev += self->pUsacConfig[s]->bsNumSignalGroups;
+    }
 
     for (grp = 0; grp < self->pUsacConfig[streamIndex]->bsNumSignalGroups; grp++) {
       int transportStartChannel =
-          self->pUsacConfig[streamIndex]->m_signalGroupType[grp].firstSigIdx;
+          transportPrevChannel + self->pUsacConfig[streamIndex]->m_signalGroupType[grp].firstSigIdx;
       int transportNumChannels = self->pUsacConfig[streamIndex]->m_signalGroupType[grp].count;
 
       for (int ch = 0; ch < transportNumChannels; ch++) {
@@ -1959,7 +2074,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
           goto bail;
         }
       }
-      self->STFT_headroom_prescaling[grp] = 0;
+      self->STFT_headroom_prescaling[grp + grpPrev] = 0;
     }
   }
 
@@ -1972,7 +2087,8 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
     if (asc->m_aot == AOT_MPEGH3DA) {
       err = CAacDecoder_InitRenderer(
           self, self->pUsacConfig[streamIndex], self->samplingRateInfo[streamIndex].samplingRate,
-          self->streamInfo.aacSamplesPerFrame, elementOffset, self->workBufferCore2);
+          self->streamInfo.aacSamplesPerFrame, elementOffset, self->workBufferCore2,
+          aacChannelsOffsetIdx, configMode & AC_CM_LAST_SUBSTREAM);
       if (err != AAC_DEC_OK) {
         goto bail;
       }
@@ -1987,7 +2103,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_Init(HANDLE_AACDECODER self,
   return err;
 
 bail:
-  CAacDecoder_DeInit(self, streamIndex);
+  CAacDecoder_DeInit(self, streamIndex, 0);
   return AAC_DEC_OUT_OF_MEMORY;
 }
 
@@ -2179,7 +2295,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
             }
 
             int ch = aacChannels;
-            for (int chIdx = aacChannels; chIdx < self->ascChannels[streamIndex]; chIdx++) {
+            for (int chIdx = aacChannelsIdx; chIdx < self->ascChannels[streamIndex]; chIdx++) {
               if (getOnOffFlag(self, chIdx)) {
                 /* Robustness check */
                 if (ch >= self->aacChannels) {
@@ -2204,7 +2320,10 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
         el_channels = CAacDecoder_GetELChannels(type);
 
         if (el_channels > 0) {
-          self->channel_elements[channel_element_count++] = type;
+          if (self->aacChannelsPrev == 0) {
+            self->channel_elements[channel_element_count] = type;
+          }
+          channel_element_count++;
         }
         aacChannels += el_channels;
         aacChannelsIdx += el_channels;
@@ -2277,6 +2396,13 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
           }
         }
 
+        if ((self->aacChannelsPrev > 0) &&
+            (type != self->channel_elements[channel_element_count])) {
+          ErrorStatus = AAC_DEC_PARSE_ERROR;
+          self->frameOK = 0;
+          break;
+        }
+
         if (self->frameOK) {
           ErrorStatus = CChannelElement_Read(
               bs, &self->pAacDecoderChannelInfo[aacChannels],
@@ -2296,7 +2422,10 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
                   self->pAacDecoderChannelInfo[aacChannels]->ElementInstanceTag, aacChannels,
                   self->chMapping, self->channelType, self->channelIndices, (28),
                   &previous_element_index, self->elements, type)) {
-            self->channel_elements[channel_element_count++] = type;
+            if (self->aacChannelsPrev == 0) {
+              self->channel_elements[channel_element_count] = type;
+            }
+            channel_element_count++;
             aacChannels += el_channels;
             aacChannelsIdx += el_channels;
           } else {
@@ -2358,43 +2487,42 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
                 if (self->targetLayout_config > -1) {
                   const OAMCONFIG* oam;
                   int objectMetadataParseError;
-                  int objectGroup_count, objectGroup_index = 0;
+                  int gvbapIdx = 0, objectOn = 0, sigCount = 0;
 
-                  for (objectGroup_count = 0;
-                       objectGroup_count < (int)self->pUsacConfig[streamIndex]->objNumSignalGroups;
-                       objectGroup_count++) {
-                    int grpIdx =
-                        self->pUsacConfig[streamIndex]->objSignalGroupsIndices[objectGroup_count];
+                  for (int s = 0; s <= streamIndex; s++) {
+                    for (int grpIdx = 0; grpIdx < (int)self->pUsacConfig[s]->bsNumSignalGroups;
+                         grpIdx++) {
+                      if (self->pUsacConfig[s]->m_signalGroupType[grpIdx].type == 1) {
+                        int sigIdx = self->pUsacConfig[s]->m_signalGroupType[grpIdx].firstSigIdx;
+                        objectOn = getOnOffFlag(self, sigIdx);
 
-                    if (!getOnOffFlag(self, self->pUsacConfig[streamIndex]
-                                                ->m_signalGroupType[grpIdx]
-                                                .firstSigIdx)) {
-                      continue;
+                        if (aacChannelsIdx == sigCount) {
+                          s = streamIndex + 1;
+                          break;
+                        }
+
+                        if (objectOn) gvbapIdx++;
+                      }
+
+                      sigCount += self->pUsacConfig[s]->m_signalGroupType[grpIdx].count;
                     }
-                    if (grpIdx == self->pUsacConfig[streamIndex]->sigIdx2GrpIdx[aacChannelsIdx])
-                      break;
-                    objectGroup_index++;
                   }
 
                   /* FDK_ASSERT(objectGroup_count < (int)self->pUsacConfig->objNumSignalGroups); */
-                  if (objectGroup_count >=
-                          (int)self->pUsacConfig[streamIndex]->objNumSignalGroups &&
-                      self->hgVBAPRenderer[objectGroup_index] !=
-                          NULL) /* Check amount of objectGroups counted */
+                  if (sigCount > aacChannelsIdx) /* Check amount of objectGroups counted */
                   {
                     ErrorStatus = AAC_DEC_PARSE_ERROR;
                     self->frameOK = 0;
                     break;
                   }
 
-                  if (self->hgVBAPRenderer[objectGroup_index] != NULL) {
+                  if (objectOn && self->hgVBAPRenderer[gvbapIdx] != NULL) {
                     oam = &self->pUsacConfig[streamIndex]
                                ->element[element_count - element_count_prev_streams]
                                .extElement.extConfig.oam;
                     objectMetadataParseError = objectMetadataFrame(
-                        self->hgVBAPRenderer[objectGroup_index], bs, usacExtElementPayloadLength,
-                        oam->lowDelayMetadataCoding,
-                        self->hgVBAPRenderer[objectGroup_index]->numObjects,
+                        self->hgVBAPRenderer[gvbapIdx], bs, usacExtElementPayloadLength,
+                        oam->lowDelayMetadataCoding, self->hgVBAPRenderer[gvbapIdx]->numObjects,
                         oam->hasDynamicObjectPriority, oam->hasUniformSpread);
                     if (objectMetadataParseError != 0) {
                       ErrorStatus = AAC_DEC_PARSE_ERROR;
@@ -2407,6 +2535,26 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
               case ID_EXT_ELE_PROD_METADATA:
                 if (self->targetLayout_config > -1) {
                   int sigGrp, objGrp = 0, gvbapIdx = 0;
+                  int sigCount = 0;
+
+                  for (int s = 0; s < streamIndex; s++) {
+                    for (int grpIdx = 0; grpIdx < (int)self->pUsacConfig[s]->bsNumSignalGroups;
+                         grpIdx++) {
+                      sigCount += self->pUsacConfig[s]->m_signalGroupType[grpIdx].count;
+
+                      if (self->pUsacConfig[s]->m_signalGroupType[grpIdx].type == 1) {
+                        int sigIdx = self->pUsacConfig[s]->m_signalGroupType[grpIdx].firstSigIdx;
+                        if (getOnOffFlag(self, sigIdx)) gvbapIdx++;
+                      }
+                    }
+                  }
+                  /* FDK_ASSERT(objectGroup_count < (int)self->pUsacConfig->objNumSignalGroups); */
+                  if (sigCount > aacChannelsIdx) /* Check amount of objectGroups counted */
+                  {
+                    ErrorStatus = AAC_DEC_PARSE_ERROR;
+                    self->frameOK = 0;
+                    break;
+                  }
 
                   for (sigGrp = 0; sigGrp < self->pUsacConfig[streamIndex]->bsNumSignalGroups;
                        sigGrp++) {
@@ -2423,8 +2571,9 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
                       INT err;
 
                       if (getOnOffFlag(self, self->pUsacConfig[streamIndex]
-                                                 ->m_signalGroupType[sigGrp]
-                                                 .firstSigIdx)) {
+                                                     ->m_signalGroupType[sigGrp]
+                                                     .firstSigIdx +
+                                                 aacChannelsIdx)) {
                         if (self->hgVBAPRenderer[gvbapIdx] != NULL) {
                           err = prodMetadataFrameGroup(self->hgVBAPRenderer[gvbapIdx], bs,
                                                        self->hgVBAPRenderer[gvbapIdx]->numObjects,
@@ -2454,16 +2603,22 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
               case ID_EXT_ELE_MCT: {
                 int mctErr;
                 int grp = self->pUsacConfig[streamIndex]->sigIdx2GrpIdx[aacChannelsIdx];
+                int prevSignalGroups = 0;
 
-                if (self->pMCTdec[grp]) {
+                for (int s = 0; s < streamIndex; s++) {
+                  prevSignalGroups += self->pUsacConfig[s]->bsNumSignalGroups;
+                }
+
+                if (self->pMCTdec[grp + prevSignalGroups]) {
                   /* Store initial value for counting bits */
                   int bits = (int)FDKgetValidBits(bs);
 
                   mctErr = CMct_inverseMctParseBS(
-                      self->pMCTdec[grp], bs, self->flags[streamIndex] & AC_INDEP,
+                      self->pMCTdec[grp + prevSignalGroups], bs,
+                      self->flags[streamIndex] & AC_INDEP,
                       self->pUsacConfig[streamIndex]->m_signalGroupType[grp].count);
 
-                  self->pMCTdec[grp]->Mct_group_parsed = 1;
+                  self->pMCTdec[grp + prevSignalGroups]->Mct_group_parsed = 1;
 
                   /*Find bits consumed */
                   int bits_left = bits - (int)FDKgetValidBits(bs);
@@ -2480,8 +2635,8 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
                 }
               } break;
               case ID_EXT_ELE_FMT_CNVRTR: /* FormatConverterFrame() */
-                if (self->pFormatConverter[streamIndex] != NULL) {
-                  FormatConverterFrame(self->pFormatConverter[streamIndex], bs);
+                if (streamIndex == 0 && self->pFormatConverter[0] != NULL) {
+                  FormatConverterFrame(self->pFormatConverter[0], bs);
                 }
                 break;
               case ID_EXT_ELE_UNI_DRC: /* uniDrcGain() */
@@ -2597,39 +2752,63 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
     streamIndex = 0;
 
     /* MCT */
-    if (self->flags[streamIndex] & AC_MPEGH3DA) {
-      for (int grp = 0; grp < self->pUsacConfig[streamIndex]->bsNumSignalGroups; grp++) {
-        if (self->pMCTdec[grp]) {
-          if ((self->frameOK) && (self->pMCTdec[grp]->Mct_group_parsed)) {
-            int err = 0;
+    {
+      int channelOffset = 0, prevSignalGroups = 0;
 
-            err = CMct_MCT_StereoFilling(
-                self->pMCTdec[grp], &self->streamInfo, self->pAacDecoderChannelInfo,
-                self->pAacDecoderStaticChannelInfo, &self->samplingRateInfo[streamIndex],
-                MCT_elFlags, (self->flags[streamIndex] & AC_INDEP) ? 1 : 0);
-            if (err) {
-              self->frameOK = 0;
-              break;
-            }
+      for (streamIndex = 0; streamIndex < TPDEC_MAX_TRACKS; streamIndex++) {
+        if (self->flags[streamIndex] & AC_MPEGH3DA) {
+          for (int grp = prevSignalGroups;
+               grp < prevSignalGroups + self->pUsacConfig[streamIndex]->bsNumSignalGroups; grp++) {
+            if (self->pMCTdec[grp]) {
+              if ((self->frameOK) && (self->pMCTdec[grp]->Mct_group_parsed)) {
+                int err = 0;
 
-            /* Save MCT output spectra for usage in the next frame stereo filling calculations */
-            CMct_StereoFilling_save_prev(self->pMCTdec[grp], self->pAacDecoderChannelInfo);
-          } else {
-            /* Clear MCT output spectra if frame not ok */
-            CMct_StereoFilling_clear_prev(self->pMCTdec[grp], self->pAacDecoderChannelInfo);
-          }
+                err = CMct_MCT_StereoFilling(self->pMCTdec[grp], &self->streamInfo,
+                                             self->pAacDecoderChannelInfo + channelOffset,
+                                             self->pAacDecoderStaticChannelInfo + channelOffset,
+                                             &self->samplingRateInfo[streamIndex],
+                                             MCT_elFlags + channelOffset,
+                                             (self->flags[streamIndex] & AC_INDEP) ? 1 : 0);
+                if (err) {
+                  self->frameOK = 0;
+                  break;
+                }
 
-          self->pMCTdec[grp]->Mct_group_parsed = 0;
+                /* Save MCT output spectra for usage in the next frame stereo filling calculations
+                 */
+                CMct_StereoFilling_save_prev(self->pMCTdec[grp],
+                                             self->pAacDecoderChannelInfo + channelOffset);
+              } else {
+                /* Clear MCT output spectra if frame not ok */
+                CMct_StereoFilling_clear_prev(self->pMCTdec[grp],
+                                              self->pAacDecoderChannelInfo + channelOffset);
+              }
 
-        } /* if (self->pMCTdec[grp]) */
+              self->pMCTdec[grp]->Mct_group_parsed = 0;
 
-      } /* for (int grp = 0; grp < self->pUsacConfig->bsNumSignalGroups; grp++) */
-    }   /* if (self->flags & AC_MPEGH3DA)  */
-  }
+            } /* if (self->pMCTdec[grp]) */
 
-  if (!(flags & (AACDEC_CONCEAL | AACDEC_FLUSH)) && self->frameOK) {
-    self->channel_elements[channel_element_count++] = ID_END;
-  }
+          } /* for (int grp = 0; grp < self->pUsacConfig->bsNumSignalGroups; grp++) */
+
+          prevSignalGroups += self->pUsacConfig[streamIndex]->bsNumSignalGroups;
+        } /* if (self->flags & AC_MPEGH3DA)  */
+
+        channelOffset += self->allocChannels[streamIndex];
+      }
+
+      streamIndex = 0;
+    }
+    if (self->frameOK) {
+      if (self->aacChannelsPrev == 0) {
+        self->channel_elements[channel_element_count] = ID_END;
+      } else if (self->channel_elements[channel_element_count] != ID_END) {
+        ErrorStatus = AAC_DEC_PARSE_ERROR;
+        self->frameOK = 0;
+      }
+      channel_element_count++;
+    }
+  } /* !(AACDEC_CONCEAL|AACDEC_FLUSH) */
+
   element_count = 0;
   aacChannels = 0;
   aacChannelsIdx = 0;
@@ -2638,14 +2817,6 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
 
   while (type != ID_END && element_count < (3 * ((28) * 2) + (((28) * 2)) / 2 + 4 * (1) + 1)) {
     int el_channels;
-
-    if ((flags & (AACDEC_CONCEAL | AACDEC_FLUSH)) || !self->frameOK) {
-      self->channel_elements[element_count] = self->elements[element_count];
-      if (self->channel_elements[element_count] == ID_NONE) {
-        self->channel_elements[element_count] = ID_END;
-      }
-    }
-
     /* Determine current sub stream */
     if (self->flags[streamIndex] & (AC_MPEGH3DA | AC_USAC)) {
       int numElements = 0;
@@ -2755,6 +2926,12 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(HANDLE_AACDECODER self, c
         if ((self->buildUpStatus == AACDEC_MPEGH_BUILD_UP_ON) ||
             (self->buildUpStatus == AACDEC_MPEGH_BUILD_UP_ON_IN_BAND) ||
             (self->buildUpStatus == AACDEC_USAC_BUILD_UP_ON)) {
+          UINT i = 0, n = 0;
+          do {
+            if (IS_CHANNEL_ELEMENT(self->elements[i]) || (self->elements[i] == ID_END)) {
+              self->channel_elements[n++] = self->elements[i];
+            }
+          } while (self->elements[i++] != ID_END);
           aacChannels = self->aacChannels;
           self->aacChannelsPrev = aacChannels; /* store */
         } else {

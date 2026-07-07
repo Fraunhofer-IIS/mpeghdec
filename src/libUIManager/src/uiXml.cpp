@@ -499,7 +499,7 @@ static void writePreset(HANDLE_UI_MANAGER hUiManager, int presetIdx, USHORT* sor
     writeBool(pWriter, pPreset ? (hUiManager->uiState.activePresetIndex == presetIdx) : 1);
 
     writeString(pWriter, " isDefault=");
-    writeBool(pWriter, pPreset ? (pPreset->groupPresetID == getMinPresetID(hUiManager)) : 1);
+    writeBool(pWriter, pPreset ? (pPreset->groupPresetID == getMinPresetID(hUiManager, 0)) : 1);
 
     writeString(pWriter, " isAvailable=");
     writeBool(pWriter, pPreset ? (hUiManager->uiState.groupPresets[presetIdx].isAvailable) : 1);
@@ -880,7 +880,7 @@ static void writeScene(HANDLE_UI_MANAGER hUiManager, UCHAR shortInfo) {
       writeString(pWriter, "<AudioSceneConfig uuid=");
       writeUUID(pWriter, hUiManager->uiState.uuid);
     }
-    writeString(pWriter, " version=\"11.0\"");
+    writeString(pWriter, " version=\"11.1\"");
     writeString(pWriter, " configChanged=");
     if (shortInfo == 2) { /* 2 indicates no UI available */
       writeBool(pWriter, 0);
@@ -1013,12 +1013,8 @@ UI_MANAGER_ERROR uiManagerWriteXML(HANDLE_UI_MANAGER hUiManager, char* xmlOut, U
     *flagsOut |= UI_MANAGER_CONTINUES_XML;
   }
 
-  if (hUiManager->configChanged) {
-    *flagsOut |= UI_MANAGER_SHORT_OUTPUT;
-  }
-
   {
-    UCHAR shortInfo = (*flagsOut & UI_MANAGER_SHORT_OUTPUT) != 0;
+    UCHAR shortInfo = 0;
 
     if (hUiManager->isActive == 0) {
       shortInfo = 2; /* 2 indicates no UI available */
@@ -1227,6 +1223,7 @@ static void readUUID(const char* str, UCHAR* uuid) {
 UINT uiManagerParseXmlAction(const char* xmlIn, UINT xmlInSize, UI_MANAGER_ACTION* pAction) {
   int i, l = xmlInSize;
   const char *p = xmlIn, *pAttrib;
+  FIXP_DBL version;
 
   FDKmemclear(&pAction->uuid, 16 * sizeof(UCHAR));
   pAction->actionType = UI_MANAGER_COMMAND_INVALID;
@@ -1255,15 +1252,19 @@ UINT uiManagerParseXmlAction(const char* xmlIn, UINT xmlInSize, UI_MANAGER_ACTIO
   /* parse version attribute */
   pAttrib = findAttrib("version", p, l);
   if (!pAttrib) return 0;
+  version = readFloat(pAttrib);
   {
-    FIXP_DBL version = readFloat(pAttrib);
-    if (version < (FIXP_DBL)0x90000 || version > (FIXP_DBL)0xB0000) return 0;
+    if (version < (FIXP_DBL)0x90000 || version > (FIXP_DBL)0xB1999) return 0;
   }
 
   /* parse actionType attribute */
   pAttrib = findAttrib("actionType", p, l);
   if (!pAttrib) return 0;
   pAction->actionType = readInt(pAttrib);
+
+  if (pAction->actionType == UI_MANAGER_COMMAND_FORCE_SCENESTATE_UPDATE &&
+      version < (FIXP_DBL)0xB1999)
+    return 0;
 
   /* parse paramInt attribute */
   pAttrib = findAttrib("paramInt", p, l);

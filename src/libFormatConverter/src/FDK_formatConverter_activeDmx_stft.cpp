@@ -291,15 +291,15 @@ FDK_INLINE FIXP_DBL computeEQAndClip(FIXP_DBL targetEne, FIXP_DBL realizedEne, I
 
 FDK_INLINE INT get1xScalefactor(FIXP_DBL* buf) {
   FIXP_DBL buf0 = buf[0];
-  buf0 = buf0 ^ (buf0 >> 31);
+  buf0 = (LONG)buf0 ^ (LONG)(buf0 >> 31);
   return fNormz(buf0) - 1; /* in range 0..31 */
 }
 
 FDK_INLINE INT get2xScalefactor(FIXP_DBL* buf) {
   FIXP_DBL buf0 = buf[0];
-  buf0 = buf0 ^ (buf0 >> 31);
+  buf0 = (LONG)buf0 ^ (LONG)(buf0 >> 31);
   FIXP_DBL buf1 = buf[1];
-  buf1 = buf1 ^ (buf1 >> 31);
+  buf1 = (LONG)buf1 ^ (LONG)(buf1 >> 31);
   return fMin(fNormz(buf0), fNormz(buf1)) - 1; /* in range 0..31 */
 }
 
@@ -646,7 +646,7 @@ void activeDmxProcess_STFT(void* handle) {
       FIXP_DBL tmpRe = realizedSig[chOut][2 * fftBand + 0];
       INT Hdr = realizedSigHeadroom[erb];
       tmpRe = fPow2Div2(tmpRe << Hdr); /* 0...0x40000000 */
-      realizedEnergy[erb] = ((FIXP_DBL)(ULONG)tmpRe >> realized_exp);
+      realizedEnergy[erb] = tmpRe >> realized_exp;
 
       /* Nyquist frequency, only real part, counts to erb=57 */
       FIXP_DBL NyqRe = realizedSig[chOut][2 * fftBand + 1], tmpIm;
@@ -659,7 +659,7 @@ void activeDmxProcess_STFT(void* handle) {
         Hdr = realizedSigHeadroom[erb];
         tmpRe = fPow2Div2(tmpRe << Hdr); /* 0...0x40000000 */
         tmpIm = fPow2Div2(tmpIm << Hdr); /* 0...0x40000000 */
-        FIXP_DBL tmpNrg = (tmpRe + tmpIm) ^ ((tmpRe + tmpIm) >> 31);
+        FIXP_DBL tmpNrg = (LONG)(tmpRe + tmpIm) ^ (LONG)((tmpRe + tmpIm) >> 31);
         realizedEnergy[erb] = (tmpNrg) >> realized_exp;
       }
       for (; erb < STFT_ERB_BANDS; erb++) {
@@ -673,14 +673,14 @@ void activeDmxProcess_STFT(void* handle) {
           Hdr = realizedSigHeadroom[erb];
           tmpRe = fPow2Div2(tmpRe << Hdr); /* 0...0x40000000 */
           tmpIm = fPow2Div2(tmpIm << Hdr); /* 0...0x40000000 */
-          FIXP_DBL tmpNrg = (tmpRe + tmpIm) ^ ((tmpRe + tmpIm) >> 31);
+          FIXP_DBL tmpNrg = (LONG)(tmpRe + tmpIm) ^ (LONG)((tmpRe + tmpIm) >> 31);
           realizedEne += (tmpNrg) >> realized_exp;
         }
-        realizedEnergy[erb] = realizedEne ^ (realizedEne >> 31);
+        realizedEnergy[erb] = (LONG)realizedEne ^ (LONG)(realizedEne >> 31);
       }
       /* Add Nyquist energy to last erb, valid variables: NyqRe, Hdr, realized_exp */
       NyqRe = fPow2Div2(NyqRe << Hdr); /* 0...0x40000000 */
-      realizedEnergy[erb - 1] += ((FIXP_DBL)(ULONG)NyqRe >> realized_exp);
+      realizedEnergy[erb - 1] += NyqRe >> realized_exp;
 #endif /* FUNCTION_activeDmxProcess_STFT_func5 */
 
 #ifdef FUNCTION_activeDmxProcess_STFT_func4
