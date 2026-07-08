@@ -1,5 +1,20 @@
 # Changelog
 
+## [r4.0.0] - 2026-07-13
+
+### Added
+
+- Added support for the multi-stream feature in the decoder and UI manager.
+
+### Changed
+
+- Updated the UI manager from XML API v11.0 to v11.1; see the updated wiki page for details.
+  - API v11.1 is fully backward-compatible with v11.0.
+  - Introduced the new action event `UI_MANAGER_COMMAND_FORCE_SCENESTATE_UPDATE` to explicitly trigger output of the current XML scene information.
+  - Prevented XML scene information updates from being emitted when no content changes have occurred.
+  - Deprecated the obsolete `DETACHED_UI_SHORT_OUTPUT` case.
+  - Updated startup behavior to avoid emitting dummy XML scene information when the UI manager starts on a non-RAP frame or when frame data is invalid.
+
 ## [r3.0.3] - 2026-03-30
 
 ### Added
