@@ -336,6 +336,32 @@ void CUIManagerProcessor::processSingleSample(mmt::isobmff::CSample& sample,
               << std::endl;
   }
 
+  // Write XML scene state
+  if (m_sceneStateFile) {
+    uint32_t flagsOut = 0;
+    std::vector<char> xmlSceneStateBuf(XML_BUFFER_SIZE);
+
+    do {
+      MPEGH_UI_ERROR err = mpegh_UI_GetXmlSceneState(m_uiManager, xmlSceneStateBuf.data(),
+                                                     XML_BUFFER_SIZE, 0, &flagsOut);
+      if (err != MPEGH_UI_OK) {
+        std::cout << "Warning: Failed to get XML scene state for ISOBMFF/MP4 Sample "
+                  << sampleCounter << std::endl;
+        break;
+      }
+
+      if (flagsOut & MPEGH_UI_NO_CHANGE) {
+        break;
+      }
+
+      if (!(flagsOut & MPEGH_UI_CONTINUES_XML)) {
+        m_sceneStateFile << "[" << sampleCounter << "]" << std::endl;
+      }
+
+      m_sceneStateFile << xmlSceneStateBuf.data();
+    } while (flagsOut & MPEGH_UI_INCOMPLETE_XML);
+  }
+
   // process XML actions
   std::vector<std::string> commands = m_parser.getCommands(sampleCounter - 1);
   uint32_t flagsOut;
@@ -375,31 +401,6 @@ void CUIManagerProcessor::processSingleSample(mmt::isobmff::CSample& sample,
                 << std::endl;
     } else {
       sample.rawData.resize(newMhasLength);
-    }
-  }
-
-  // Write XML scene state
-  if (m_sceneStateFile) {
-    uint32_t flagsOut = 0;
-    bool frameCounterWritten = false;
-    std::vector<char> xmlSceneStateBuf(XML_BUFFER_SIZE);
-
-    while (!(flagsOut & MPEGH_UI_NO_CHANGE)) {
-      MPEGH_UI_ERROR err = mpegh_UI_GetXmlSceneState(m_uiManager, xmlSceneStateBuf.data(),
-                                                     XML_BUFFER_SIZE, 0, &flagsOut);
-      if (err != MPEGH_UI_OK) {
-        std::cout << "Warning: Failed to get XML scene state for ISOBMFF/MP4 Sample "
-                  << sampleCounter << std::endl;
-        break;
-      }
-
-      if (!(flagsOut & MPEGH_UI_NO_CHANGE)) {
-        if (!frameCounterWritten) {
-          m_sceneStateFile << "[" << sampleCounter << "]" << std::endl;
-          frameCounterWritten = true;
-        }
-        m_sceneStateFile << xmlSceneStateBuf.data();
-      }
     }
   }
 }
