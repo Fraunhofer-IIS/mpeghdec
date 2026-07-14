@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 project(mpeghdec
-  VERSION 3.0.3
+  VERSION 4.0.0
   DESCRIPTION "The Fraunhofer MPEG-H decoder"
   HOMEPAGE_URL "https://github.com/Fraunhofer-IIS/mpeghdec"
   LANGUAGES CXX
