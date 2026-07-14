@@ -1,6 +1,6 @@
 # MPEG-H decoder software
 
-The Fraunhofer MPEG-H decoder (**mpeghdec**) is a C/C++ implementation of the MPEG-H Audio standard as defined in [ISO/IEC 23008-3:2022](https://www.iso.org/standard/83525.html). MPEG-H Audio is the Next Generation Audio (NGA) codec for personalized and immersive sound. Please visit [www.mpegh.com](https://mpegh.com) to learn more about MPEG-H Audio.
+The Fraunhofer MPEG-H decoder (**mpeghdec**) is a C/C++ implementation of the MPEG-H Audio standard as defined in [ISO/IEC 23008-3:2026](https://www.iso.org/standard/90199.html). MPEG-H Audio is the Next Generation Audio (NGA) codec for personalized and immersive sound. Please visit [www.mpegh.com](https://mpegh.com) to learn more about MPEG-H Audio.
 
 For documentation and usage, please have a look at the [Wiki](https://github.com/Fraunhofer-IIS/mpeghdec/wiki/home).
 
