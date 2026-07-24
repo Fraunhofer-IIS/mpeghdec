@@ -109,6 +109,10 @@ The following project-specific CMake parameters are available:
 </td>
 </tr>
 <tr>
+<td><code>mpeghdec_SYMBOL_PREFIX</code></td>
+<td>Prefix collision symbols to avoid clashes with libfdk-aac (default: ON).</td>
+</tr>
+<tr>
 <td><code>USE_PKGCONFIG_DEPS</code></td>
 <td>Consume the dependencies via pkg-config from a system-wide installation instead of downloading and building them locally.</td>
 </tr>
