@@ -49,6 +49,21 @@ set(mpeghdec_BUILD_DOC OFF CACHE BOOL "Build mpeghdec documentation")
 
 set(USE_PKGCONFIG_DEPS   OFF CACHE BOOL   "Use pkg-config to find dependencies")
 
+# ---------------------------------------------------------------------------
+# Symbol isolation for static linking alongside libfdk-aac.
+#
+# When mpeghdec and libfdk-aac are linked statically into the same program,
+# their internal symbols may collide. Enabling this option force-includes a
+# pre-generated prefix header that renames only the colliding symbols
+# (found by comparing mpeghdec with libfdk-aac).
+# ---------------------------------------------------------------------------
+option(mpeghdec_SYMBOL_PREFIX
+    "Prefix collision symbols to avoid clashes with libfdk-aac" ON)
+
+set(mpeghdec_SYMBOL_PREFIX_HEADER
+    "${CMAKE_SOURCE_DIR}/src/mpeghdec_symbol_prefix.h"
+    CACHE FILEPATH "Path to the symbol-prefix header")
+
 # Add libraries
 add_subdirectory(src)
 
