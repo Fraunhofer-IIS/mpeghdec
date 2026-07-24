@@ -1,0 +1,445 @@
+/*-----------------------------------------------------------------------------
+Software License for The Fraunhofer FDK MPEG-H Software
+
+Copyright (c) 2018 - 2023 Fraunhofer-Gesellschaft zur Förderung der angewandten
+Forschung e.V. and Contributors
+All rights reserved.
+
+1. INTRODUCTION
+
+The "Fraunhofer FDK MPEG-H Software" is software that implements the ISO/MPEG
+MPEG-H 3D Audio standard for digital audio or related system features. Patent
+licenses for necessary patent claims for the Fraunhofer FDK MPEG-H Software
+(including those of Fraunhofer), for the use in commercial products and
+services, may be obtained from the respective patent owners individually and/or
+from Via LA (www.via-la.com).
+
+Fraunhofer supports the development of MPEG-H products and services by offering
+additional software, documentation, and technical advice. In addition, it
+operates the MPEG-H Trademark Program to ease interoperability testing of end-
+products. Please visit www.mpegh.com for more information.
+
+2. COPYRIGHT LICENSE
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted without payment of copyright license fees provided that you
+satisfy the following conditions:
+
+* You must retain the complete text of this software license in redistributions
+of the Fraunhofer FDK MPEG-H Software or your modifications thereto in source
+code form.
+
+* You must retain the complete text of this software license in the
+documentation and/or other materials provided with redistributions of
+the Fraunhofer FDK MPEG-H Software or your modifications thereto in binary form.
+You must make available free of charge copies of the complete source code of
+the Fraunhofer FDK MPEG-H Software and your modifications thereto to recipients
+of copies in binary form.
+
+* The name of Fraunhofer may not be used to endorse or promote products derived
+from the Fraunhofer FDK MPEG-H Software without prior written permission.
+
+* You may not charge copyright license fees for anyone to use, copy or
+distribute the Fraunhofer FDK MPEG-H Software or your modifications thereto.
+
+* Your modified versions of the Fraunhofer FDK MPEG-H Software must carry
+prominent notices stating that you changed the software and the date of any
+change. For modified versions of the Fraunhofer FDK MPEG-H Software, the term
+"Fraunhofer FDK MPEG-H Software" must be replaced by the term "Third-Party
+Modified Version of the Fraunhofer FDK MPEG-H Software".
+
+3. No PATENT LICENSE
+
+NO EXPRESS OR IMPLIED LICENSES TO ANY PATENT CLAIMS, including without
+limitation the patents of Fraunhofer, ARE GRANTED BY THIS SOFTWARE LICENSE.
+Fraunhofer provides no warranty of patent non-infringement with respect to this
+software. You may use this Fraunhofer FDK MPEG-H Software or modifications
+thereto only for purposes that are authorized by appropriate patent licenses.
+
+4. DISCLAIMER
+
+This Fraunhofer FDK MPEG-H Software is provided by Fraunhofer on behalf of the
+copyright holders and contributors "AS IS" and WITHOUT ANY EXPRESS OR IMPLIED
+WARRANTIES, including but not limited to the implied warranties of
+merchantability and fitness for a particular purpose. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE for any direct, indirect,
+incidental, special, exemplary, or consequential damages, including but not
+limited to procurement of substitute goods or services; loss of use, data, or
+profits, or business interruption, however caused and on any theory of
+liability, whether in contract, strict liability, or tort (including
+negligence), arising in any way out of the use of this software, even if
+advised of the possibility of such damage.
+
+5. CONTACT INFORMATION
+
+Fraunhofer Institute for Integrated Circuits IIS
+Attention: Division Audio and Media Technologies - MPEG-H FDK
+Am Wolfsmantel 33
+91058 Erlangen, Germany
+www.iis.fraunhofer.de/amm
+amm-info@iis.fraunhofer.de
+-----------------------------------------------------------------------------*/
+/*
+ * mpeghdec_symbol_prefix.h
+ *
+ * Force-included into every mpeghdec translation unit to rename
+ * symbols that collide with libfdk-aac when both are statically
+ * linked into the same program.
+ *
+ * Only symbols that actually appear in both libraries are renamed.
+ * The public API (mpeghdecoder_*, mpeghUIManager_*, etc.) is untouched.
+ *
+ * Collision symbols renamed: 344
+ */
+
+/* clang-format off */
+
+#ifndef MPEGHDEC_SYMBOL_PREFIX_H
+#define MPEGHDEC_SYMBOL_PREFIX_H
+
+#define AACcodeBookDescriptionSCL _mpeghdec_AACcodeBookDescriptionSCL
+#define AacDec_randomSign _mpeghdec_AacDec_randomSign
+#define ApplyTools _mpeghdec_ApplyTools
+#define AudioSpecificConfig_Init _mpeghdec_AudioSpecificConfig_Init
+#define BitMask _mpeghdec_BitMask
+#define CAacDecoder_AncDataGet _mpeghdec_CAacDecoder_AncDataGet
+#define CAacDecoder_AncDataInit _mpeghdec_CAacDecoder_AncDataInit
+#define CAacDecoder_Close _mpeghdec_CAacDecoder_Close
+#define CAacDecoder_CtrlCFGChange _mpeghdec_CAacDecoder_CtrlCFGChange
+#define CAacDecoder_DecodeFrame _mpeghdec_CAacDecoder_DecodeFrame
+#define CAacDecoder_FreeMem _mpeghdec_CAacDecoder_FreeMem
+#define CAacDecoder_GetStreamInfo _mpeghdec_CAacDecoder_GetStreamInfo
+#define CAacDecoder_Init _mpeghdec_CAacDecoder_Init
+#define CAacDecoder_Open _mpeghdec_CAacDecoder_Open
+#define CAacDecoder_PreRollExtensionPayloadParse _mpeghdec_CAacDecoder_PreRollExtensionPayloadParse
+#define CAacDecoder_SignalInterruption _mpeghdec_CAacDecoder_SignalInterruption
+#define CArco_Create _mpeghdec_CArco_Create
+#define CArco_DecodeArithData _mpeghdec_CArco_DecodeArithData
+#define CArco_Destroy _mpeghdec_CArco_Destroy
+#define CBlock_ApplyNoise _mpeghdec_CBlock_ApplyNoise
+#define CBlock_FrequencyToTime _mpeghdec_CBlock_FrequencyToTime
+#define CBlock_InverseQuantizeSpectralData _mpeghdec_CBlock_InverseQuantizeSpectralData
+#define CBlock_ReadAcSpectralData _mpeghdec_CBlock_ReadAcSpectralData
+#define CBlock_ReadScaleFactorData _mpeghdec_CBlock_ReadScaleFactorData
+#define CBlock_ScaleSpectralData _mpeghdec_CBlock_ScaleSpectralData
+#define CChannelElement_Decode _mpeghdec_CChannelElement_Decode
+#define CChannelElement_Read _mpeghdec_CChannelElement_Read
+#define CChannel_CodebookTableInit _mpeghdec_CChannel_CodebookTableInit
+#define CConcealment_Apply _mpeghdec_CConcealment_Apply
+#define CConcealment_GetDelay _mpeghdec_CConcealment_GetDelay
+#define CConcealment_GetLastFrameOk _mpeghdec_CConcealment_GetLastFrameOk
+#define CConcealment_GetMethod _mpeghdec_CConcealment_GetMethod
+#define CConcealment_GetState _mpeghdec_CConcealment_GetState
+#define CConcealment_InitChannelData _mpeghdec_CConcealment_InitChannelData
+#define CConcealment_InitCommonData _mpeghdec_CConcealment_InitCommonData
+#define CConcealment_SetAttenuation _mpeghdec_CConcealment_SetAttenuation
+#define CConcealment_SetParams _mpeghdec_CConcealment_SetParams
+#define CConcealment_Store _mpeghdec_CConcealment_Store
+#define CConcealment_TDFading _mpeghdec_CConcealment_TDFading
+#define CJointStereo_ApplyMS _mpeghdec_CJointStereo_ApplyMS
+#define CJointStereo_Read _mpeghdec_CJointStereo_Read
+#define CLpc_AutoToParcor _mpeghdec_CLpc_AutoToParcor
+#define CLpc_ParcorToLpc _mpeghdec_CLpc_ParcorToLpc
+#define CLpc_Synthesis _mpeghdec_CLpc_Synthesis
+#define CLpc_SynthesisLattice _mpeghdec_CLpc_SynthesisLattice
+#define CProgramConfig_Init _mpeghdec_CProgramConfig_Init
+#define CProgramConfig_IsValid _mpeghdec_CProgramConfig_IsValid
+#define CProgramConfig_LookupElement _mpeghdec_CProgramConfig_LookupElement
+#define CProgramConfig_Reset _mpeghdec_CProgramConfig_Reset
+#define CTns_Apply _mpeghdec_CTns_Apply
+#define CTns_Read _mpeghdec_CTns_Read
+#define CTns_ReadDataPresentFlag _mpeghdec_CTns_ReadDataPresentFlag
+#define CTns_ReadDataPresentUsac _mpeghdec_CTns_ReadDataPresentUsac
+#define CTns_Reset _mpeghdec_CTns_Reset
+#define CalcLdInt _mpeghdec_CalcLdInt
+#define CalcLog2 _mpeghdec_CalcLog2
+#define CopyAlignedBlock _mpeghdec_CopyAlignedBlock
+#define FDKSEEK_CUR _mpeghdec_FDKSEEK_CUR
+#define FDKSEEK_END _mpeghdec_FDKSEEK_END
+#define FDKSEEK_SET _mpeghdec_FDKSEEK_SET
+#define FDK_Copy _mpeghdec_FDK_Copy
+#define FDK_CreateBitBuffer _mpeghdec_FDK_CreateBitBuffer
+#define FDK_Delay_Create _mpeghdec_FDK_Delay_Create
+#define FDK_Delay_Destroy _mpeghdec_FDK_Delay_Destroy
+#define FDK_DeleteBitBuffer _mpeghdec_FDK_DeleteBitBuffer
+#define FDK_Feed _mpeghdec_FDK_Feed
+#define FDK_Fetch _mpeghdec_FDK_Fetch
+#define FDK_InitBitBuffer _mpeghdec_FDK_InitBitBuffer
+#define FDK_ResetBitBuffer _mpeghdec_FDK_ResetBitBuffer
+#define FDK_drcDec_ApplyDownmix _mpeghdec_FDK_drcDec_ApplyDownmix
+#define FDK_drcDec_Close _mpeghdec_FDK_drcDec_Close
+#define FDK_drcDec_GetGroupLoudness _mpeghdec_FDK_drcDec_GetGroupLoudness
+#define FDK_drcDec_GetParam _mpeghdec_FDK_drcDec_GetParam
+#define FDK_drcDec_GetSelectionProcessOutput _mpeghdec_FDK_drcDec_GetSelectionProcessOutput
+#define FDK_drcDec_Init _mpeghdec_FDK_drcDec_Init
+#define FDK_drcDec_Open _mpeghdec_FDK_drcDec_Open
+#define FDK_drcDec_Preprocess _mpeghdec_FDK_drcDec_Preprocess
+#define FDK_drcDec_ProcessFreq _mpeghdec_FDK_drcDec_ProcessFreq
+#define FDK_drcDec_ProcessTime _mpeghdec_FDK_drcDec_ProcessTime
+#define FDK_drcDec_ReadLoudnessInfoSet _mpeghdec_FDK_drcDec_ReadLoudnessInfoSet
+#define FDK_drcDec_ReadUniDrc _mpeghdec_FDK_drcDec_ReadUniDrc
+#define FDK_drcDec_ReadUniDrcConfig _mpeghdec_FDK_drcDec_ReadUniDrcConfig
+#define FDK_drcDec_ReadUniDrcGain _mpeghdec_FDK_drcDec_ReadUniDrcGain
+#define FDK_drcDec_SetChannelGains _mpeghdec_FDK_drcDec_SetChannelGains
+#define FDK_drcDec_SetCodecMode _mpeghdec_FDK_drcDec_SetCodecMode
+#define FDK_drcDec_SetDownmixInstructions _mpeghdec_FDK_drcDec_SetDownmixInstructions
+#define FDK_drcDec_SetInterfaceParameters _mpeghdec_FDK_drcDec_SetInterfaceParameters
+#define FDK_drcDec_SetParam _mpeghdec_FDK_drcDec_SetParam
+#define FDK_drcDec_SetSelectionProcessMpeghParameters_simple _mpeghdec_FDK_drcDec_SetSelectionProcessMpeghParameters_simple
+#define FDK_drcDec_SetSelectionProcessOutput _mpeghdec_FDK_drcDec_SetSelectionProcessOutput
+#define FDK_get _mpeghdec_FDK_get
+#define FDK_get32 _mpeghdec_FDK_get32
+#define FDK_getBwd _mpeghdec_FDK_getBwd
+#define FDK_getFreeBits _mpeghdec_FDK_getFreeBits
+#define FDK_getValidBits _mpeghdec_FDK_getValidBits
+#define FDK_interleave _mpeghdec_FDK_interleave
+#define FDK_pushBack _mpeghdec_FDK_pushBack
+#define FDK_pushForward _mpeghdec_FDK_pushForward
+#define FDK_put _mpeghdec_FDK_put
+#define FDK_putBwd _mpeghdec_FDK_putBwd
+#define FDKaacDec_tnsCoeff3 _mpeghdec_FDKaacDec_tnsCoeff3
+#define FDKaacDec_tnsCoeff4 _mpeghdec_FDKaacDec_tnsCoeff4
+#define FDKaalloc _mpeghdec_FDKaalloc
+#define FDKaalloc_L _mpeghdec_FDKaalloc_L
+#define FDKafree _mpeghdec_FDKafree
+#define FDKafree_L _mpeghdec_FDKafree_L
+#define FDKcalloc _mpeghdec_FDKcalloc
+#define FDKcalloc_L _mpeghdec_FDKcalloc_L
+#define FDKcrcEndReg _mpeghdec_FDKcrcEndReg
+#define FDKcrcGetCRC _mpeghdec_FDKcrcGetCRC
+#define FDKcrcInit _mpeghdec_FDKcrcInit
+#define FDKcrcReset _mpeghdec_FDKcrcReset
+#define FDKcrcStartReg _mpeghdec_FDKcrcStartReg
+#define FDKfclose _mpeghdec_FDKfclose
+#define FDKfeof _mpeghdec_FDKfeof
+#define FDKfflush _mpeghdec_FDKfflush
+#define FDKfgets _mpeghdec_FDKfgets
+#define FDKfopen _mpeghdec_FDKfopen
+#define FDKfprintf _mpeghdec_FDKfprintf
+#define FDKfread _mpeghdec_FDKfread
+#define FDKfread_EL _mpeghdec_FDKfread_EL
+#define FDKfree _mpeghdec_FDKfree
+#define FDKfree_L _mpeghdec_FDKfree_L
+#define FDKfseek _mpeghdec_FDKfseek
+#define FDKftell _mpeghdec_FDKftell
+#define FDKfwrite _mpeghdec_FDKfwrite
+#define FDKfwrite_EL _mpeghdec_FDKfwrite_EL
+#define FDKgetWindowSlope _mpeghdec_FDKgetWindowSlope
+#define FDKgetchar _mpeghdec_FDKgetchar
+#define FDKmalloc _mpeghdec_FDKmalloc
+#define FDKmemclear _mpeghdec_FDKmemclear
+#define FDKmemcmp _mpeghdec_FDKmemcmp
+#define FDKmemcpy _mpeghdec_FDKmemcpy
+#define FDKmemmove _mpeghdec_FDKmemmove
+#define FDKmemset _mpeghdec_FDKmemset
+#define FDKprintf _mpeghdec_FDKprintf
+#define FDKprintfErr _mpeghdec_FDKprintfErr
+#define FDKrewind _mpeghdec_FDKrewind
+#define FDKstrchr _mpeghdec_FDKstrchr
+#define FDKstrcmp _mpeghdec_FDKstrcmp
+#define FDKstrcpy _mpeghdec_FDKstrcpy
+#define FDKstrlen _mpeghdec_FDKstrlen
+#define FDKstrncmp _mpeghdec_FDKstrncmp
+#define FDKstrncpy _mpeghdec_FDKstrncpy
+#define FDKstrstr _mpeghdec_FDKstrstr
+#define FreeAacDecoder _mpeghdec_FreeAacDecoder
+#define FreeAacDecoderChannelInfo _mpeghdec_FreeAacDecoderChannelInfo
+#define FreeAacDecoderStaticChannelInfo _mpeghdec_FreeAacDecoderStaticChannelInfo
+#define FreeArcoData _mpeghdec_FreeArcoData
+#define FreeCpePersistentData _mpeghdec_FreeCpePersistentData
+#define FreeCplxPredictionData _mpeghdec_FreeCplxPredictionData
+#define FreeOverlapBuffer _mpeghdec_FreeOverlapBuffer
+#define FreeRam_TransportDecoder _mpeghdec_FreeRam_TransportDecoder
+#define FreeRam_TransportDecoderBuffer _mpeghdec_FreeRam_TransportDecoderBuffer
+#define FreeWorkBufferCore1 _mpeghdec_FreeWorkBufferCore1
+#define FreeWorkBufferCore2 _mpeghdec_FreeWorkBufferCore2
+#define FreeWorkBufferCore5 _mpeghdec_FreeWorkBufferCore5
+#define FreeWorkBufferCore6 _mpeghdec_FreeWorkBufferCore6
+#define GetAacDecoder _mpeghdec_GetAacDecoder
+#define GetAacDecoderChannelInfo _mpeghdec_GetAacDecoderChannelInfo
+#define GetAacDecoderStaticChannelInfo _mpeghdec_GetAacDecoderStaticChannelInfo
+#define GetArcoData _mpeghdec_GetArcoData
+#define GetCpePersistentData _mpeghdec_GetCpePersistentData
+#define GetCplxPredictionData _mpeghdec_GetCplxPredictionData
+#define GetOverlapBuffer _mpeghdec_GetOverlapBuffer
+#define GetRam_TransportDecoder _mpeghdec_GetRam_TransportDecoder
+#define GetRam_TransportDecoderBuffer _mpeghdec_GetRam_TransportDecoderBuffer
+#define GetRequiredMemAacDecoder _mpeghdec_GetRequiredMemAacDecoder
+#define GetRequiredMemAacDecoderChannelInfo _mpeghdec_GetRequiredMemAacDecoderChannelInfo
+#define GetRequiredMemAacDecoderStaticChannelInfo _mpeghdec_GetRequiredMemAacDecoderStaticChannelInfo
+#define GetRequiredMemArcoData _mpeghdec_GetRequiredMemArcoData
+#define GetRequiredMemCpePersistentData _mpeghdec_GetRequiredMemCpePersistentData
+#define GetRequiredMemCplxPredictionData _mpeghdec_GetRequiredMemCplxPredictionData
+#define GetRequiredMemOverlapBuffer _mpeghdec_GetRequiredMemOverlapBuffer
+#define GetRequiredMemRam_TransportDecoder _mpeghdec_GetRequiredMemRam_TransportDecoder
+#define GetRequiredMemRam_TransportDecoderBuffer _mpeghdec_GetRequiredMemRam_TransportDecoderBuffer
+#define GetRequiredMemWorkBufferCore1 _mpeghdec_GetRequiredMemWorkBufferCore1
+#define GetRequiredMemWorkBufferCore2 _mpeghdec_GetRequiredMemWorkBufferCore2
+#define GetRequiredMemWorkBufferCore5 _mpeghdec_GetRequiredMemWorkBufferCore5
+#define GetRequiredMemWorkBufferCore6 _mpeghdec_GetRequiredMemWorkBufferCore6
+#define GetWorkBufferCore1 _mpeghdec_GetWorkBufferCore1
+#define GetWorkBufferCore2 _mpeghdec_GetWorkBufferCore2
+#define GetWorkBufferCore5 _mpeghdec_GetWorkBufferCore5
+#define GetWorkBufferCore6 _mpeghdec_GetWorkBufferCore6
+#define IS_LITTLE_ENDIAN _mpeghdec_IS_LITTLE_ENDIAN
+#define IcsRead _mpeghdec_IcsRead
+#define IcsReadMaxSfb _mpeghdec_IcsReadMaxSfb
+#define InitLdInt _mpeghdec_InitLdInt
+#define KBDWindow1024 _mpeghdec_KBDWindow1024
+#define KBDWindow128 _mpeghdec_KBDWindow128
+#define LdDataVector _mpeghdec_LdDataVector
+#define MantissaTable _mpeghdec_MantissaTable
+#define SineTable1024 _mpeghdec_SineTable1024
+#define SineTable512 _mpeghdec_SineTable512
+#define SineWindow1024 _mpeghdec_SineWindow1024
+#define SineWindow128 _mpeghdec_SineWindow128
+#define SineWindow256 _mpeghdec_SineWindow256
+#define SineWindow512 _mpeghdec_SineWindow512
+#define TO_LITTLE_ENDIAN _mpeghdec_TO_LITTLE_ENDIAN
+#define aacDecoder_AncDataGet _mpeghdec_aacDecoder_AncDataGet
+#define aacDecoder_AncDataInit _mpeghdec_aacDecoder_AncDataInit
+#define aacDecoder_Close _mpeghdec_aacDecoder_Close
+#define aacDecoder_ConfigRaw _mpeghdec_aacDecoder_ConfigRaw
+#define aacDecoder_DecodeFrame _mpeghdec_aacDecoder_DecodeFrame
+#define aacDecoder_Fill _mpeghdec_aacDecoder_Fill
+#define aacDecoder_GetFreeBytes _mpeghdec_aacDecoder_GetFreeBytes
+#define aacDecoder_GetStreamInfo _mpeghdec_aacDecoder_GetStreamInfo
+#define aacDecoder_Open _mpeghdec_aacDecoder_Open
+#define aacDecoder_SetParam _mpeghdec_aacDecoder_SetParam
+#define approxDb2lin _mpeghdec_approxDb2lin
+#define bitstreamContainsMultibandDrc _mpeghdec_bitstreamContainsMultibandDrc
+#define dB2lin _mpeghdec_dB2lin
+#define dct_II _mpeghdec_dct_II
+#define dct_III _mpeghdec_dct_III
+#define dct_IV _mpeghdec_dct_IV
+#define dct_getTables _mpeghdec_dct_getTables
+#define deltaGain_codingProfile_0_1_huffman _mpeghdec_deltaGain_codingProfile_0_1_huffman
+#define deltaGain_codingProfile_2_huffman _mpeghdec_deltaGain_codingProfile_2_huffman
+#define deriveDrcChannelGroups _mpeghdec_deriveDrcChannelGroups
+#define dit_fft _mpeghdec_dit_fft
+#define downmixCoeff _mpeghdec_downmixCoeff
+#define downmixCoeffV1 _mpeghdec_downmixCoeffV1
+#define drcDec_GainDecoder_Close _mpeghdec_drcDec_GainDecoder_Close
+#define drcDec_GainDecoder_Conceal _mpeghdec_drcDec_GainDecoder_Conceal
+#define drcDec_GainDecoder_Config _mpeghdec_drcDec_GainDecoder_Config
+#define drcDec_GainDecoder_GetDeltaTminDefault _mpeghdec_drcDec_GainDecoder_GetDeltaTminDefault
+#define drcDec_GainDecoder_GetFrameSize _mpeghdec_drcDec_GainDecoder_GetFrameSize
+#define drcDec_GainDecoder_Init _mpeghdec_drcDec_GainDecoder_Init
+#define drcDec_GainDecoder_Open _mpeghdec_drcDec_GainDecoder_Open
+#define drcDec_GainDecoder_Preprocess _mpeghdec_drcDec_GainDecoder_Preprocess
+#define drcDec_GainDecoder_ProcessSubbandDomain _mpeghdec_drcDec_GainDecoder_ProcessSubbandDomain
+#define drcDec_GainDecoder_ProcessTimeDomain _mpeghdec_drcDec_GainDecoder_ProcessTimeDomain
+#define drcDec_GainDecoder_SetChannelGains _mpeghdec_drcDec_GainDecoder_SetChannelGains
+#define drcDec_GainDecoder_SetCodecDependentParameters _mpeghdec_drcDec_GainDecoder_SetCodecDependentParameters
+#define drcDec_GainDecoder_SetLoudnessNormalizationGainDb _mpeghdec_drcDec_GainDecoder_SetLoudnessNormalizationGainDb
+#define drcDec_GainDecoder_SetParam _mpeghdec_drcDec_GainDecoder_SetParam
+#define drcDec_SelectionProcess_Create _mpeghdec_drcDec_SelectionProcess_Create
+#define drcDec_SelectionProcess_Delete _mpeghdec_drcDec_SelectionProcess_Delete
+#define drcDec_SelectionProcess_GetParam _mpeghdec_drcDec_SelectionProcess_GetParam
+#define drcDec_SelectionProcess_Init _mpeghdec_drcDec_SelectionProcess_Init
+#define drcDec_SelectionProcess_Process _mpeghdec_drcDec_SelectionProcess_Process
+#define drcDec_SelectionProcess_SetCodecMode _mpeghdec_drcDec_SelectionProcess_SetCodecMode
+#define drcDec_SelectionProcess_SetParam _mpeghdec_drcDec_SelectionProcess_SetParam
+#define drcDec_readUniDrcGain _mpeghdec_drcDec_readUniDrcGain
+#define dst_III _mpeghdec_dst_III
+#define dst_IV _mpeghdec_dst_IV
+#define exp2_tab_long _mpeghdec_exp2_tab_long
+#define exp2w_tab_long _mpeghdec_exp2w_tab_long
+#define exp2x_tab_long _mpeghdec_exp2x_tab_long
+#define f2Pow _mpeghdec_f2Pow
+#define fDivNorm _mpeghdec_fDivNorm
+#define fDivNormHighPrec _mpeghdec_fDivNormHighPrec
+#define fDivNormSigned _mpeghdec_fDivNormSigned
+#define fLdPow _mpeghdec_fLdPow
+#define fMultNorm _mpeghdec_fMultNorm
+#define fPow _mpeghdec_fPow
+#define fPowInt _mpeghdec_fPowInt
+#define fdkCallocMatrix1D _mpeghdec_fdkCallocMatrix1D
+#define fdkCallocMatrix1D_aligned _mpeghdec_fdkCallocMatrix1D_aligned
+#define fdkCallocMatrix2D _mpeghdec_fdkCallocMatrix2D
+#define fdkFreeMatrix1D _mpeghdec_fdkFreeMatrix1D
+#define fdkFreeMatrix1D_aligned _mpeghdec_fdkFreeMatrix1D_aligned
+#define fdkFreeMatrix2D _mpeghdec_fdkFreeMatrix2D
+#define fft _mpeghdec_fft
+#define fixp_ceil _mpeghdec_fixp_ceil
+#define fixp_ceilToInt _mpeghdec_fixp_ceilToInt
+#define fixp_cos _mpeghdec_fixp_cos
+#define fixp_cos_sin _mpeghdec_fixp_cos_sin
+#define fixp_floor _mpeghdec_fixp_floor
+#define fixp_floorToInt _mpeghdec_fixp_floorToInt
+#define fixp_round _mpeghdec_fixp_round
+#define fixp_roundToInt _mpeghdec_fixp_roundToInt
+#define fixp_sin _mpeghdec_fixp_sin
+#define fixp_truncate _mpeghdec_fixp_truncate
+#define fixp_truncateToInt _mpeghdec_fixp_truncateToInt
+#define getBitstreamElementList _mpeghdec_getBitstreamElementList
+#define getDeltaTmin _mpeghdec_getDeltaTmin
+#define getSamplingRateInfo _mpeghdec_getSamplingRateInfo
+#define getScalefactor _mpeghdec_getScalefactor
+#define getScalefactorPCM _mpeghdec_getScalefactorPCM
+#define getScalefactorShort _mpeghdec_getScalefactorShort
+#define ifft _mpeghdec_ifft
+#define imdct_adapt_parameters _mpeghdec_imdct_adapt_parameters
+#define imdct_copy_ov_and_nr _mpeghdec_imdct_copy_ov_and_nr
+#define imdct_drain _mpeghdec_imdct_drain
+#define imdct_gain _mpeghdec_imdct_gain
+#define imlt_block _mpeghdec_imlt_block
+#define initActiveDrc _mpeghdec_initActiveDrc
+#define initActiveDrcOffset _mpeghdec_initActiveDrcOffset
+#define initDrcGainBuffers _mpeghdec_initDrcGainBuffers
+#define initGainDec _mpeghdec_initGainDec
+#define invCount _mpeghdec_invCount
+#define invSqrtTab _mpeghdec_invSqrtTab
+#define mdct_block _mpeghdec_mdct_block
+#define mdct_init _mpeghdec_mdct_init
+#define mdst_filt_coef_curr _mpeghdec_mdst_filt_coef_curr
+#define mdst_filt_coef_prev _mpeghdec_mdst_filt_coef_prev
+#define pcmLimiter_Apply _mpeghdec_pcmLimiter_Apply
+#define pcmLimiter_Create _mpeghdec_pcmLimiter_Create
+#define pcmLimiter_Destroy _mpeghdec_pcmLimiter_Destroy
+#define pcmLimiter_GetDelay _mpeghdec_pcmLimiter_GetDelay
+#define pcmLimiter_GetMaxGainReduction _mpeghdec_pcmLimiter_GetMaxGainReduction
+#define pcmLimiter_Reset _mpeghdec_pcmLimiter_Reset
+#define pcmLimiter_SetAttack _mpeghdec_pcmLimiter_SetAttack
+#define pcmLimiter_SetNChannels _mpeghdec_pcmLimiter_SetNChannels
+#define pcmLimiter_SetRelease _mpeghdec_pcmLimiter_SetRelease
+#define pcmLimiter_SetSampleRate _mpeghdec_pcmLimiter_SetSampleRate
+#define pcmLimiter_SetThreshold _mpeghdec_pcmLimiter_SetThreshold
+#define prepareDrcGain _mpeghdec_prepareDrcGain
+#define processDrcSubband _mpeghdec_processDrcSubband
+#define processDrcTime _mpeghdec_processDrcTime
+#define scaleValues _mpeghdec_scaleValues
+#define scaleValuesSaturate _mpeghdec_scaleValuesSaturate
+#define scaleValuesWithFactor _mpeghdec_scaleValuesWithFactor
+#define selectDownmixInstructions _mpeghdec_selectDownmixInstructions
+#define selectDrcCoefficients _mpeghdec_selectDrcCoefficients
+#define selectDrcInstructions _mpeghdec_selectDrcInstructions
+#define sfbOffsetTables _mpeghdec_sfbOffsetTables
+#define sin_twiddle_L64 _mpeghdec_sin_twiddle_L64
+#define slopeSteepness _mpeghdec_slopeSteepness
+#define slopeSteepness_huffman _mpeghdec_slopeSteepness_huffman
+#define sqrt_tab _mpeghdec_sqrt_tab
+#define tns_max_bands_tbl _mpeghdec_tns_max_bands_tbl
+#define transportDec_Close _mpeghdec_transportDec_Close
+#define transportDec_CrcCheck _mpeghdec_transportDec_CrcCheck
+#define transportDec_CrcEndReg _mpeghdec_transportDec_CrcEndReg
+#define transportDec_CrcStartReg _mpeghdec_transportDec_CrcStartReg
+#define transportDec_EndAccessUnit _mpeghdec_transportDec_EndAccessUnit
+#define transportDec_FillData _mpeghdec_transportDec_FillData
+#define transportDec_GetAuBitsRemaining _mpeghdec_transportDec_GetAuBitsRemaining
+#define transportDec_GetAuBitsTotal _mpeghdec_transportDec_GetAuBitsTotal
+#define transportDec_GetBitstream _mpeghdec_transportDec_GetBitstream
+#define transportDec_GetFormat _mpeghdec_transportDec_GetFormat
+#define transportDec_GetMissingAccessUnitCount _mpeghdec_transportDec_GetMissingAccessUnitCount
+#define transportDec_InBandConfig _mpeghdec_transportDec_InBandConfig
+#define transportDec_Open _mpeghdec_transportDec_Open
+#define transportDec_OutOfBandConfig _mpeghdec_transportDec_OutOfBandConfig
+#define transportDec_ReadAccessUnit _mpeghdec_transportDec_ReadAccessUnit
+#define transportDec_RegisterAscCallback _mpeghdec_transportDec_RegisterAscCallback
+#define transportDec_RegisterCtrlCFGChangeCallback _mpeghdec_transportDec_RegisterCtrlCFGChangeCallback
+#define transportDec_RegisterFreeMemCallback _mpeghdec_transportDec_RegisterFreeMemCallback
+#define transportDec_RegisterUniDrcConfigCallback _mpeghdec_transportDec_RegisterUniDrcConfigCallback
+#define transportDec_SetParam _mpeghdec_transportDec_SetParam
+#define windowSlopes _mpeghdec_windowSlopes
+
+#endif /* MPEGHDEC_SYMBOL_PREFIX_H */

@@ -9,6 +9,24 @@ endfunction()
 
 add_library(mpeghdec)
 install(TARGETS mpeghdec)
+
+# ---------------------------------------------------------------------------
+# Force-include the symbol-prefix header (see mpeghdec_SYMBOL_PREFIX in the root CMakeLists.txt file).
+
+if(mpeghdec_SYMBOL_PREFIX)
+  if(NOT EXISTS "${mpeghdec_SYMBOL_PREFIX_HEADER}")
+    message(FATAL_ERROR
+      "mpeghdec_SYMBOL_PREFIX is ON but the header was not found:\n"
+      "  ${mpeghdec_SYMBOL_PREFIX_HEADER}\n")
+  endif()
+  if(MSVC)
+    target_compile_options(mpeghdec PRIVATE "/FI${mpeghdec_SYMBOL_PREFIX_HEADER}")
+  else()
+    target_compile_options(mpeghdec PRIVATE "-include" "${mpeghdec_SYMBOL_PREFIX_HEADER}")
+  endif()
+  message(STATUS "mpeghdec: symbol prefixing enabled via ${mpeghdec_SYMBOL_PREFIX_HEADER}")
+endif()
+
 target_include_directories(mpeghdec PUBLIC "${PROJECT_SOURCE_DIR}/include")
 target_include_directories(mpeghdec PRIVATE "${PROJECT_SOURCE_DIR}/include/sys")
 

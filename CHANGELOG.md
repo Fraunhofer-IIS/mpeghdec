@@ -1,5 +1,11 @@
 # Changelog
 
+## [r4.0.1] - 2026-07-24
+
+### Added
+
+- Added CMake option `mpeghdec_SYMBOL_PREFIX` (default: ON) to circumvent clashing symbols when statically linking with libfdk-aac
+
 ## [r4.0.0] - 2026-07-13
 
 ### Added
