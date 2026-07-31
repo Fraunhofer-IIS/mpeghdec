@@ -20,6 +20,7 @@ if(${mpeghdec_BUILD_DECODER})
       "mpeghUiManager/mpeghUiManagerProcessor.h"
     )
   endif()
+  install(TARGETS mpeghDecoder RUNTIME)
 endif()
 
 if(${mpeghdec_BUILD_UIMANAGER})
@@ -30,4 +31,5 @@ if(${mpeghdec_BUILD_UIMANAGER})
     "mpeghUiManager/mpeghUiManagerProcessor.h"
   )
   target_link_libraries(mpeghUiManager mpeghdec mmtisobmff ilo)
+  install(TARGETS mpeghUiManager RUNTIME)
 endif()
