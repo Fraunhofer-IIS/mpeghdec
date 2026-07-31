@@ -1,3 +1,4 @@
 - Fraunhofer IIS MPEG-H 3D Audio Decoder Team
 - [Florian Kolbeck](https://github.com/fkolbeck-iis), Fraunhofer IIS
 - [Rinat Zeh](https://github.com/rzeh-iis), Fraunhofer IIS
+- [Jo Jöns](https://github.com/jopejoe1), NixOS
