@@ -41,6 +41,18 @@ if(DOXYGEN_FOUND)
     VERBATIM
     DEPENDS ${PROJECT_NAME}_doc
   )
+
+  include(GNUInstallDirs)
+
+  install(
+    DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc/html/
+    DESTINATION ${CMAKE_INSTALL_DOCDIR}
+  )
+
+  install(
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/latex/refman.pdf
+    DESTINATION ${CMAKE_INSTALL_DOCDIR}
+  )
 else()
   message("Doxygen need to be installed to generate the doxygen documentation")
 endif()
